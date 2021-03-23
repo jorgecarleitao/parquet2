@@ -1,0 +1,13 @@
+[package]
+name = "parquet"
+version = "4.0.0-SNAPSHOT"
+license = "Apache-2.0"
+authors = ["Jorge C. Leitao <jorgecarleitao@gmail.com"]
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+parquet-format = "~2.6.1"
+thrift = "0.13"
+chrono = "0.4"
+num-bigint = "0.3"
