@@ -1,8 +1,8 @@
 // see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
-use std::collections::HashMap;
 use crate::errors::{ParquetError, Result};
+use std::collections::HashMap;
 
-use super::{BasicTypeInfo, ConvertedType, Repetition};
+use super::{BasicTypeInfo, GroupConvertedType, LogicalType, PrimitiveConvertedType, Repetition};
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PhysicalType {
@@ -24,10 +24,14 @@ pub enum PhysicalType {
 pub enum ParquetType {
     PrimitiveType {
         basic_info: BasicTypeInfo,
+        logical_type: Option<LogicalType>,
+        converted_type: Option<PrimitiveConvertedType>,
         physical_type: PhysicalType,
     },
     GroupType {
         basic_info: BasicTypeInfo,
+        logical_type: Option<LogicalType>,
+        converted_type: Option<GroupConvertedType>,
         fields: Vec<ParquetType>,
     },
 }
@@ -113,7 +117,11 @@ impl ParquetType {
 
 // Not all converted types are valid for a given physical type. Let's check this
 #[inline]
-fn check_decimal_invariants(physical_type: &PhysicalType, precision: i32, scale: i32) -> Result<()> {
+fn check_decimal_invariants(
+    physical_type: &PhysicalType,
+    precision: i32,
+    scale: i32,
+) -> Result<()> {
     if precision < 1 {
         return Err(general_err!(
             "DECIMAL precision must be larger than 0; It is {}",
@@ -159,22 +167,28 @@ fn check_decimal_invariants(physical_type: &PhysicalType, precision: i32, scale:
                 ));
             }
         }
-        PhysicalType::ByteArray => {},
-        _ => return Err(general_err!(
-            "DECIMAL can only annotate INT32, INT64, BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY"
-        ))
+        PhysicalType::ByteArray => {}
+        _ => {
+            return Err(general_err!(
+                "DECIMAL can only annotate INT32, INT64, BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY"
+            ))
+        }
     };
     Ok(())
 }
 
-fn check_converted_invariants(physical_type: &PhysicalType, converted_type: &Option<ConvertedType>) -> Result<()> {
+fn check_converted_invariants(
+    physical_type: &PhysicalType,
+    converted_type: &Option<PrimitiveConvertedType>,
+) -> Result<()> {
     if converted_type.is_none() {
-        return Ok(())
+        return Ok(());
     };
     let converted_type = converted_type.as_ref().unwrap();
 
+    use PrimitiveConvertedType::*;
     match converted_type {
-        ConvertedType::Utf8 | ConvertedType::Bson | ConvertedType::Json => {
+        Utf8 | Bson | Json => {
             if physical_type != &PhysicalType::ByteArray {
                 return Err(general_err!(
                     "{:?} can only annotate BYTE_ARRAY fields",
@@ -182,53 +196,30 @@ fn check_converted_invariants(physical_type: &PhysicalType, converted_type: &Opt
                 ));
             }
         }
-        ConvertedType::Decimal(precision, scale) => {
+        Decimal(precision, scale) => {
             check_decimal_invariants(physical_type, *precision, *scale)?;
         }
-        ConvertedType::Date
-        | ConvertedType::TimeMillis
-        | ConvertedType::Uint8
-        | ConvertedType::Uint16
-        | ConvertedType::Uint32
-        | ConvertedType::Int8
-        | ConvertedType::Int16
-        | ConvertedType::Int32 => {
+        Date | TimeMillis | Uint8 | Uint16 | Uint32 | Int8 | Int16 | Int32 => {
             if physical_type != &PhysicalType::Int32 {
-                return Err(general_err!(
-                    "{:?} can only annotate INT32",
-                    converted_type
-                ));
+                return Err(general_err!("{:?} can only annotate INT32", converted_type));
             }
         }
-        ConvertedType::TimeMicros
-        | ConvertedType::TimestampMillis
-        | ConvertedType::TimestampMicros
-        | ConvertedType::Uint64
-        | ConvertedType::Int64 => {
+        TimeMicros | TimestampMillis | TimestampMicros | Uint64 | Int64 => {
             if physical_type != &PhysicalType::Int64 {
-                return Err(general_err!(
-                    "{:?} can only annotate INT64",
-                    converted_type
-                ));
+                return Err(general_err!("{:?} can only annotate INT64", converted_type));
             }
         }
-        ConvertedType::Interval => {
+        Interval => {
             if physical_type != &PhysicalType::FixedLenByteArray(12) {
                 return Err(general_err!(
                     "INTERVAL can only annotate FIXED_LEN_BYTE_ARRAY(12)"
                 ));
             }
         }
-        ConvertedType::Enum => {
+        Enum => {
             if physical_type != &PhysicalType::ByteArray {
                 return Err(general_err!("ENUM can only annotate BYTE_ARRAY fields"));
             }
-        }
-        _ => {
-            return Err(general_err!(
-                "{:?} cannot be applied to a primitive type",
-                converted_type
-            ));
         }
     };
     Ok(())
@@ -237,43 +228,56 @@ fn check_converted_invariants(physical_type: &PhysicalType, converted_type: &Opt
 /// Constructors
 impl ParquetType {
     pub fn from_fields(name: String, fields: Vec<ParquetType>) -> Self {
-        let basic_info = BasicTypeInfo::from_logical_type(name, None, None, None);
-        ParquetType::GroupType { basic_info, fields }
+        let basic_info = BasicTypeInfo::new(name, None, None);
+        ParquetType::GroupType {
+            basic_info,
+            fields,
+            logical_type: None,
+            converted_type: None,
+        }
     }
 
     pub fn from_converted(
         name: String,
         fields: Vec<ParquetType>,
         repetition: Option<Repetition>,
-        converted_type: Option<ConvertedType>,
+        converted_type: Option<GroupConvertedType>,
         id: Option<i32>,
     ) -> Self {
-        let basic_info = BasicTypeInfo::from_converted_type(name, repetition, converted_type, id);
-        ParquetType::GroupType { basic_info, fields }
+        let basic_info = BasicTypeInfo::new(name, repetition, id);
+        ParquetType::GroupType {
+            basic_info,
+            fields,
+            converted_type,
+            logical_type: None,
+        }
     }
 
     pub fn try_from_primitive(
         name: String,
         physical_type: PhysicalType,
         repetition: Repetition,
-        converted_type: Option<ConvertedType>,
+        converted_type: Option<PrimitiveConvertedType>,
         id: Option<i32>,
     ) -> Result<Self> {
         check_converted_invariants(&physical_type, &converted_type)?;
 
-        let basic_info =
-            BasicTypeInfo::from_converted_type(name, Some(repetition), converted_type, id);
+        let basic_info = BasicTypeInfo::new(name, Some(repetition), id);
 
         Ok(ParquetType::PrimitiveType {
             basic_info,
+            converted_type,
+            logical_type: None,
             physical_type,
         })
     }
 
     pub fn from_physical(name: String, physical_type: PhysicalType) -> Self {
-        let basic_info = BasicTypeInfo::from_converted_type(name, None, None, None);
+        let basic_info = BasicTypeInfo::new(name, None, None);
         ParquetType::PrimitiveType {
             basic_info,
+            converted_type: None,
+            logical_type: None,
             physical_type,
         }
     }

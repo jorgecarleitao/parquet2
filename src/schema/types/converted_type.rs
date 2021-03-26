@@ -1,13 +1,8 @@
+use crate::errors::{ParquetError, Result};
+
 #[derive(Clone, Debug, PartialEq)]
-pub enum ConvertedType {
+pub enum PrimitiveConvertedType {
     Utf8,
-    /// a map is converted as an optional field containing a repeated key/value pair
-    Map,
-    /// a key/value pair is converted into a group of two fields
-    MapKeyValue,
-    /// a list is converted into an optional field containing a repeated field for its
-    /// values
-    List,
     /// an enum is converted into a binary field
     Enum,
     /// A decimal value.
@@ -92,30 +87,46 @@ pub enum ConvertedType {
     Interval,
 }
 
+#[derive(Clone, Debug, PartialEq)]
+pub enum GroupConvertedType {
+    /// a map is converted as an optional field containing a repeated key/value pair
+    Map,
+    /// a key/value pair is converted into a group of two fields
+    MapKeyValue,
+    /// a list is converted into an optional field containing a repeated field for its
+    /// values
+    List,
+}
 
-pub fn converted_to_converted(ty: &parquet_format::ConvertedType) -> ConvertedType {
-    match ty {
-        parquet_format::ConvertedType::Utf8 => ConvertedType::Utf8,
-        parquet_format::ConvertedType::Map => ConvertedType::Map,
-        parquet_format::ConvertedType::MapKeyValue => ConvertedType::MapKeyValue,
-        parquet_format::ConvertedType::List => ConvertedType::List,
-        parquet_format::ConvertedType::Enum => ConvertedType::Enum,
+pub fn converted_to_primitive_converted(
+    ty: &parquet_format::ConvertedType,
+) -> Result<PrimitiveConvertedType> {
+    use PrimitiveConvertedType::*;
+    Ok(match ty {
+        parquet_format::ConvertedType::Utf8 => Utf8,
+        parquet_format::ConvertedType::Enum => Enum,
         parquet_format::ConvertedType::Decimal => unreachable!(),
-        parquet_format::ConvertedType::Date => ConvertedType::Date,
-        parquet_format::ConvertedType::TimeMillis => ConvertedType::TimeMillis,
-        parquet_format::ConvertedType::TimeMicros => ConvertedType::TimeMicros,
-        parquet_format::ConvertedType::TimestampMillis => ConvertedType::TimestampMillis,
-        parquet_format::ConvertedType::TimestampMicros => ConvertedType::TimestampMicros,
-        parquet_format::ConvertedType::Uint8 => ConvertedType::Uint8,
-        parquet_format::ConvertedType::Uint16 => ConvertedType::Uint16,
-        parquet_format::ConvertedType::Uint32 => ConvertedType::Uint32,
-        parquet_format::ConvertedType::Uint64 => ConvertedType::Uint64,
-        parquet_format::ConvertedType::Int8 => ConvertedType::Int8,
-        parquet_format::ConvertedType::Int16 => ConvertedType::Int16,
-        parquet_format::ConvertedType::Int32 => ConvertedType::Int32,
-        parquet_format::ConvertedType::Int64 => ConvertedType::Int64,
-        parquet_format::ConvertedType::Json => ConvertedType::Json,
-        parquet_format::ConvertedType::Bson => ConvertedType::Bson,
-        parquet_format::ConvertedType::Interval => ConvertedType::Interval,
-    }
+        parquet_format::ConvertedType::Date => Date,
+        parquet_format::ConvertedType::TimeMillis => TimeMillis,
+        parquet_format::ConvertedType::TimeMicros => TimeMicros,
+        parquet_format::ConvertedType::TimestampMillis => TimestampMillis,
+        parquet_format::ConvertedType::TimestampMicros => TimestampMicros,
+        parquet_format::ConvertedType::Uint8 => Uint8,
+        parquet_format::ConvertedType::Uint16 => Uint16,
+        parquet_format::ConvertedType::Uint32 => Uint32,
+        parquet_format::ConvertedType::Uint64 => Uint64,
+        parquet_format::ConvertedType::Int8 => Int8,
+        parquet_format::ConvertedType::Int16 => Int16,
+        parquet_format::ConvertedType::Int32 => Int32,
+        parquet_format::ConvertedType::Int64 => Int64,
+        parquet_format::ConvertedType::Json => Json,
+        parquet_format::ConvertedType::Bson => Bson,
+        parquet_format::ConvertedType::Interval => Interval,
+        _ => {
+            return Err(general_err!(
+                "Converted type \"{:?}\" cannot be applied to a primitive type",
+                ty
+            ))
+        }
+    })
 }

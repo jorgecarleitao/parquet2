@@ -3,7 +3,6 @@ pub mod errors;
 
 mod schema;
 
-
 /// The in-memory representation of a parquet primitive type
 trait Type {
     type Bytes: AsRef<[u8]>;

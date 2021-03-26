@@ -42,7 +42,7 @@
 //! println!("{:?}", schema);
 //! ```
 
-use super::types::{ConvertedType, converted_to_converted};
+use super::types::{converted_to_primitive_converted, GroupConvertedType, PrimitiveConvertedType};
 use super::types::{ParquetType, PhysicalType};
 use super::{
     BsonType, DateType, EnumType, IntType, JsonType, ListType, LogicalType, MapType, MicroSeconds,
@@ -51,8 +51,8 @@ use super::{
 };
 use crate::errors::{ParquetError, Result};
 
-fn converted_group_from_str(s: &str) -> Result<ConvertedType> {
-    use ConvertedType::*;
+fn converted_group_from_str(s: &str) -> Result<GroupConvertedType> {
+    use GroupConvertedType::*;
     Ok(match s {
         "MAP" => Map,
         "MAP_KEY_VALUE" => MapKeyValue,
@@ -454,9 +454,9 @@ impl<'a> Parser<'a> {
                     };
 
                     assert_token(self.tokenizer.next(), ")")?;
-                    ConvertedType::Decimal(precision, scale)
+                    PrimitiveConvertedType::Decimal(precision, scale)
                 }
-                _ => converted_to_converted(&tpe),
+                _ => converted_to_primitive_converted(&tpe)?,
             };
 
             assert_token(self.tokenizer.next(), ")")?;
@@ -744,14 +744,14 @@ mod tests {
                 "f1".to_string(),
                 PhysicalType::FixedLenByteArray(5),
                 Repetition::Optional,
-                Some(ConvertedType::Decimal(9, 3)),
+                Some(PrimitiveConvertedType::Decimal(9, 3)),
                 None,
             )?,
             ParquetType::try_from_primitive(
                 "f2".to_string(),
                 PhysicalType::FixedLenByteArray(16),
                 Repetition::Optional,
-                Some(ConvertedType::Decimal(38, 18)),
+                Some(PrimitiveConvertedType::Decimal(38, 18)),
                 None,
             )?,
         ];
@@ -791,14 +791,14 @@ mod tests {
             "a2".to_string(),
             PhysicalType::ByteArray,
             Repetition::Repeated,
-            Some(ConvertedType::Utf8),
+            Some(PrimitiveConvertedType::Utf8),
             None,
         )?;
         let a1 = ParquetType::from_converted(
             "a1".to_string(),
             vec![a2],
             None,
-            Some(ConvertedType::List),
+            Some(GroupConvertedType::List),
             None,
         );
         let b2 = ParquetType::from_converted(
@@ -809,16 +809,22 @@ mod tests {
             ],
             Some(Repetition::Repeated),
             None,
-            None
+            None,
         );
         let b1 = ParquetType::from_converted(
             "b1".to_string(),
             vec![b2],
             None,
-            Some(ConvertedType::List),
+            Some(GroupConvertedType::List),
             None,
         );
-        let a0 = ParquetType::from_converted("a0".to_string(), vec![a1, b1], Some(Repetition::Required), None, None);
+        let a0 = ParquetType::from_converted(
+            "a0".to_string(),
+            vec![a1, b1],
+            Some(Repetition::Required),
+            None,
+            None,
+        );
 
         let expected = ParquetType::from_fields("root".to_string(), vec![a0]);
 
