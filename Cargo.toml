@@ -1,5 +1,5 @@
 [package]
-name = "parquet"
+name = "parquet2"
 version = "4.0.0-SNAPSHOT"
 license = "Apache-2.0"
 authors = ["Jorge C. Leitao <jorgecarleitao@gmail.com"]
