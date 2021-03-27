@@ -22,7 +22,7 @@
 //! # Example
 //!
 //! ```rust
-//! use schema::parser::parse_message_type;
+//! use parquet2::schema::io_message::from_message;
 //!
 //! let message_type = "
 //!   message spark_schema {
@@ -38,21 +38,19 @@
 //!   }
 //! ";
 //!
-//! let schema = parse_message_type(message_type).expect("Expected valid schema");
+//! let schema = from_message(message_type).expect("Expected valid schema");
 //! println!("{:?}", schema);
 //! ```
 
-use super::types::{converted_to_primitive_converted, GroupConvertedType, PrimitiveConvertedType};
-use super::types::{ParquetType, PhysicalType};
-use super::{
-    BsonType, DateType, EnumType, IntType, JsonType, ListType, LogicalType, MapType, MicroSeconds,
-    MilliSeconds, NullType, Repetition, StringType, TimeType, TimeUnit, TimestampType, Type,
-    UUIDType,
+use super::super::types::{
+    converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,
+    ParquetType,
 };
+use super::super::{Repetition, Type};
 use crate::errors::{ParquetError, Result};
 
-fn converted_group_from_str(s: &str) -> Result<GroupConvertedType> {
-    use GroupConvertedType::*;
+fn converted_group_from_str(s: &str) -> Result<parquet_format::ConvertedType> {
+    use parquet_format::ConvertedType::*;
     Ok(match s {
         "MAP" => Map,
         "MAP_KEY_VALUE" => MapKeyValue,
@@ -87,96 +85,6 @@ fn converted_primitive_from_str(s: &str) -> Result<parquet_format::ConvertedType
     })
 }
 
-fn logical_from_str(s: &str) -> Result<LogicalType> {
-    match s {
-        "INTEGER(8,true)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 8,
-            is_signed: true,
-        })),
-        "INTEGER(16,true)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 16,
-            is_signed: true,
-        })),
-        "INTEGER(32,true)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 32,
-            is_signed: true,
-        })),
-        "INTEGER(64,true)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 64,
-            is_signed: true,
-        })),
-        "INTEGER(8,false)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 8,
-            is_signed: false,
-        })),
-        "INTEGER(16,false)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 16,
-            is_signed: false,
-        })),
-        "INTEGER(32,false)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 32,
-            is_signed: false,
-        })),
-        "INTEGER(64,false)" => Ok(LogicalType::INTEGER(IntType {
-            bit_width: 64,
-            is_signed: false,
-        })),
-        "MAP" => Ok(LogicalType::MAP(MapType {})),
-        "LIST" => Ok(LogicalType::LIST(ListType {})),
-        "ENUM" => Ok(LogicalType::ENUM(EnumType {})),
-        // TODO: ARROW-11365
-        // "DECIMAL" => Ok(LogicalType::DECIMAL),
-        "DATE" => Ok(LogicalType::DATE(DateType {})),
-        "TIME(MILLIS,true)" => Ok(LogicalType::TIME(TimeType {
-            is_adjusted_to_u_t_c: true,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        })),
-        "TIME(MILLIS,false)" => Ok(LogicalType::TIME(TimeType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        })),
-        "TIME(MICROS,true)" => Ok(LogicalType::TIME(TimeType {
-            is_adjusted_to_u_t_c: true,
-            unit: TimeUnit::MICROS(MicroSeconds {}),
-        })),
-        "TIME(MICROS,false)" => Ok(LogicalType::TIME(TimeType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MICROS(MicroSeconds {}),
-        })),
-        "TIMESTAMP(MILLIS,true)" => Ok(LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: true,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        })),
-        "TIMESTAMP(MILLIS,false)" => Ok(LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        })),
-        "TIMESTAMP(MICROS,true)" => Ok(LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: true,
-            unit: TimeUnit::MICROS(MicroSeconds {}),
-        })),
-        "TIMESTAMP(MICROS,false)" => Ok(LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MICROS(MicroSeconds {}),
-        })),
-        "TIMESTAMP(NANOS,true)" => Ok(LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: true,
-            unit: TimeUnit::MICROS(MicroSeconds {}),
-        })),
-        "TIMESTAMP(NANOS,false)" => Ok(LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MICROS(MicroSeconds {}),
-        })),
-        "STRING" => Ok(LogicalType::STRING(StringType {})),
-        "JSON" => Ok(LogicalType::JSON(JsonType {})),
-        "BSON" => Ok(LogicalType::BSON(BsonType {})),
-        "UUID" => Ok(LogicalType::UUID(UUIDType {})),
-        "UNKNOWN" => Ok(LogicalType::UNKNOWN(NullType {})),
-        "INTERVAL" => Err(general_err!("Interval logical type not yet supported")),
-        other => Err(general_err!("Invalid logical type {}", other)),
-    }
-}
-
 fn repetition_from_str(s: &str) -> Result<Repetition> {
     Ok(match s {
         "REQUIRED" => Repetition::Required,
@@ -203,7 +111,7 @@ fn type_from_str(s: &str) -> Result<Type> {
 /// Parses message type as string into a Parquet [`ParquetType`](crate::schema::types::ParquetType)
 /// which, for example, could be used to extract individual columns. Returns Parquet
 /// general error when parsing or validation fails.
-pub fn parse_message_type(message_type: &str) -> Result<ParquetType> {
+pub fn from_message(message_type: &str) -> Result<ParquetType> {
     let mut parser = Parser {
         tokenizer: &mut Tokenizer::from_str(message_type),
     };
@@ -319,7 +227,7 @@ impl<'a> Parser<'a> {
                     .next()
                     .ok_or_else(|| general_err!("Expected name, found None"))?;
                 let fields = self.parse_child_types()?;
-                Ok(ParquetType::from_fields(name.to_string(), fields))
+                Ok(ParquetType::new_root(name.to_string(), fields))
             }
             _ => Err(general_err!("Message type does not start with 'message'")),
         }
@@ -368,13 +276,14 @@ impl<'a> Parser<'a> {
 
         // Parse converted type if exists
         let converted_type = if let Some("(") = self.tokenizer.next() {
-            let tpe = self
+            let converted_type = self
                 .tokenizer
                 .next()
                 .ok_or_else(|| general_err!("Expected converted type, found None"))
                 .and_then(|v| converted_group_from_str(&v.to_uppercase()))?;
             assert_token(self.tokenizer.next(), ")")?;
-            Some(tpe)
+            let converted_type = converted_to_group_converted(&converted_type)?;
+            Some(converted_type)
         } else {
             self.tokenizer.backtrack();
             None
@@ -405,16 +314,18 @@ impl<'a> Parser<'a> {
         physical_type: Type,
     ) -> Result<ParquetType> {
         // Read type length if the type is FIXED_LEN_BYTE_ARRAY.
-        let mut length: i32 = -1;
-        if physical_type == Type::FixedLenByteArray {
+        let length = if physical_type == Type::FixedLenByteArray {
             assert_token(self.tokenizer.next(), "(")?;
-            length = parse_i32(
+            let length = parse_i32(
                 self.tokenizer.next(),
                 "Expected length for FIXED_LEN_BYTE_ARRAY, found None",
                 "Failed to parse length for FIXED_LEN_BYTE_ARRAY",
             )?;
             assert_token(self.tokenizer.next(), ")")?;
-        }
+            Some(length)
+        } else {
+            None
+        };
 
         // Parse name of the primitive type
         let name = self
@@ -430,7 +341,7 @@ impl<'a> Parser<'a> {
                 .ok_or_else(|| general_err!("Expected converted type, found None"))
                 .and_then(|v| converted_primitive_from_str(&v.to_uppercase()))?;
 
-            let tpe = match tpe {
+            let (converted_type, maybe_decimal) = match tpe {
                 parquet_format::ConvertedType::Decimal => {
                     assert_token(self.tokenizer.next(), "(")?;
                     // Parse precision
@@ -454,10 +365,14 @@ impl<'a> Parser<'a> {
                     };
 
                     assert_token(self.tokenizer.next(), ")")?;
-                    PrimitiveConvertedType::Decimal(precision, scale)
+                    (
+                        parquet_format::ConvertedType::Decimal,
+                        Some((precision, scale)),
+                    )
                 }
-                _ => converted_to_primitive_converted(&tpe)?,
+                other => (other, None),
             };
+            let tpe = converted_to_primitive_converted(&converted_type, maybe_decimal)?;
 
             assert_token(self.tokenizer.next(), ")")?;
             Some(tpe)
@@ -475,22 +390,14 @@ impl<'a> Parser<'a> {
         };
         assert_token(self.tokenizer.next(), ";")?;
 
-        let physical_type = match physical_type {
-            Type::Boolean => PhysicalType::Boolean,
-            Type::Int32 => PhysicalType::Int32,
-            Type::Int64 => PhysicalType::Int64,
-            Type::Int96 => PhysicalType::Int96,
-            Type::Float => PhysicalType::Float,
-            Type::Double => PhysicalType::Double,
-            Type::ByteArray => PhysicalType::ByteArray,
-            Type::FixedLenByteArray => PhysicalType::FixedLenByteArray(length),
-        };
+        let physical_type = type_to_physical_type(&physical_type, length)?;
 
         ParquetType::try_from_primitive(
             name.to_string(),
             physical_type,
             repetition,
             converted_type,
+            None,
             id,
         )
     }
@@ -499,6 +406,7 @@ impl<'a> Parser<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::schema::types::{GroupConvertedType, PhysicalType, PrimitiveConvertedType};
 
     #[test]
     fn test_tokenize_empty_string() {
@@ -746,6 +654,7 @@ mod tests {
                 Repetition::Optional,
                 Some(PrimitiveConvertedType::Decimal(9, 3)),
                 None,
+                None,
             )?,
             ParquetType::try_from_primitive(
                 "f2".to_string(),
@@ -753,10 +662,11 @@ mod tests {
                 Repetition::Optional,
                 Some(PrimitiveConvertedType::Decimal(38, 18)),
                 None,
+                None,
             )?,
         ];
 
-        let expected = ParquetType::from_fields("root".to_string(), fields);
+        let expected = ParquetType::new_root("root".to_string(), fields);
 
         assert_eq!(message, expected);
         Ok(())
@@ -793,6 +703,7 @@ mod tests {
             Repetition::Repeated,
             Some(PrimitiveConvertedType::Utf8),
             None,
+            None,
         )?;
         let a1 = ParquetType::from_converted(
             "a1".to_string(),
@@ -826,15 +737,14 @@ mod tests {
             None,
         );
 
-        let expected = ParquetType::from_fields("root".to_string(), vec![a0]);
+        let expected = ParquetType::new_root("root".to_string(), vec![a0]);
 
         assert_eq!(message, expected);
         Ok(())
     }
 
-    /*
     #[test]
-    fn test_parse_message_type_compare_3() {
+    fn test_parse_message_type_compare_3() -> Result<()> {
         let schema = "
     message root {
       required int32 _1 (INT_8);
@@ -852,49 +762,59 @@ mod tests {
         .parse_message_type()
         .unwrap();
 
-        let mut fields = vec![
-            Arc::new(
-                ParquetType::primitive_type_builder("_1", Type::INT32)
-                    .with_repetition(Repetition::REQUIRED)
-                    .with_converted_type(ConvertedType::INT_8)
-                    .build()
-                    .unwrap(),
-            ),
-            Arc::new(
-                ParquetType::primitive_type_builder("_2", Type::INT32)
-                    .with_repetition(Repetition::REQUIRED)
-                    .with_converted_type(ConvertedType::INT_16)
-                    .build()
-                    .unwrap(),
-            ),
-            Arc::new(
-                ParquetType::primitive_type_builder("_3", Type::FLOAT)
-                    .with_repetition(Repetition::REQUIRED)
-                    .build()
-                    .unwrap(),
-            ),
-            Arc::new(
-                ParquetType::primitive_type_builder("_4", Type::DOUBLE)
-                    .with_repetition(Repetition::REQUIRED)
-                    .build()
-                    .unwrap(),
-            ),
-            Arc::new(
-                ParquetType::primitive_type_builder("_5", Type::INT32)
-                    .with_converted_type(ConvertedType::DATE)
-                    .build()
-                    .unwrap(),
-            ),
-            Arc::new(
-                ParquetType::primitive_type_builder("_6", Type::BYTE_ARRAY)
-                    .with_converted_type(ConvertedType::UTF8)
-                    .build()
-                    .unwrap(),
-            ),
-        ];
+        let f1 = ParquetType::try_from_primitive(
+            "_1".to_string(),
+            PhysicalType::Int32,
+            Repetition::Required,
+            Some(PrimitiveConvertedType::Int8),
+            None,
+            None,
+        )?;
+        let f2 = ParquetType::try_from_primitive(
+            "_2".to_string(),
+            PhysicalType::Int32,
+            Repetition::Required,
+            Some(PrimitiveConvertedType::Int16),
+            None,
+            None,
+        )?;
+        let f3 = ParquetType::try_from_primitive(
+            "_3".to_string(),
+            PhysicalType::Float,
+            Repetition::Required,
+            None,
+            None,
+            None,
+        )?;
+        let f4 = ParquetType::try_from_primitive(
+            "_4".to_string(),
+            PhysicalType::Double,
+            Repetition::Required,
+            None,
+            None,
+            None,
+        )?;
+        let f5 = ParquetType::try_from_primitive(
+            "_5".to_string(),
+            PhysicalType::Int32,
+            Repetition::Optional,
+            Some(PrimitiveConvertedType::Date),
+            None,
+            None,
+        )?;
+        let f6 = ParquetType::try_from_primitive(
+            "_6".to_string(),
+            PhysicalType::ByteArray,
+            Repetition::Optional,
+            Some(PrimitiveConvertedType::Utf8),
+            None,
+            None,
+        )?;
 
-        let expected = ParquetType::from_fields("root", fields);
+        let fields = vec![f1, f2, f3, f4, f5, f6];
+
+        let expected = ParquetType::new_root("root".to_string(), fields);
         assert_eq!(message, expected);
+        Ok(())
     }
-     */
 }

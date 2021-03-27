@@ -1,6 +1,11 @@
 pub use parquet_format::FieldRepetitionType as Repetition;
 pub use parquet_format::{LogicalType, TimeType, TimeUnit, Type};
 
+mod spec;
+
+mod physical_type;
+pub use physical_type::*;
+
 mod basic_type;
 pub use basic_type::*;
 

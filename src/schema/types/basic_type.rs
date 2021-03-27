@@ -1,11 +1,14 @@
 use super::Repetition;
 
-/// Basic type info. This contains information such as the name of the type,
-/// the repetition level, the logical type and the kind of the type (group, primitive).
+/// Common type information.
 #[derive(Clone, Debug, PartialEq)]
 pub struct BasicTypeInfo {
     name: String,
+    // Parquet Spec:
+    //   Root of the schema does not have a repetition.
+    //   All other types must have one.
     repetition: Repetition,
+    is_root: bool,
     id: Option<i32>,
 }
 
@@ -16,29 +19,29 @@ impl BasicTypeInfo {
         &self.name
     }
 
+    pub fn is_root(&self) -> bool {
+        self.is_root
+    }
+
     /// Returns [`Repetition`](crate::basic::Repetition) value for the type.
+    /// Returns `Optional` if the repetition is not defined
     pub fn repetition(&self) -> &Repetition {
         &self.repetition
     }
 
     /// Returns `true` if id is set, `false` otherwise.
-    pub fn has_id(&self) -> bool {
-        self.id.is_some()
-    }
-
-    /// Returns id value for the type.
-    pub fn id(&self) -> i32 {
-        assert!(self.id.is_some());
-        self.id.unwrap()
+    pub fn id(&self) -> &Option<i32> {
+        &self.id
     }
 }
 
 // Constructors
 impl BasicTypeInfo {
-    pub fn new(name: String, repetition: Option<Repetition>, id: Option<i32>) -> Self {
+    pub fn new(name: String, repetition: Repetition, id: Option<i32>, is_root: bool) -> Self {
         Self {
             name,
-            repetition: repetition.unwrap_or(Repetition::Optional),
+            repetition,
+            is_root,
             id,
         }
     }

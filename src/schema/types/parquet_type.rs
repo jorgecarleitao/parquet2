@@ -1,20 +1,11 @@
 // see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
-use crate::errors::{ParquetError, Result};
+use crate::errors::Result;
 use std::collections::HashMap;
 
-use super::{BasicTypeInfo, GroupConvertedType, LogicalType, PrimitiveConvertedType, Repetition};
-
-#[derive(Clone, Debug, PartialEq)]
-pub enum PhysicalType {
-    Boolean,
-    Int32,
-    Int64,
-    Int96,
-    Float,
-    Double,
-    ByteArray,
-    FixedLenByteArray(i32),
-}
+use super::{
+    spec, BasicTypeInfo, GroupConvertedType, LogicalType, PhysicalType, PrimitiveConvertedType,
+    Repetition,
+};
 
 /// Representation of a Parquet type.
 /// Used to describe primitive leaf fields and structs, including top-level schema.
@@ -51,14 +42,18 @@ impl ParquetType {
         self.get_basic_info().name()
     }
 
+    pub fn is_root(&self) -> bool {
+        self.get_basic_info().is_root()
+    }
+
     /// Checks if `sub_type` schema is part of current schema.
     /// This method can be used to check if projected columns are part of the root schema.
     pub fn check_contains(&self, sub_type: &ParquetType) -> bool {
         // Names match, and repetitions match or not set for both
         let basic_match = self.get_basic_info().name() == sub_type.get_basic_info().name()
-            && (self.is_schema() && sub_type.is_schema()
-                || !self.is_schema()
-                    && !sub_type.is_schema()
+            && (self.is_root() && sub_type.is_root()
+                || !self.is_root()
+                    && !sub_type.is_root()
                     && self.get_basic_info().repetition()
                         == sub_type.get_basic_info().repetition());
 
@@ -97,138 +92,12 @@ impl ParquetType {
             _ => false,
         }
     }
-
-    /// Returns `true` if this type is the top-level schema type (message type).
-    fn is_schema(&self) -> bool {
-        match *self {
-            Self::GroupType { ref basic_info, .. } => {
-                basic_info.repetition() != &Repetition::Optional
-            }
-            _ => false,
-        }
-    }
-
-    /// Returns `true` if this type is repeated or optional.
-    /// If this type doesn't have repetition defined, we still treat it as optional.
-    pub fn is_optional(&self) -> bool {
-        self.get_basic_info().repetition() != &Repetition::Required
-    }
-}
-
-// Not all converted types are valid for a given physical type. Let's check this
-#[inline]
-fn check_decimal_invariants(
-    physical_type: &PhysicalType,
-    precision: i32,
-    scale: i32,
-) -> Result<()> {
-    if precision < 1 {
-        return Err(general_err!(
-            "DECIMAL precision must be larger than 0; It is {}",
-            precision
-        ));
-    }
-    if scale >= precision {
-        return Err(general_err!(
-            "Invalid DECIMAL: scale ({}) cannot be greater than or equal to precision \
-            ({})",
-            scale,
-            precision
-        ));
-    }
-
-    match physical_type {
-        PhysicalType::Int32 => {
-            if precision > 9 {
-                return Err(general_err!(
-                    "Cannot represent INT32 as DECIMAL with precision {}",
-                    precision
-                ));
-            }
-        }
-        PhysicalType::Int64 => {
-            if precision > 18 {
-                return Err(general_err!(
-                    "Cannot represent INT64 as DECIMAL with precision {}",
-                    precision
-                ));
-            }
-        }
-        PhysicalType::FixedLenByteArray(length) => {
-            let max_precision = (2f64.powi(8 * length - 1) - 1f64).log10().floor() as i32;
-
-            if precision > max_precision {
-                return Err(general_err!(
-                    "Cannot represent FIXED_LEN_BYTE_ARRAY as DECIMAL with length {} and \
-                    precision {}. The max precision can only be {}",
-                    length,
-                    precision,
-                    max_precision
-                ));
-            }
-        }
-        PhysicalType::ByteArray => {}
-        _ => {
-            return Err(general_err!(
-                "DECIMAL can only annotate INT32, INT64, BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY"
-            ))
-        }
-    };
-    Ok(())
-}
-
-fn check_converted_invariants(
-    physical_type: &PhysicalType,
-    converted_type: &Option<PrimitiveConvertedType>,
-) -> Result<()> {
-    if converted_type.is_none() {
-        return Ok(());
-    };
-    let converted_type = converted_type.as_ref().unwrap();
-
-    use PrimitiveConvertedType::*;
-    match converted_type {
-        Utf8 | Bson | Json => {
-            if physical_type != &PhysicalType::ByteArray {
-                return Err(general_err!(
-                    "{:?} can only annotate BYTE_ARRAY fields",
-                    converted_type
-                ));
-            }
-        }
-        Decimal(precision, scale) => {
-            check_decimal_invariants(physical_type, *precision, *scale)?;
-        }
-        Date | TimeMillis | Uint8 | Uint16 | Uint32 | Int8 | Int16 | Int32 => {
-            if physical_type != &PhysicalType::Int32 {
-                return Err(general_err!("{:?} can only annotate INT32", converted_type));
-            }
-        }
-        TimeMicros | TimestampMillis | TimestampMicros | Uint64 | Int64 => {
-            if physical_type != &PhysicalType::Int64 {
-                return Err(general_err!("{:?} can only annotate INT64", converted_type));
-            }
-        }
-        Interval => {
-            if physical_type != &PhysicalType::FixedLenByteArray(12) {
-                return Err(general_err!(
-                    "INTERVAL can only annotate FIXED_LEN_BYTE_ARRAY(12)"
-                ));
-            }
-        }
-        Enum => {
-            if physical_type != &PhysicalType::ByteArray {
-                return Err(general_err!("ENUM can only annotate BYTE_ARRAY fields"));
-            }
-        }
-    };
-    Ok(())
 }
 
 /// Constructors
 impl ParquetType {
-    pub fn from_fields(name: String, fields: Vec<ParquetType>) -> Self {
-        let basic_info = BasicTypeInfo::new(name, None, None);
+    pub fn new_root(name: String, fields: Vec<ParquetType>) -> Self {
+        let basic_info = BasicTypeInfo::new(name, Repetition::Optional, None, true);
         ParquetType::GroupType {
             basic_info,
             fields,
@@ -244,7 +113,8 @@ impl ParquetType {
         converted_type: Option<GroupConvertedType>,
         id: Option<i32>,
     ) -> Self {
-        let basic_info = BasicTypeInfo::new(name, repetition, id);
+        let basic_info =
+            BasicTypeInfo::new(name, repetition.unwrap_or(Repetition::Optional), id, false);
         ParquetType::GroupType {
             basic_info,
             fields,
@@ -258,22 +128,24 @@ impl ParquetType {
         physical_type: PhysicalType,
         repetition: Repetition,
         converted_type: Option<PrimitiveConvertedType>,
+        logical_type: Option<LogicalType>,
         id: Option<i32>,
     ) -> Result<Self> {
-        check_converted_invariants(&physical_type, &converted_type)?;
+        spec::check_converted_invariants(&physical_type, &converted_type)?;
+        spec::check_logical_invariants(&physical_type, &logical_type)?;
 
-        let basic_info = BasicTypeInfo::new(name, Some(repetition), id);
+        let basic_info = BasicTypeInfo::new(name, repetition, id, false);
 
         Ok(ParquetType::PrimitiveType {
             basic_info,
             converted_type,
-            logical_type: None,
+            logical_type,
             physical_type,
         })
     }
 
     pub fn from_physical(name: String, physical_type: PhysicalType) -> Self {
-        let basic_info = BasicTypeInfo::new(name, None, None);
+        let basic_info = BasicTypeInfo::new(name, Repetition::Optional, None, false);
         ParquetType::PrimitiveType {
             basic_info,
             converted_type: None,

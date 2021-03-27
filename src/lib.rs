@@ -1,7 +1,7 @@
 #[macro_use]
 pub mod errors;
 
-mod schema;
+pub mod schema;
 
 /// The in-memory representation of a parquet primitive type
 trait Type {
