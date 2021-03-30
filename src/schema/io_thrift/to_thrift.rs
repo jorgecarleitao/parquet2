@@ -7,14 +7,16 @@ use super::super::types::{
     ParquetType,
 };
 
-/// Method to convert to Thrift.
-pub fn to_thrift(schema: &ParquetType) -> Result<Vec<SchemaElement>> {
-    if !schema.is_root() {
-        return Err(general_err!("Root schema must be Group type"));
+impl ParquetType {
+    /// Method to convert to Thrift.
+    pub fn to_thrift(&self) -> Result<Vec<SchemaElement>> {
+        if !self.is_root() {
+            return Err(general_err!("Root schema must be Group type"));
+        }
+        let mut elements: Vec<SchemaElement> = Vec::new();
+        to_thrift_helper(self, &mut elements);
+        Ok(elements)
     }
-    let mut elements: Vec<SchemaElement> = Vec::new();
-    to_thrift_helper(schema, &mut elements);
-    Ok(elements)
 }
 
 /// Constructs list of `SchemaElement` from the schema using depth-first traversal.
@@ -67,19 +69,12 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
                 Some(*basic_info.repetition())
             };
 
-            let num_children = if basic_info.is_root() {
-                // https://github.com/apache/parquet-format/blob/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46/src/main/thrift/parquet.thrift#L370
-                None
-            } else {
-                Some(fields.len() as i32)
-            };
-
             let element = SchemaElement {
                 type_: None,
                 type_length: None,
                 repetition_type,
                 name: basic_info.name().to_owned(),
-                num_children,
+                num_children: Some(fields.len() as i32),
                 converted_type,
                 scale: None,
                 precision: None,

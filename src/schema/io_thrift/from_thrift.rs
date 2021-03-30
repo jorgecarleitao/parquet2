@@ -4,26 +4,28 @@ use crate::errors::{ParquetError, Result};
 
 use super::super::types::{
     converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,
-    ParquetType, Repetition,
+    ParquetType,
 };
 
-/// Method to convert from Thrift.
-pub fn from_thrift(elements: &[&SchemaElement]) -> Result<ParquetType> {
-    let mut index = 0;
-    let mut schema_nodes = Vec::new();
-    while index < elements.len() {
-        let t = from_thrift_helper(elements, index)?;
-        index = t.0;
-        schema_nodes.push(t.1);
-    }
-    if schema_nodes.len() != 1 {
-        return Err(general_err!(
-            "Expected exactly one root node, but found {}",
-            schema_nodes.len()
-        ));
-    }
+impl ParquetType {
+    /// Method to convert from Thrift.
+    pub fn try_from_thrift(elements: &[&SchemaElement]) -> Result<ParquetType> {
+        let mut index = 0;
+        let mut schema_nodes = Vec::new();
+        while index < elements.len() {
+            let t = from_thrift_helper(elements, index)?;
+            index = t.0;
+            schema_nodes.push(t.1);
+        }
+        if schema_nodes.len() != 1 {
+            return Err(general_err!(
+                "Expected exactly one root node, but found {}",
+                schema_nodes.len()
+            ));
+        }
 
-    Ok(schema_nodes.remove(0))
+        Ok(schema_nodes.remove(0))
+    }
 }
 
 /// Constructs a new Type from the `elements`, starting at index `index`.
@@ -35,14 +37,14 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
     // There is only one message type node in the schema tree.
     let is_root_node = index == 0;
 
-    let element = &elements[index];
-    let name = elements[index].name.clone();
+    let element = elements[index];
+    let name = element.name.clone();
     let converted_type = element.converted_type;
     // LogicalType is only present in v2 Parquet files. ConvertedType is always
     // populated, regardless of the version of the file (v1 or v2).
     let logical_type = &element.logical_type;
-    let field_id = elements[index].field_id;
-    match elements[index].num_children {
+    let field_id = element.field_id;
+    match element.num_children {
         // From parquet-format:
         //   The children count is used to construct the nested relationship.
         //   This field is not set when the element is a primitive type
@@ -50,18 +52,18 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
         // have to handle this case too.
         None | Some(0) => {
             // primitive type
-            let repetition = elements[index].repetition_type.ok_or_else(|| {
+            let repetition = element.repetition_type.ok_or_else(|| {
                 general_err!("Repetition level must be defined for a primitive type")
             })?;
-            let physical_type = elements[index].type_.ok_or_else(|| {
+            let physical_type = element.type_.ok_or_else(|| {
                 general_err!("Physical type must be defined for a primitive type")
             })?;
-            let length = elements[index].type_length;
+            let length = element.type_length;
             let physical_type = type_to_physical_type(&physical_type, length)?;
 
             let converted_type = match converted_type {
                 Some(converted_type) => Some({
-                    let maybe_decimal = match (elements[index].precision, elements[index].scale) {
+                    let maybe_decimal = match (element.precision, element.scale) {
                         (Some(precision), Some(scale)) => Some((precision, scale)),
                         (None, None) => None,
                         _ => {
@@ -87,7 +89,7 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
             Ok((index + 1, tp))
         }
         Some(n) => {
-            let repetition = elements[index].repetition_type.map(Repetition::from);
+            let repetition = element.repetition_type;
             let mut fields = vec![];
             let mut next_index = index + 1;
             for _ in 0..n {

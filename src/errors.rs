@@ -34,6 +34,25 @@ impl std::fmt::Display for ParquetError {
     }
 }
 
+#[cfg(feature = "snappy")]
+impl From<snap::Error> for ParquetError {
+    fn from(e: snap::Error) -> ParquetError {
+        ParquetError::General(format!("underlying snap error: {}", e))
+    }
+}
+
+impl From<thrift::Error> for ParquetError {
+    fn from(e: thrift::Error) -> ParquetError {
+        ParquetError::General(format!("underlying thrift error: {}", e))
+    }
+}
+
+impl From<std::io::Error> for ParquetError {
+    fn from(e: std::io::Error) -> ParquetError {
+        ParquetError::General(format!("underlying IO error: {}", e))
+    }
+}
+
 /// A specialized `Result` for Parquet errors.
 pub type Result<T> = std::result::Result<T, ParquetError>;
 

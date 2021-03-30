@@ -6,15 +6,15 @@ pub use to_thrift::*;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::errors::Result;
     use crate::schema::io_message::from_message;
+    use crate::schema::types::ParquetType;
 
     fn test_round_trip(message: &str) -> Result<()> {
         let expected_schema = from_message(message)?;
-        let thrift_schema = to_thrift(&expected_schema)?;
+        let thrift_schema = expected_schema.to_thrift()?;
         let thrift_schema = thrift_schema.iter().collect::<Vec<_>>();
-        let result_schema = from_thrift(&thrift_schema)?;
+        let result_schema = ParquetType::try_from_thrift(&thrift_schema)?;
         assert_eq!(result_schema, expected_schema);
         Ok(())
     }
