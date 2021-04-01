@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use parquet_format::Encoding;
 
 #[derive(Debug)]
@@ -7,6 +9,7 @@ pub struct PageV1 {
     pub encoding: Encoding,
     pub def_level_encoding: Encoding,
     pub rep_level_encoding: Encoding,
+    pub dictionary_page: Option<Arc<PageDict>>,
     //statistics: Option<Statistics>,
 }
 
@@ -17,6 +20,7 @@ impl PageV1 {
         encoding: Encoding,
         def_level_encoding: Encoding,
         rep_level_encoding: Encoding,
+        dictionary_page: Option<Arc<PageDict>>,
     ) -> Self {
         Self {
             buf,
@@ -24,6 +28,7 @@ impl PageV1 {
             encoding,
             def_level_encoding,
             rep_level_encoding,
+            dictionary_page,
         }
     }
 }
@@ -38,6 +43,7 @@ pub struct PageV2 {
     pub def_levels_byte_len: u32,
     pub rep_levels_byte_len: u32,
     pub is_compressed: bool,
+    pub dictionary_page: Option<Arc<PageDict>>,
     //statistics: Option<Statistics>,
 }
 
@@ -52,6 +58,7 @@ impl PageV2 {
         def_levels_byte_len: u32,
         rep_levels_byte_len: u32,
         is_compressed: bool,
+        dictionary_page: Option<Arc<PageDict>>,
     ) -> Self {
         Self {
             buf,
@@ -62,10 +69,13 @@ impl PageV2 {
             def_levels_byte_len,
             rep_levels_byte_len,
             is_compressed,
+            dictionary_page,
         }
     }
 }
 
+// todo: make this decoded on the first read, so that it does not need to be decoded on every
+// page. Requires introducing typing to this struct :/
 #[derive(Debug)]
 pub struct PageDict {
     pub buf: Vec<u8>,
@@ -92,5 +102,13 @@ impl PageDict {
 pub enum Page {
     V1(PageV1),
     V2(PageV2),
-    Dictionary(PageDict),
+}
+
+impl Page {
+    pub fn dictionary_page(&self) -> Option<&PageDict> {
+        match self {
+            Page::V1(page) => page.dictionary_page.as_ref().map(|x| x.as_ref()),
+            Page::V2(page) => page.dictionary_page.as_ref().map(|x| x.as_ref()),
+        }
+    }
 }

@@ -22,13 +22,18 @@ pub enum ParquetError {
     /// General Parquet error.
     /// Returned when code violates normal workflow of working with Parquet files.
     General(String),
+    /// When the parquet file is known to be out of spec.
+    OutOfSpec(String),
 }
 
 impl std::fmt::Display for ParquetError {
     fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ParquetError::General(ref message) => {
-                write!(fmt, "Parquet error: {}", message)
+        match self {
+            ParquetError::General(message) => {
+                write!(fmt, "{}", message)
+            }
+            ParquetError::OutOfSpec(message) => {
+                write!(fmt, "{}", message)
             }
         }
     }

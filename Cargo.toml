@@ -9,6 +9,7 @@ edition = "2018"
 [dependencies]
 parquet-format = "~2.6.1"
 thrift = "0.13"
+bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
 
 snap = { version = "1.0", optional = true }
 brotli = { version = "3.3", optional = true }

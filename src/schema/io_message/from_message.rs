@@ -511,7 +511,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Parquet error: Message type does not start with 'message'"
+            "Message type does not start with 'message'"
         );
     }
 
@@ -523,10 +523,7 @@ mod tests {
         }
         .parse_message_type();
         assert!(result.is_err());
-        assert_eq!(
-            result.unwrap_err().to_string(),
-            "Parquet error: Expected name, found None"
-        );
+        assert_eq!(result.unwrap_err().to_string(), "Expected name, found None");
     }
 
     #[test]

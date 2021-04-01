@@ -9,8 +9,8 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::errors::Result;
 use crate::metadata::{ParquetMetaData, RowGroupMetaData};
 
+pub use page::{Page, PageDict};
 use page_iterator::PageIterator;
-pub use page::Page;
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true
@@ -66,13 +66,11 @@ mod tests {
         let mut iter = get_page_iterator(&metadata, row_group, column, &mut file)?;
 
         let a = iter.next().unwrap().unwrap();
-        if let Page::Dictionary(page) = &a {
+        if let Page::V1(page) = &a {
             assert_eq!(page.num_values, 8)
         } else {
             panic!("Page not a dict");
         }
-
-        println!("{:#?}", a);
         Ok(())
     }
 }

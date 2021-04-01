@@ -1,4 +1,4 @@
-use std::io::Read;
+use std::{io::Read, sync::Arc};
 
 use parquet_format::{CompressionCodec, PageHeader, PageType};
 use thrift::protocol::TCompactInputProtocol;
@@ -26,6 +26,9 @@ pub struct PageIterator<'a, R: Read> {
 
     // The number of total values in this column chunk.
     total_num_values: i64,
+
+    // Arc: it will be shared between multiple pages
+    current_dictionary: Option<Arc<PageDict>>,
 }
 
 impl<'a, R: Read> PageIterator<'a, R> {
@@ -40,6 +43,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
             total_num_values,
             decompressor,
             seen_num_values: 0,
+            current_dictionary: None,
         })
     }
 
@@ -112,12 +116,14 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
                 assert!(page_header.dictionary_page_header.is_some());
                 let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
                 let is_sorted = dict_header.is_sorted.unwrap_or(false);
-                Page::Dictionary(PageDict::new(
+
+                reader.current_dictionary = Some(Arc::new(PageDict::new(
                     buffer,
                     dict_header.num_values as u32,
                     dict_header.encoding,
                     is_sorted,
-                ))
+                )));
+                continue;
             }
             PageType::DataPage => {
                 assert!(page_header.data_page_header.is_some());
@@ -129,6 +135,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
                     header.encoding,
                     header.definition_level_encoding,
                     header.repetition_level_encoding,
+                    reader.current_dictionary.clone(),
                 ))
             }
             PageType::DataPageV2 => {
@@ -145,6 +152,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
                     header.definition_levels_byte_length as u32,
                     header.repetition_levels_byte_length as u32,
                     is_compressed,
+                    reader.current_dictionary.clone(),
                 ))
             }
             PageType::IndexPage => {

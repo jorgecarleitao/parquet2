@@ -54,59 +54,9 @@ See https://github.com/tantivy-search/bitpacking/issues/31
 
 ### Deserialization ideas:
 
-Since decoding may be the final step of the pipeline (e.g. when we decode a bitmap), a decoded
-page may require type information. Idea:
+Since decoding may be the final step of the pipeline, a decoded page may require type information.
 
-```rust
-use std::any::Any;
-
-use crate::schema::types::PhysicalType;
-
-pub trait DecodedPage {
-    fn as_any(&self) -> &dyn Any;
-    fn physical_type(&self) -> &PhysicalType;
-    fn rep_levels(&self) -> &[i32];
-    fn def_levels(&self) -> &[i32];
-}
-
-use std::sync::Arc;
-
-use crate::{
-    errors::Result,
-    read::{
-        decoded_page::DecodedPage,
-        page::{PageDict, PageV1, PageV2},
-    },
-    metadata::ColumnDescriptor,
-    read::page::Page,
-};
-
-// own page so that we can re-use its buffer
-fn read_page(page: Page, descriptor: &ColumnDescriptor) -> Result<Arc<dyn DecodedPage>> {
-    match page {
-        Page::V1(page) => read_page_v1(page, descriptor),
-        Page::V2(page) => read_page_v2(page, descriptor),
-        Page::Dictionary(page) => read_page_dictionary(page, descriptor),
-    }
-}
-
-fn read_page_v1(page: PageV1, descriptor: &ColumnDescriptor) -> Result<Arc<dyn DecodedPage>> {
-    todo!()
-}
-
-fn read_page_v2(page: PageV2, descriptor: &ColumnDescriptor) -> Result<Arc<dyn DecodedPage>> {
-    todo!()
-}
-
-fn read_page_dictionary(
-    page: PageDict,
-    descriptor: &ColumnDescriptor,
-) -> Result<Arc<dyn DecodedPage>> {
-    todo!()
-}
-```
-
-Alternative: concatenate pages together in a single run, since pages are read by a single reader  (because they are sequential).
-
-Regardless, this requires consumer-specific knowledge (e.g. arrow may use buffers while non-arrow may use `Vec`). Thus, IMO we should just offer the APIs and decoders, and leave it for consumers to 
+This requires consumer-specific knowledge (e.g. arrow may use buffers while non-arrow may use `Vec`). Thus, IMO we should just offer the APIs and decoders, and leave it for consumers to 
 use them.
+
+For dictionary-encoded pages, we should only have to decode the keys once. However, doing so requires an in-memory representation.
