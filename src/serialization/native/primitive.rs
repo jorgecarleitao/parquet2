@@ -2,86 +2,22 @@ use std::convert::{TryFrom, TryInto};
 
 use parquet_format::Encoding;
 
-use super::levels;
+use super::super::levels;
+use super::super::utils::ValuesDef;
 use crate::encoding::{bitpacking, uleb128};
 use crate::errors::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
 use crate::{
-    read::{Page, PageDict},
+    read::{Page, PrimitivePageDict},
     types::NativeType,
 };
-
-struct ValuesDef<T, V, D>
-where
-    V: Iterator<Item = T>,
-    D: Iterator<Item = u32>,
-{
-    values: V,
-    def_levels: D,
-    max_def_level: u32,
-}
-
-impl<T, V, D> ValuesDef<T, V, D>
-where
-    V: Iterator<Item = T>,
-    D: Iterator<Item = u32>,
-{
-    pub fn new(values: V, def_levels: D, max_def_level: u32) -> Self {
-        Self {
-            values,
-            def_levels,
-            max_def_level,
-        }
-    }
-}
-
-impl<T, V, D> Iterator for ValuesDef<T, V, D>
-where
-    V: Iterator<Item = T>,
-    D: Iterator<Item = u32>,
-{
-    type Item = Option<T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.def_levels.next() {
-            Some(def) => {
-                if def == self.max_def_level {
-                    Some(self.values.next())
-                } else {
-                    Some(None)
-                }
-            }
-            None => None,
-        }
-    }
-}
-
-/// Returns an Iterator of values of type `T`.
-fn read_required<'a, T: NativeType>(values: &'a [u8]) -> Vec<T>
-where
-    <T as NativeType>::Bytes: TryFrom<&'a [u8]>,
-    <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
-{
-    let chunks = values.chunks_exact(std::mem::size_of::<T>());
-    assert_eq!(chunks.remainder().len(), 0);
-    chunks
-        .map(|chunk| {
-            let chunk: T::Bytes = chunk.try_into().unwrap();
-            T::from_le_bytes(chunk)
-        })
-        .collect()
-}
 
 fn read_buffer<'a, T: NativeType>(
     values: &'a [u8],
     length: u32,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
-) -> Vec<Option<T>>
-where
-    <T as NativeType>::Bytes: TryFrom<&'a [u8]>,
-    <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
-{
+) -> Vec<Option<T>> {
     // skip bytes from levels
     let offset = levels::needed_bytes(values, length, def_level_encoding);
     let def_levels = levels::decode(values, length, def_level_encoding);
@@ -98,7 +34,10 @@ where
         .map(|maybe_id| {
             maybe_id.map(|chunk| {
                 // unwrap is infalible due to the chunk size.
-                let chunk: T::Bytes = chunk.try_into().unwrap();
+                let chunk: T::Bytes = match chunk.try_into() {
+                    Ok(v) => v,
+                    Err(_) => panic!(),
+                };
                 T::from_le_bytes(chunk)
             })
         })
@@ -108,16 +47,12 @@ where
 fn read_dict_buffer<'a, T: NativeType>(
     values: &'a [u8],
     length: u32,
-    dict: &'a PageDict,
+    dict: &'a PrimitivePageDict<T>,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
-) -> Vec<Option<T>>
-where
-    <T as NativeType>::Bytes: TryFrom<&'a [u8]>,
-    <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
-{
+) -> Vec<Option<T>> {
     // todo: `match` its encoding
-    let dict_values = read_required::<'a, T>(&dict.buf);
+    let dict_values = dict.values();
 
     // skip bytes from levels
     let offset = levels::needed_bytes(values, length, def_level_encoding);
@@ -147,20 +82,16 @@ where
         .collect()
 }
 
-pub fn page_dict_to_vec<'a, T: NativeType>(
-    page: &'a Page,
+pub fn page_dict_to_vec<T: NativeType>(
+    page: &Page,
     descriptor: &ColumnDescriptor,
-) -> Result<Vec<Option<T>>>
-where
-    <T as NativeType>::Bytes: TryFrom<&'a [u8]>,
-    <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
-{
+) -> Result<Vec<Option<T>>> {
     match page {
         Page::V1(page) => match (&page.encoding, &page.dictionary_page) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer::<T>(
                 &page.buf,
                 page.num_values,
-                &dict,
+                dict.as_any().downcast_ref().unwrap(),
                 (&page.rep_level_encoding, descriptor.max_rep_level()),
                 (&page.def_level_encoding, descriptor.max_def_level()),
             )),

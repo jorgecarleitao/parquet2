@@ -1,5 +1,8 @@
+mod compression;
+pub use compression::decompress_page;
 mod metadata;
 mod page;
+mod page_dict;
 mod page_iterator;
 
 pub use metadata::read_metadata;
@@ -9,8 +12,9 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::errors::Result;
 use crate::metadata::{ParquetMetaData, RowGroupMetaData};
 
-pub use page::{Page, PageDict};
-use page_iterator::PageIterator;
+pub use page::Page;
+pub use page_dict::{BinaryPageDict, PageDict, PrimitivePageDict};
+pub use page_iterator::PageIterator;
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true
@@ -39,7 +43,8 @@ pub fn get_page_iterator<'b, RR: Read + Seek>(
     PageIterator::try_new(
         reader,
         column_metadata.num_values(),
-        column_metadata.compression(),
+        *column_metadata.compression(),
+        column_metadata.column_descriptor().clone(),
     )
 }
 

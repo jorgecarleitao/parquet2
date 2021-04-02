@@ -1,32 +1,23 @@
 use parquet_format::Encoding;
 
-use super::levels;
-use crate::encoding::{bitpacking, get_length, uleb128};
+use super::super::levels;
 use crate::errors::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
-use crate::read::{Page, PageDict};
-
-fn read_buffer(values: &[u8], length: u32) -> Vec<Option<Vec<u8>>> {
-    let mut values = values;
-    (0..length)
-        .map(|_| {
-            let length = get_length(values) as usize;
-            let item = values[4..4 + length].to_vec();
-            values = &values[4 + length..];
-            Some(item)
-        })
-        .collect()
-}
+use crate::read::Page;
+use crate::{
+    encoding::{bitpacking, uleb128},
+    read::BinaryPageDict,
+};
 
 fn read_dict_buffer(
     values: &[u8],
     length: u32,
-    dict: &PageDict,
+    dict: &BinaryPageDict,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Vec<Option<Vec<u8>>> {
-    // todo: parse these once per group, not once per page
-    let dict_values = read_buffer(&dict.buf, dict.num_values);
+    let dict_values = dict.values();
+    let dict_offsets = dict.offsets();
 
     // skip bytes from levels
     let offset = levels::needed_bytes(values, length, def_level_encoding);
@@ -46,7 +37,12 @@ fn read_dict_buffer(
 
     decompressed
         .into_iter()
-        .map(|id| dict_values[id as usize].clone())
+        .map(|id| {
+            let id = id as usize;
+            let start = dict_offsets[id] as usize;
+            let end = dict_offsets[id + 1] as usize;
+            Some(dict_values[start..end].to_vec())
+        })
         .collect()
 }
 
@@ -59,7 +55,7 @@ pub fn page_dict_to_vec(
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer(
                 &page.buf,
                 page.num_values,
-                &dict,
+                dict.as_any().downcast_ref().unwrap(),
                 (&page.rep_level_encoding, descriptor.max_rep_level()),
                 (&page.def_level_encoding, descriptor.max_def_level()),
             )),

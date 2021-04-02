@@ -1,15 +1,20 @@
 use std::sync::Arc;
 
-use parquet_format::Encoding;
+use parquet_format::{CompressionCodec, DataPageHeaderV2, Encoding};
 
+use super::page_dict::PageDict;
+
+/// a Page in the V1 of the format.
+/// `buf` is compressed.
 #[derive(Debug)]
 pub struct PageV1 {
     pub buf: Vec<u8>,
     pub num_values: u32,
     pub encoding: Encoding,
+    pub compression: (CompressionCodec, usize),
     pub def_level_encoding: Encoding,
     pub rep_level_encoding: Encoding,
-    pub dictionary_page: Option<Arc<PageDict>>,
+    pub dictionary_page: Option<Arc<dyn PageDict>>,
     //statistics: Option<Statistics>,
 }
 
@@ -18,14 +23,16 @@ impl PageV1 {
         buf: Vec<u8>,
         num_values: u32,
         encoding: Encoding,
+        compression: (CompressionCodec, usize),
         def_level_encoding: Encoding,
         rep_level_encoding: Encoding,
-        dictionary_page: Option<Arc<PageDict>>,
+        dictionary_page: Option<Arc<dyn PageDict>>,
     ) -> Self {
         Self {
             buf,
             num_values,
             encoding,
+            compression,
             def_level_encoding,
             rep_level_encoding,
             dictionary_page,
@@ -36,14 +43,9 @@ impl PageV1 {
 #[derive(Debug)]
 pub struct PageV2 {
     pub buf: Vec<u8>,
-    pub num_values: u32,
-    pub encoding: Encoding,
-    pub num_nulls: u32,
-    pub num_rows: u32,
-    pub def_levels_byte_len: u32,
-    pub rep_levels_byte_len: u32,
-    pub is_compressed: bool,
-    pub dictionary_page: Option<Arc<PageDict>>,
+    pub header: DataPageHeaderV2,
+    pub compression: (CompressionCodec, usize),
+    pub dictionary_page: Option<Arc<dyn PageDict>>,
     //statistics: Option<Statistics>,
 }
 
@@ -51,53 +53,22 @@ impl PageV2 {
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         buf: Vec<u8>,
-        num_values: u32,
-        encoding: Encoding,
-        num_nulls: u32,
-        num_rows: u32,
-        def_levels_byte_len: u32,
-        rep_levels_byte_len: u32,
-        is_compressed: bool,
-        dictionary_page: Option<Arc<PageDict>>,
+        header: DataPageHeaderV2,
+        compression: (CompressionCodec, usize),
+        dictionary_page: Option<Arc<dyn PageDict>>,
     ) -> Self {
         Self {
             buf,
-            num_values,
-            encoding,
-            num_nulls,
-            num_rows,
-            def_levels_byte_len,
-            rep_levels_byte_len,
-            is_compressed,
+            header,
+            compression,
             dictionary_page,
         }
     }
 }
 
-// todo: make this decoded on the first read, so that it does not need to be decoded on every
-// page. Requires introducing typing to this struct :/
-#[derive(Debug)]
-pub struct PageDict {
-    pub buf: Vec<u8>,
-    pub num_values: u32,
-    pub encoding: Encoding,
-    pub is_sorted: bool,
-}
-
-impl PageDict {
-    pub fn new(buf: Vec<u8>, num_values: u32, encoding: Encoding, is_sorted: bool) -> Self {
-        Self {
-            buf,
-            num_values,
-            encoding,
-            is_sorted,
-        }
-    }
-}
-
-/// A page is an uncompressed, encoded representation of a Parquet page. It holds actual data
-/// and thus memory operations on it are expensive.
-/// Its in-memory representation depends on its type.
+/// A [`Page`] is an uncompressed, encoded representation of a Parquet page. It holds actual data
+/// and thus cloning it is expensive.
+/// Parquet has two page versions, which this enum accounts for.
 #[derive(Debug)]
 pub enum Page {
     V1(PageV1),
@@ -105,10 +76,17 @@ pub enum Page {
 }
 
 impl Page {
-    pub fn dictionary_page(&self) -> Option<&PageDict> {
+    pub fn dictionary_page(&self) -> Option<&dyn PageDict> {
         match self {
             Page::V1(page) => page.dictionary_page.as_ref().map(|x| x.as_ref()),
             Page::V2(page) => page.dictionary_page.as_ref().map(|x| x.as_ref()),
+        }
+    }
+
+    pub fn compression(&self) -> &(CompressionCodec, usize) {
+        match self {
+            Page::V1(page) => &page.compression,
+            Page::V2(page) => &page.compression,
         }
     }
 }

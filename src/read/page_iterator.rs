@@ -3,13 +3,11 @@ use std::{io::Read, sync::Arc};
 use parquet_format::{CompressionCodec, PageHeader, PageType};
 use thrift::protocol::TCompactInputProtocol;
 
-use crate::compression::Codec;
-use crate::{
-    compression::create_codec,
-    errors::{ParquetError, Result},
-};
+use crate::schema::types::ParquetType;
+use crate::{errors::Result, metadata::ColumnDescriptor};
 
-use super::page::{Page, PageDict, PageV1, PageV2};
+use super::page::{Page, PageV1, PageV2};
+use super::page_dict::{read_page_dict, PageDict};
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -18,8 +16,7 @@ pub struct PageIterator<'a, R: Read> {
     // The source
     reader: &'a mut R,
 
-    // The compression codec for this column chunk. None represents PLAIN.
-    decompressor: Option<Box<dyn Codec>>,
+    compression: CompressionCodec,
 
     // The number of values we have seen so far.
     seen_num_values: i64,
@@ -27,23 +24,27 @@ pub struct PageIterator<'a, R: Read> {
     // The number of total values in this column chunk.
     total_num_values: i64,
 
-    // Arc: it will be shared between multiple pages
-    current_dictionary: Option<Arc<PageDict>>,
+    // Arc: it will be shared between multiple pages and pages should be Send + Sync.
+    current_dictionary: Option<Arc<dyn PageDict>>,
+
+    //
+    descriptor: ColumnDescriptor,
 }
 
 impl<'a, R: Read> PageIterator<'a, R> {
     pub fn try_new(
         reader: &'a mut R,
         total_num_values: i64,
-        compression: &CompressionCodec,
+        compression: CompressionCodec,
+        descriptor: ColumnDescriptor,
     ) -> Result<Self> {
-        let decompressor = create_codec(compression)?;
         Ok(Self {
             reader,
             total_num_values,
-            decompressor,
+            compression,
             seen_num_values: 0,
             current_dictionary: None,
+            descriptor,
         })
     }
 
@@ -52,6 +53,10 @@ impl<'a, R: Read> PageIterator<'a, R> {
         let mut prot = TCompactInputProtocol::new(&mut self.reader);
         let page_header = PageHeader::read_from_in_protocol(&mut prot)?;
         Ok(page_header)
+    }
+
+    pub fn descriptor(&self) -> &ColumnDescriptor {
+        &self.descriptor
     }
 }
 
@@ -63,95 +68,65 @@ impl<'a, R: Read> Iterator for PageIterator<'a, R> {
     }
 }
 
+/// This function is lightweight and executes a minimal amount of work so that it is IO bounded.
+// Any un-necessary CPU-intensive tasks SHOULD be executed on individual pages.
 fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
     while reader.seen_num_values < reader.total_num_values {
         let page_header = reader.read_page_header()?;
 
-        // When processing data page v2, depending on enabled compression for the
-        // page, we should account for uncompressed data ('offset') of
-        // repetition and definition levels.
-        //
-        // We always use 0 offset for other pages other than v2, `true` flag means
-        // that compression will be applied if decompressor is defined
-        let mut offset: usize = 0;
-        let mut can_decompress = true;
-
-        if let Some(ref header_v2) = page_header.data_page_header_v2 {
-            offset = (header_v2.definition_levels_byte_length
-                + header_v2.repetition_levels_byte_length) as usize;
-            // When is_compressed flag is missing the page is considered compressed
-            can_decompress = header_v2.is_compressed.unwrap_or(true);
-        }
-
-        let compressed_len = page_header.compressed_page_size as usize - offset;
-        let uncompressed_len = page_header.uncompressed_page_size as usize - offset;
-        // We still need to read all bytes from buffered stream
-        let mut buffer = vec![0; offset + compressed_len];
+        let mut buffer = vec![0; page_header.compressed_page_size as usize];
         reader.reader.read_exact(&mut buffer)?;
-
-        if let Some(decompressor) = reader.decompressor.as_mut() {
-            if can_decompress {
-                let mut decompressed_buffer = Vec::with_capacity(uncompressed_len);
-                let decompressed_size =
-                    decompressor.decompress(&buffer[offset..], &mut decompressed_buffer)?;
-                if decompressed_size != uncompressed_len {
-                    return Err(general_err!(
-                        "Actual decompressed size doesn't match the expected one ({} vs {})",
-                        decompressed_size,
-                        uncompressed_len
-                    ));
-                }
-                if offset == 0 {
-                    buffer = decompressed_buffer;
-                } else {
-                    // Prepend saved offsets to the buffer
-                    buffer.truncate(offset);
-                    buffer.append(&mut decompressed_buffer);
-                }
-            }
-        }
 
         let result = match page_header.type_ {
             PageType::DictionaryPage => {
-                assert!(page_header.dictionary_page_header.is_some());
                 let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
                 let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
-                reader.current_dictionary = Some(Arc::new(PageDict::new(
+                let physical = match reader.descriptor.type_() {
+                    ParquetType::PrimitiveType { physical_type, .. } => physical_type,
+                    _ => unreachable!(),
+                };
+
+                let page = read_page_dict(
                     buffer,
                     dict_header.num_values as u32,
-                    dict_header.encoding,
+                    (
+                        reader.compression,
+                        page_header.uncompressed_page_size as usize,
+                    ),
                     is_sorted,
-                )));
+                    *physical,
+                )?;
+
+                reader.current_dictionary = Some(page);
                 continue;
             }
             PageType::DataPage => {
-                assert!(page_header.data_page_header.is_some());
                 let header = page_header.data_page_header.unwrap();
                 reader.seen_num_values += header.num_values as i64;
                 Page::V1(PageV1::new(
                     buffer,
                     header.num_values as u32,
                     header.encoding,
+                    (
+                        reader.compression,
+                        page_header.uncompressed_page_size as usize,
+                    ),
                     header.definition_level_encoding,
                     header.repetition_level_encoding,
                     reader.current_dictionary.clone(),
                 ))
             }
             PageType::DataPageV2 => {
-                assert!(page_header.data_page_header_v2.is_some());
                 let header = page_header.data_page_header_v2.unwrap();
-                let is_compressed = header.is_compressed.unwrap_or(true);
                 reader.seen_num_values += header.num_values as i64;
                 Page::V2(PageV2::new(
                     buffer,
-                    header.num_values as u32,
-                    header.encoding,
-                    header.num_nulls as u32,
-                    header.num_rows as u32,
-                    header.definition_levels_byte_length as u32,
-                    header.repetition_levels_byte_length as u32,
-                    is_compressed,
+                    header,
+                    (
+                        reader.compression,
+                        page_header.uncompressed_page_size as usize,
+                    ),
                     reader.current_dictionary.clone(),
                 ))
             }

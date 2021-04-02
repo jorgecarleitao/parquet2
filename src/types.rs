@@ -1,6 +1,8 @@
+use std::convert::TryFrom;
+
 /// A physical native representation of a Parquet fixed-sized type.
-pub trait NativeType: Sized + Copy + std::fmt::Debug {
-    type Bytes: AsRef<[u8]>;
+pub trait NativeType: Sized + Copy + std::fmt::Debug + 'static {
+    type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
 
