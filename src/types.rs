@@ -1,4 +1,5 @@
-pub unsafe trait NativeType: Sized + Copy {
+/// A physical native representation of a Parquet fixed-sized type.
+pub trait NativeType: Sized + Copy + std::fmt::Debug {
     type Bytes: AsRef<[u8]>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
@@ -10,7 +11,7 @@ pub unsafe trait NativeType: Sized + Copy {
 
 macro_rules! native {
     ($type:ty) => {
-        unsafe impl NativeType for $type {
+        impl NativeType for $type {
             type Bytes = [u8; std::mem::size_of::<Self>()];
             #[inline]
             fn to_le_bytes(&self) -> Self::Bytes {

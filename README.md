@@ -3,7 +3,7 @@
 This is an experiment, a re-write of the parquet crate that
 * delegates parallelism downstream
 * deletages decoding batches downstream
-* no `unsafe` so far
+* no `unsafe`
 
 ## Organization
 
