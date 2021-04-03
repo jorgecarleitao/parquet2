@@ -234,15 +234,17 @@ mod lz4_codec {
     impl Codec for Lz4Codec {
         fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize> {
             let mut decoder = lz4::Decoder::new(input_buf)?;
-            let mut buffer: [u8; LZ4_BUFFER_SIZE] = [0; LZ4_BUFFER_SIZE];
             let mut total_len = 0;
             loop {
-                let len = decoder.read(&mut buffer)?;
-                if len == 0 {
+                let previous_len = output_buf.len();
+                output_buf.extend(std::iter::repeat(0).take(LZ4_BUFFER_SIZE));
+                let len =
+                    decoder.read(&mut output_buf[previous_len..previous_len + LZ4_BUFFER_SIZE])?;
+                total_len += len;
+                if len < LZ4_BUFFER_SIZE {
+                    output_buf.truncate(total_len);
                     break;
                 }
-                total_len += len;
-                output_buf.write_all(&buffer[0..len])?;
             }
             Ok(total_len)
         }
