@@ -1,0 +1,6 @@
+Cython==0.29.22
+numpy==1.19.5
+pkg-resources==0.0.0
+py4j==0.10.9
+pyarrow==2.0.0
+pyspark==3.1.1
