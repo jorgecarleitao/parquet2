@@ -1,24 +1,24 @@
 mod primitive;
 
-use std::io::Read;
-
 use arrow2::{array::Array, datatypes::DataType};
 
-use crate::errors::Result;
-use crate::read::PageIterator;
 use crate::schema::types::{ParquetType, PhysicalType};
+use crate::{errors::Result, metadata::ColumnDescriptor, read::Page};
 
-pub fn page_iter_to_array<R: Read>(mut iter: PageIterator<R>) -> Result<Box<dyn Array>> {
-    let descriptor = iter.descriptor();
-
+pub fn page_iter_to_array<I: Iterator<Item = Result<Page>>>(
+    iter: I,
+    descriptor: &ColumnDescriptor,
+) -> Result<Box<dyn Array>> {
     match descriptor.type_() {
         ParquetType::PrimitiveType { physical_type, .. } => match physical_type {
-            PhysicalType::Int32 => Ok(Box::new(primitive::iter_to_array::<_, i32>(
-                &mut iter,
+            PhysicalType::Int32 => Ok(Box::new(primitive::iter_to_array::<i32, _>(
+                iter,
+                descriptor,
                 DataType::Int32,
             )?)),
-            PhysicalType::Int64 => Ok(Box::new(primitive::iter_to_array::<_, i64>(
-                &mut iter,
+            PhysicalType::Int64 => Ok(Box::new(primitive::iter_to_array::<i64, _>(
+                iter,
+                descriptor,
                 DataType::Int64,
             )?)),
             _ => todo!(),
@@ -45,7 +45,9 @@ mod tests {
         let metadata = read_metadata(&mut file)?;
         let iter = get_page_iterator(&metadata, row_group, column, &mut file)?;
 
-        page_iter_to_array(iter)
+        let descriptor = &iter.descriptor().clone();
+
+        page_iter_to_array(iter, descriptor)
     }
 
     #[test]

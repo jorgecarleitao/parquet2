@@ -84,7 +84,7 @@ mod tests {
     use std::path::PathBuf;
 
     use crate::read::{get_page_iterator, read_metadata};
-    use crate::tests::get_path;
+    use crate::tests::{alltypes_plain, get_path};
     use crate::types::int96_to_i64;
 
     use super::*;
@@ -121,108 +121,60 @@ mod tests {
         page_to_array(page, &descriptor)
     }
 
-    fn test_column(column: usize, expected: &Array) -> Result<()> {
+    fn test_column(column: usize) -> Result<()> {
         let result = get_column(column)?;
-        assert_eq!(&result, expected);
+        assert_eq!(result, alltypes_plain(column));
         Ok(())
     }
 
     #[test]
     fn int32() -> Result<()> {
-        let expected = vec![4, 5, 6, 7, 2, 3, 0, 1];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Int32(expected);
-        test_column(0, &expected)
+        test_column(0)
     }
 
     #[test]
     fn bool() -> Result<()> {
-        let expected = vec![true, false, true, false, true, false, true, false];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Boolean(expected);
-        test_column(1, &expected)
+        test_column(1)
     }
 
     #[test]
     fn tiny_int() -> Result<()> {
-        let expected = vec![0, 1, 0, 1, 0, 1, 0, 1];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Int32(expected);
-        test_column(2, &expected)
+        test_column(2)
     }
 
     #[test]
     fn smallint_col() -> Result<()> {
-        let expected = vec![0, 1, 0, 1, 0, 1, 0, 1];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Int32(expected);
-        test_column(3, &expected)
+        test_column(3)
     }
 
     #[test]
     fn int_col() -> Result<()> {
-        let expected = vec![0, 1, 0, 1, 0, 1, 0, 1];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Int32(expected);
-        test_column(4, &expected)
+        test_column(4)
     }
 
     #[test]
     fn bigint_col() -> Result<()> {
-        let expected = vec![0, 10, 0, 10, 0, 10, 0, 10];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Int64(expected);
-        test_column(5, &expected)
+        test_column(5)
     }
 
     #[test]
     fn float32_col() -> Result<()> {
-        let expected = vec![0.0, 1.1, 0.0, 1.1, 0.0, 1.1, 0.0, 1.1];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Float32(expected);
-        test_column(6, &expected)
+        test_column(6)
     }
 
     #[test]
     fn float64_col() -> Result<()> {
-        let expected = vec![0.0, 10.1, 0.0, 10.1, 0.0, 10.1, 0.0, 10.1];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Float64(expected);
-        test_column(7, &expected)
+        test_column(7)
     }
 
     #[test]
     fn date_string_col() -> Result<()> {
-        let expected = vec![
-            vec![48, 51, 47, 48, 49, 47, 48, 57],
-            vec![48, 51, 47, 48, 49, 47, 48, 57],
-            vec![48, 52, 47, 48, 49, 47, 48, 57],
-            vec![48, 52, 47, 48, 49, 47, 48, 57],
-            vec![48, 50, 47, 48, 49, 47, 48, 57],
-            vec![48, 50, 47, 48, 49, 47, 48, 57],
-            vec![48, 49, 47, 48, 49, 47, 48, 57],
-            vec![48, 49, 47, 48, 49, 47, 48, 57],
-        ];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Binary(expected);
-        test_column(8, &expected)
+        test_column(8)
     }
 
     #[test]
     fn string_col() -> Result<()> {
-        let expected = vec![
-            vec![48],
-            vec![49],
-            vec![48],
-            vec![49],
-            vec![48],
-            vec![49],
-            vec![48],
-            vec![49],
-        ];
-        let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let expected = Array::Binary(expected);
-        test_column(9, &expected)
+        test_column(9)
     }
 
     #[test]

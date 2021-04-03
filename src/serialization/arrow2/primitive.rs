@@ -1,5 +1,4 @@
 use std::convert::TryInto;
-use std::io::Read;
 
 use arrow2::{
     array::PrimitiveArray, bitmap::MutableBitmap, buffer::MutableBuffer, datatypes::DataType,
@@ -8,12 +7,12 @@ use arrow2::{
 use parquet_format::Encoding;
 
 use crate::encoding::{bitpacking, uleb128};
+use crate::types::NativeType;
 use crate::{
     errors::{ParquetError, Result},
     metadata::ColumnDescriptor,
     read::{decompress_page, Page, PrimitivePageDict},
 };
-use crate::{read::PageIterator, types::NativeType};
 
 use super::super::levels;
 use super::super::utils::ValuesDef;
@@ -100,12 +99,15 @@ fn read_buffer<T: NativeType + ArrowNativeType>(
     unsafe { values.extend_from_trusted_len_iter(iterator) }
 }
 
-pub fn iter_to_array<R: Read, T: NativeType + ArrowNativeType>(
-    iter: &mut PageIterator<R>,
+pub fn iter_to_array<T, I>(
+    mut iter: I,
+    descriptor: &ColumnDescriptor,
     data_type: DataType,
-) -> Result<PrimitiveArray<T>> {
-    let descriptor = iter.descriptor().clone();
-
+) -> Result<PrimitiveArray<T>>
+where
+    T: NativeType + ArrowNativeType,
+    I: Iterator<Item = Result<Page>>,
+{
     // todo: push metadata from the file to get this capacity
     let capacity = 0;
     let mut values = MutableBuffer::<T>::with_capacity(capacity);
@@ -119,7 +121,7 @@ pub fn iter_to_array<R: Read, T: NativeType + ArrowNativeType>(
     ))
 }
 
-pub fn extend_from_page<T: NativeType + ArrowNativeType>(
+fn extend_from_page<T: NativeType + ArrowNativeType>(
     page: Page,
     descriptor: &ColumnDescriptor,
     values: &mut MutableBuffer<T>,
