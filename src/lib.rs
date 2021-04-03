@@ -117,4 +117,46 @@ mod tests {
             _ => unreachable!(),
         }
     }
+
+    pub fn pyarrow_integration(column: usize) -> Array {
+        match column {
+            0 => Array::Int64(vec![
+                Some(0),
+                Some(1),
+                None,
+                Some(3),
+                None,
+                Some(5),
+                Some(6),
+                Some(7),
+                None,
+                Some(9),
+            ]),
+            1 => Array::Float64(vec![
+                Some(0.0),
+                Some(1.0),
+                None,
+                Some(3.0),
+                None,
+                Some(5.0),
+                Some(6.0),
+                Some(7.0),
+                None,
+                Some(9.0),
+            ]),
+            2 => Array::Binary(vec![
+                Some(b"Hello".to_vec()),
+                None,
+                Some(b"aa".to_vec()),
+                Some(b"".to_vec()),
+                None,
+                Some(b"abc".to_vec()),
+                None,
+                None,
+                Some(b"def".to_vec()),
+                Some(b"aaa".to_vec()),
+            ]),
+            _ => unreachable!(),
+        }
+    }
 }
