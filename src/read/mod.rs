@@ -9,7 +9,7 @@ pub use metadata::read_metadata;
 
 use std::io::{Read, Seek, SeekFrom};
 
-use crate::errors::Result;
+use crate::error::Result;
 use crate::metadata::{ParquetMetaData, RowGroupMetaData};
 
 pub use page::Page;

@@ -9,7 +9,7 @@ use std::{any::Any, sync::Arc};
 use parquet_format::CompressionCodec;
 
 use crate::compression::create_codec;
-use crate::errors::Result;
+use crate::error::Result;
 use crate::schema::types::PhysicalType;
 
 use super::compression::decompress;

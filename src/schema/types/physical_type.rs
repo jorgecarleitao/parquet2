@@ -1,5 +1,5 @@
 use super::Type;
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum PhysicalType {

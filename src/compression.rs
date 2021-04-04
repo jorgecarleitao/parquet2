@@ -17,7 +17,7 @@
 
 pub use parquet_format::CompressionCodec;
 
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 
 /// Parquet compression codec interface.
 pub trait Codec: std::fmt::Debug {
@@ -61,7 +61,7 @@ mod snappy_codec {
     use snap::raw::{decompress_len, max_compress_len, Decoder, Encoder};
 
     use crate::compression::Codec;
-    use crate::errors::Result;
+    use crate::error::Result;
 
     /// Codec for Snappy compression format.
     #[derive(Debug)]
@@ -112,7 +112,7 @@ mod gzip_codec {
     use flate2::{read, write, Compression};
 
     use crate::compression::Codec;
-    use crate::errors::Result;
+    use crate::error::Result;
 
     /// Codec for GZIP compression algorithm.
     #[derive(Debug)]
@@ -147,7 +147,7 @@ mod brotli_codec {
     use std::io::{Read, Write};
 
     use crate::compression::Codec;
-    use crate::errors::Result;
+    use crate::error::Result;
 
     const BROTLI_DEFAULT_BUFFER_SIZE: usize = 4096;
     const BROTLI_DEFAULT_COMPRESSION_QUALITY: u32 = 1; // supported levels 0-9
@@ -191,7 +191,7 @@ mod lz4_codec {
     use std::io::{Read, Write};
 
     use crate::compression::Codec;
-    use crate::errors::Result;
+    use crate::error::Result;
 
     const LZ4_BUFFER_SIZE: usize = 4096;
 
@@ -247,7 +247,7 @@ mod zstd_codec {
     use std::io::{self, Write};
 
     use crate::compression::Codec;
-    use crate::errors::Result;
+    use crate::error::Result;
 
     /// Codec for Zstandard compression algorithm.
     #[derive(Debug)]

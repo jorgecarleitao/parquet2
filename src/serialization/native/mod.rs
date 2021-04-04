@@ -6,7 +6,7 @@ mod boolean;
 mod primitive;
 mod utils;
 
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
 use crate::schema::types::PhysicalType;
 use crate::{
@@ -89,7 +89,7 @@ mod tests {
     use crate::types::int96_to_i64;
 
     use super::*;
-    use crate::{errors::Result, metadata::ColumnDescriptor, read::Page};
+    use crate::{error::Result, metadata::ColumnDescriptor, read::Page};
 
     fn prepare(
         path: &str,

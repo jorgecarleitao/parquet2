@@ -1,5 +1,5 @@
 use crate::compression::{create_codec, Codec};
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 
 use super::page::{PageV1, PageV2};
 use super::Page;

@@ -29,7 +29,7 @@ use super::super::metadata::ColumnOrder;
 use super::super::metadata::SchemaDescriptor;
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
 
 // see (unstable) Seek::stream_len

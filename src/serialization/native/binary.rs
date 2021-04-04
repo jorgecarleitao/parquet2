@@ -1,7 +1,7 @@
 use parquet_format::Encoding;
 
 use super::super::levels;
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
 use crate::read::Page;
 use crate::{

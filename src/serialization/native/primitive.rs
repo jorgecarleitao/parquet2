@@ -5,7 +5,7 @@ use parquet_format::Encoding;
 use super::super::levels;
 use super::utils::ValuesDef;
 use crate::encoding::{bitpacking, uleb128};
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
 use crate::{
     read::{Page, PrimitivePageDict},

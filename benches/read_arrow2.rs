@@ -4,7 +4,7 @@ use std::{fs::File, path::PathBuf};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use parquet2::errors::Result;
+use parquet2::error::Result;
 use parquet2::read::{get_page_iterator, read_metadata};
 use parquet2::serialization::arrow2::page_iter_to_array;
 

@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::errors::Result;
+use crate::error::Result;
 use crate::{encoding::get_length, schema::types::PhysicalType};
 
 use super::PageDict;

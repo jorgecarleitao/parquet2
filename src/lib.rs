@@ -1,5 +1,5 @@
 #[macro_use]
-pub mod errors;
+pub mod error;
 pub mod schema;
 pub mod compression;
 pub mod encoding;

@@ -1,7 +1,7 @@
 use parquet_format::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::{column_descriptor::ColumnDescriptor, column_path::ColumnPath};
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 use crate::{compression::CompressionCodec, schema::types::Type};
 
 /// Metadata for a column chunk.

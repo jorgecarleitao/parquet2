@@ -4,7 +4,7 @@ use parquet_format::{CompressionCodec, PageHeader, PageType};
 use thrift::protocol::TCompactInputProtocol;
 
 use crate::schema::types::ParquetType;
-use crate::{errors::Result, metadata::ColumnDescriptor};
+use crate::{error::Result, metadata::ColumnDescriptor};
 
 use super::page::{Page, PageV1, PageV2};
 use super::page_dict::{read_page_dict, PageDict};

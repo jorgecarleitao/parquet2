@@ -1,6 +1,6 @@
 use parquet_format::SchemaElement;
 
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 
 use super::super::types::{
     converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,

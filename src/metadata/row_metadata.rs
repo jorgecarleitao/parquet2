@@ -1,7 +1,7 @@
 use parquet_format::RowGroup;
 
 use super::{column_chunk_metadata::ColumnChunkMetaData, schema_descriptor::SchemaDescriptor};
-use crate::errors::Result;
+use crate::error::Result;
 
 /// Metadata for a row group.
 #[derive(Debug, Clone)]

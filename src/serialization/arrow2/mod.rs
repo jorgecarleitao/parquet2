@@ -7,7 +7,7 @@ use arrow2::{array::Array, datatypes::DataType};
 
 use crate::schema::types::{LogicalType, ParquetType, PhysicalType, PrimitiveConvertedType};
 use crate::{
-    errors::{ParquetError, Result},
+    error::{ParquetError, Result},
     metadata::ColumnDescriptor,
     read::Page,
 };
@@ -92,7 +92,7 @@ mod tests {
     use super::*;
     use crate::tests::pyarrow_integration;
     use crate::{
-        errors::Result,
+        error::Result,
         read::{get_page_iterator, read_metadata},
     };
 

@@ -6,7 +6,7 @@ pub use to_thrift::*;
 
 #[cfg(test)]
 mod tests {
-    use crate::errors::Result;
+    use crate::error::Result;
     use crate::schema::io_message::from_message;
     use crate::schema::types::ParquetType;
 

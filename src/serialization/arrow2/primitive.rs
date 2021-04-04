@@ -9,7 +9,7 @@ use parquet_format::Encoding;
 
 use crate::{
     encoding::get_length,
-    errors::{ParquetError, Result},
+    error::{ParquetError, Result},
     metadata::ColumnDescriptor,
     read::{decompress_page, Page, PrimitivePageDict},
 };

@@ -47,7 +47,7 @@ use super::super::types::{
     ParquetType,
 };
 use super::super::{Repetition, Type};
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 
 fn converted_group_from_str(s: &str) -> Result<parquet_format::ConvertedType> {
     use parquet_format::ConvertedType::*;

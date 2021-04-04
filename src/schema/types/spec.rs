@@ -1,5 +1,5 @@
 // see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 
 use super::{LogicalType, PhysicalType, PrimitiveConvertedType, TimeType, TimeUnit};
 

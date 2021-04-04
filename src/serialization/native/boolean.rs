@@ -1,6 +1,6 @@
 use parquet_format::Encoding;
 
-use crate::errors::Result;
+use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 use crate::read::Page;
 

@@ -1,4 +1,4 @@
-use crate::errors::{ParquetError, Result};
+use crate::error::{ParquetError, Result};
 use parquet_format::ConvertedType;
 
 #[derive(Clone, Debug, PartialEq)]

@@ -1,5 +1,5 @@
 // see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
-use crate::errors::Result;
+use crate::error::Result;
 use std::collections::HashMap;
 
 use super::{

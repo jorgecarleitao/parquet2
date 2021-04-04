@@ -1,6 +1,6 @@
 use std::{any::Any, convert::TryFrom, convert::TryInto, sync::Arc};
 
-use crate::errors::Result;
+use crate::error::Result;
 use crate::{schema::types::PhysicalType, types::NativeType};
 
 use super::PageDict;
