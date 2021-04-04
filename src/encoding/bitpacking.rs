@@ -7,8 +7,10 @@ pub fn required_capacity(length: u32) -> usize {
     chunks_n * BitPacker1x::BLOCK_LEN
 }
 
-/// Decodes bitpacked bytes into `u32` values in `num_bits`.
+/// Decodes bitpacked bytes of `num_bits` into `u32`.
 /// Returns the number of decoded values.
+/// # Panics
+/// Panics if `decompressed` has less than [`required_capacity`]
 pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usize {
     let bitpacker = BitPacker1x::new();
 
@@ -38,6 +40,8 @@ pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usiz
     compressed.len() / num_bits as usize * 8
 }
 
+/// Decodes bitpacked bytes into `u32` values in `num_bits`.
+/// Returns the number of decoded values.
 pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usize {
     let bitpacker = BitPacker1x::new();
 
@@ -58,7 +62,6 @@ pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usiz
             compressed_len += bitpacker.compress(&chunk, chunk_compressed, num_bits);
         });
     decompressed.len() * num_bits as usize / 8
-    //compressed_len - trailing * num_bits as usize / 8
 }
 
 #[cfg(test)]

@@ -18,12 +18,16 @@ def case1(size = 1):
     }, f"basic_nulls_{size}.parquet"
 
 def write_case1_pyarrow(size = 1):
-    data, path = case1(size = 1)
+    data, path = case1(size)
     t = pyarrow.table(data)
     os.makedirs(PYARROW_PATH, exist_ok=True)
     pyarrow.parquet.write_table(t, f"{PYARROW_PATH}/{path}")
 
-write_case1_pyarrow()
+write_case1_pyarrow(1)
+write_case1_pyarrow(10)
+write_case1_pyarrow(100)
+write_case1_pyarrow(1000)
+write_case1_pyarrow(10000)
 exit(0) # we are only testing against pyarrow in the code.
 
 def write_case1_pyspark():

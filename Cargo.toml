@@ -28,7 +28,14 @@ default-features = false
 features = []
 optional = true
 
+[dev-dependencies]
+criterion = "0.3"
+
 [features]
 default = ["snappy", "gzip", "lz4", "zstd", "brotli", "arrow2"]
 snappy = ["snap"]
 gzip = ["flate2"]
+
+[[bench]]
+name = "read_arrow2"
+harness = false
