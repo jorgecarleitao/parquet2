@@ -42,9 +42,6 @@ fn read_compressed_pages(size: usize) -> Result<()> {
 }
 
 fn add_benchmark(c: &mut Criterion) {
-    c.bench_function("read_compressed_pages_1", |b| {
-        b.iter(|| read_compressed_pages(1))
-    });
     c.bench_function("read_compressed_pages_10", |b| {
         b.iter(|| read_compressed_pages(10))
     });
@@ -58,9 +55,6 @@ fn add_benchmark(c: &mut Criterion) {
         b.iter(|| read_compressed_pages(10000))
     });
 
-    c.bench_function("read_decompressed_pages_1", |b| {
-        b.iter(|| read_decompressed_pages(1))
-    });
     c.bench_function("read_decompressed_pages_10", |b| {
         b.iter(|| read_decompressed_pages(10))
     });

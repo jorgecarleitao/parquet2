@@ -93,7 +93,7 @@ mod tests {
     #[test]
     fn pyarrow_integration_int64() -> Result<()> {
         let column = 0;
-        let path = "fixtures/pyarrow3/basic_nulls_1.parquet";
+        let path = "fixtures/pyarrow3/basic_nulls_10.parquet";
         let array = get_column(path, 0, column)?;
 
         let expected = native_to_arrow(pyarrow_integration(column));
@@ -106,7 +106,7 @@ mod tests {
     #[test]
     fn pyarrow_integration_float64() -> Result<()> {
         let column = 1;
-        let path = "fixtures/pyarrow3/basic_nulls_1.parquet";
+        let path = "fixtures/pyarrow3/basic_nulls_10.parquet";
         let array = get_column(path, 0, column)?;
 
         let expected = native_to_arrow(pyarrow_integration(column));
@@ -121,7 +121,7 @@ mod tests {
     #[ignore]
     fn pyarrow_integration_string() -> Result<()> {
         let column = 2;
-        let path = "fixtures/pyarrow3/basic_nulls_1.parquet";
+        let path = "fixtures/pyarrow3/basic_nulls_10.parquet";
         let array = get_column(path, 0, column)?;
 
         let expected = native_to_arrow(pyarrow_integration(column));

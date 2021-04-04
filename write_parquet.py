@@ -15,7 +15,7 @@ def case1(size = 1):
         "int64": int64,
         "float64": float64,
         "string": string,
-    }, f"basic_nulls_{size}.parquet"
+    }, f"basic_nulls_{size*10}.parquet"
 
 def write_case1_pyarrow(size = 1):
     data, path = case1(size)
@@ -27,7 +27,6 @@ write_case1_pyarrow(1)
 write_case1_pyarrow(10)
 write_case1_pyarrow(100)
 write_case1_pyarrow(1000)
-write_case1_pyarrow(10000)
 exit(0) # we are only testing against pyarrow in the code.
 
 def write_case1_pyspark():
