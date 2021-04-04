@@ -15,31 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! Contains codec interface and supported codec implementations.
-//!
-//! See [`CompressionCodec`](crate::basic::CompressionCodec) enum for all available compression
-//! algorithms.
-//!
-//! # Example
-//!
-//! ```no_run
-//! use parquet::{basic::CompressionCodec, compression::create_codec};
-//!
-//! let mut codec = match create_codec(CompressionCodec::SNAPPY) {
-//!     Ok(Some(codec)) => codec,
-//!     _ => panic!(),
-//! };
-//!
-//! let data = vec![b'p', b'a', b'r', b'q', b'u', b'e', b't'];
-//! let mut compressed = vec![];
-//! codec.compress(&data[..], &mut compressed).unwrap();
-//!
-//! let mut output = vec![];
-//! codec.decompress(&compressed[..], &mut output).unwrap();
-//!
-//! assert_eq!(output, data);
-//! ```
-
 pub use parquet_format::CompressionCodec;
 
 use crate::errors::{ParquetError, Result};
