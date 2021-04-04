@@ -204,33 +204,4 @@ mod tests {
         };
         Ok(())
     }
-
-    #[test]
-    fn test_pyarrow_integration() -> Result<()> {
-        let column = 0;
-        let path = "pyarrow3/basic_nulls_10.parquet";
-        let (descriptor, mut pages) = prepare(path, 0, column, "fixtures".into())?;
-        assert_eq!(pages.len(), 1);
-
-        let page = pages.pop().unwrap();
-
-        let array = page_to_array(page, &descriptor)?;
-
-        let expected = Array::Int64(vec![
-            Some(0),
-            Some(1),
-            None,
-            Some(3),
-            None,
-            Some(5),
-            Some(6),
-            Some(7),
-            None,
-            Some(9),
-        ]);
-
-        assert_eq!(array, expected,);
-
-        Ok(())
-    }
 }
