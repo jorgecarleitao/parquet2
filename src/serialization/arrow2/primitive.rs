@@ -40,31 +40,41 @@ fn read_dict_buffer<'a, T: NativeType + ArrowNativeType>(
     let indices_buffer = &indices_buffer[1..];
 
     let non_null_indices_len = (buffer.len() * 8 / bit_width as usize) as u32;
-    let indices = levels::rle_decode(&indices_buffer, bit_width as u32, non_null_indices_len);
+    let mut indices =
+        levels::rle_decode(&indices_buffer, bit_width as u32, non_null_indices_len).into_iter();
 
     let validity_iterator = hybrid_rle::Decoder::new(&validity_buffer, 1);
 
     validity.reserve(length);
     values.reserve(length);
-    let mut current_len = 0;
     for run in validity_iterator {
         match run {
             hybrid_rle::HybridEncoded::Bitpacked(packed) => {
-                // bitpacked has the same representation as arrow's bitmaps and thus we can just copy
-                // them. Arrow2 has no API to extend from a slice, so we do it bit by bit
-                let len = std::cmp::min(packed.len() * 8, length);
+                let remaining = length - values.len();
+                let len = std::cmp::min(packed.len() * 8, remaining);
                 for is_valid in BitmapIter::new(packed, 0, len) {
                     validity.push(is_valid);
                     let value = if is_valid {
-                        current_len += 1;
-                        dict_values[indices[current_len - 1] as usize]
+                        dict_values[indices.next().unwrap() as usize]
                     } else {
                         T::default()
                     };
                     values.push(value);
                 }
             }
-            _ => todo!(),
+            hybrid_rle::HybridEncoded::Rle(value, additional) => {
+                let is_set = value[0] == 1;
+                validity.extend_constant(additional, is_set);
+                if is_set {
+                    (0..additional).for_each(|_| {
+                        let index = indices.next().unwrap() as usize;
+                        let value = dict_values[index];
+                        values.push(value)
+                    })
+                } else {
+                    values.extend_constant(additional, T::default())
+                }
+            }
         }
     }
 }
@@ -93,9 +103,9 @@ fn read_buffer<T: NativeType + ArrowNativeType>(
     for run in validity_iterator {
         match run {
             hybrid_rle::HybridEncoded::Bitpacked(packed) => {
-                // bitpacked has the same representation as arrow's bitmaps and thus we can just copy
-                // them. Arrow2 has no API to extend from a slice, so we do it bit by bit
-                let len = std::cmp::min(packed.len() * 8, length);
+                // the pack may contain more items than needed.
+                let remaining = length - values.len();
+                let len = std::cmp::min(packed.len() * 8, remaining);
                 for is_valid in BitmapIter::new(packed, 0, len) {
                     validity.push(is_valid);
                     let value = if is_valid {
@@ -106,7 +116,18 @@ fn read_buffer<T: NativeType + ArrowNativeType>(
                     values.push(value);
                 }
             }
-            _ => todo!(),
+            hybrid_rle::HybridEncoded::Rle(value, additional) => {
+                let is_set = value[0] == 1;
+                validity.extend_constant(additional, is_set);
+                if is_set {
+                    (0..additional).for_each(|_| {
+                        let value = types::decode(chunks.next().unwrap());
+                        values.push(value)
+                    })
+                } else {
+                    values.extend_constant(additional, T::default())
+                }
+            }
         }
     }
 }

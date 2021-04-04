@@ -7,7 +7,8 @@ use super::uleb128;
 pub enum HybridEncoded<'a> {
     /// A bitpacked slice. The consumer must know its bit-width to unpack it.
     Bitpacked(&'a [u8]),
-    /// A RLE-encoded slice.
+    /// A RLE-encoded slice. The first attribute corresponds to the slice (that can be interpreted)
+    /// the second attribute corresponds to the number of repetitions.
     Rle(&'a [u8], usize),
 }
 

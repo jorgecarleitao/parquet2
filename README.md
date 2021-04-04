@@ -65,6 +65,10 @@ let array = page_iter_to_array(iter).unwrap();
 
 There are many types that are not supported atm. The plan is to add support to them.
 
+## Performance
+
+The code is about ~2x faster than performing the same operation with `parquet + arrow` crates.
+
 ### Higher Parallelism
 
 The function above creates an iterator over a row group, `iter`. In arrow, this corresponds 
