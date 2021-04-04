@@ -3,7 +3,7 @@ use std::convert::{TryFrom, TryInto};
 use parquet_format::Encoding;
 
 use super::super::levels;
-use super::super::utils::ValuesDef;
+use super::utils::ValuesDef;
 use crate::encoding::{bitpacking, uleb128};
 use crate::errors::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;

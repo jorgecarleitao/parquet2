@@ -4,6 +4,7 @@
 mod binary;
 mod boolean;
 mod primitive;
+mod utils;
 
 use crate::errors::{ParquetError, Result};
 use crate::schema::types::ParquetType;
