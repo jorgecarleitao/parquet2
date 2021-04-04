@@ -1,4 +1,4 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
 /// A physical native representation of a Parquet fixed-sized type.
 pub trait NativeType: Sized + Copy + std::fmt::Debug + 'static {
@@ -97,4 +97,13 @@ pub fn int96_to_i64(value: [u32; 3]) -> i64 {
     let seconds = (day - JULIAN_DAY_OF_EPOCH) * SECONDS_PER_DAY;
 
     seconds * MILLIS_PER_SECOND + nanoseconds / 1_000_000
+}
+
+#[inline]
+pub fn decode<T: NativeType>(chunk: &[u8]) -> T {
+    let chunk: <T as NativeType>::Bytes = match chunk.try_into() {
+        Ok(v) => v,
+        Err(_) => panic!(),
+    };
+    T::from_le_bytes(chunk)
 }

@@ -9,7 +9,7 @@ use parquet2::read::{get_page_iterator, read_metadata};
 use parquet2::serialization::arrow2::page_iter_to_array;
 
 fn read_decompressed_pages(size: usize) -> Result<()> {
-    // reads compressed pages (i.e. no CPU)
+    // reads decompressed pages (i.e. CPU)
     let dir = env!("CARGO_MANIFEST_DIR");
     let path = PathBuf::from(dir).join(format!("fixtures/pyarrow3/basic_nulls_{}.parquet", size));
     let mut file = File::open(path).unwrap();

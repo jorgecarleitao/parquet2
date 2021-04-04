@@ -1,100 +1,114 @@
-use std::convert::TryInto;
-
 use arrow2::{
-    array::PrimitiveArray, bitmap::MutableBitmap, buffer::MutableBuffer, datatypes::DataType,
+    array::PrimitiveArray,
+    bitmap::{BitmapIter, MutableBitmap},
+    buffer::MutableBuffer,
+    datatypes::DataType,
     types::NativeType as ArrowNativeType,
 };
 use parquet_format::Encoding;
 
-use crate::types::NativeType;
 use crate::{
+    encoding::get_length,
     errors::{ParquetError, Result},
     metadata::ColumnDescriptor,
     read::{decompress_page, Page, PrimitivePageDict},
 };
+use crate::{encoding::hybrid_rle, types, types::NativeType};
 
 use super::super::levels;
-use super::super::utils::ValuesDef;
 
+/// Assumptions: No rep levels
 fn read_dict_buffer<'a, T: NativeType + ArrowNativeType>(
     buffer: &'a [u8],
     length: u32,
     dict: &'a PrimitivePageDict<T>,
-    rep_level_encoding: (&Encoding, i16),
-    def_level_encoding: (&Encoding, i16),
+    _has_validity: bool,
     values: &mut MutableBuffer<T>,
     validity: &mut MutableBitmap,
 ) {
+    let length = length as usize;
     let dict_values = dict.values();
 
-    // skip bytes from levels
-    let offset = levels::needed_bytes(buffer, length, def_level_encoding);
-    let def_levels = levels::decode(buffer, length, def_level_encoding);
-    assert_eq!(def_levels.len(), length as usize);
-    let buffer = &buffer[offset..];
-    let offset = levels::needed_bytes(buffer, length, rep_level_encoding);
-    let buffer = &buffer[offset..];
+    // split in two buffers: def_levels and data
+    let def_level_buffer_length = get_length(buffer) as usize;
+    let validity_buffer = &buffer[4..4 + def_level_buffer_length];
+    let indices_buffer = &buffer[4 + def_level_buffer_length..];
 
     // SPEC: Data page format: the bit width used to encode the entry ids stored as 1 byte (max bit width = 32),
     // SPEC: followed by the values encoded using RLE/Bit packed described above (with the given bit width).
-    let bit_width = buffer[0];
-    let buffer = &buffer[1..];
+    let bit_width = indices_buffer[0];
+    let indices_buffer = &indices_buffer[1..];
 
     let non_null_indices_len = (buffer.len() * 8 / bit_width as usize) as u32;
-    let indices = levels::rle_decode(&buffer, bit_width as u32, non_null_indices_len);
+    let indices = levels::rle_decode(&indices_buffer, bit_width as u32, non_null_indices_len);
 
-    let iterator = ValuesDef::new(
-        indices.into_iter(),
-        def_levels.into_iter(),
-        def_level_encoding.1 as u32,
-    );
+    let validity_iterator = hybrid_rle::Decoder::new(&validity_buffer, 1);
 
-    let iterator = iterator.map(|maybe_id| {
-        validity.push(maybe_id.is_some());
-        match maybe_id {
-            Some(id) => dict_values[id as usize],
-            None => T::default(),
+    validity.reserve(length);
+    values.reserve(length);
+    let mut current_len = 0;
+    for run in validity_iterator {
+        match run {
+            hybrid_rle::HybridEncoded::Bitpacked(packed) => {
+                // bitpacked has the same representation as arrow's bitmaps and thus we can just copy
+                // them. Arrow2 has no API to extend from a slice, so we do it bit by bit
+                let len = std::cmp::min(packed.len() * 8, length);
+                for is_valid in BitmapIter::new(packed, 0, len) {
+                    validity.push(is_valid);
+                    let value = if is_valid {
+                        current_len += 1;
+                        dict_values[indices[current_len - 1] as usize]
+                    } else {
+                        T::default()
+                    };
+                    values.push(value);
+                }
+            }
+            _ => todo!(),
         }
-    });
-
-    unsafe { values.extend_from_trusted_len_iter(iterator) }
+    }
 }
 
 fn read_buffer<T: NativeType + ArrowNativeType>(
     buffer: &[u8],
     length: u32,
-    rep_level_encoding: (&Encoding, i16),
-    def_level_encoding: (&Encoding, i16),
+    _has_validity: bool,
     values: &mut MutableBuffer<T>,
     validity: &mut MutableBitmap,
 ) {
-    // skip bytes from levels
-    let offset = levels::needed_bytes(buffer, length, def_level_encoding);
-    let def_levels = levels::decode(buffer, length, def_level_encoding);
-    let buffer = &buffer[offset..];
-    let offset = levels::needed_bytes(buffer, length, rep_level_encoding);
-    let buffer = &buffer[offset..];
+    let length = length as usize;
 
-    let chunks =
-        buffer[..length as usize * std::mem::size_of::<T>()].chunks_exact(std::mem::size_of::<T>());
-    assert_eq!(chunks.remainder().len(), 0);
+    // split in two buffers: def_levels and data
+    let def_level_buffer_length = get_length(buffer) as usize;
+    let validity_buffer = &buffer[4..4 + def_level_buffer_length];
+    let values_buffer = &buffer[4 + def_level_buffer_length..];
 
-    let iterator = ValuesDef::new(chunks, def_levels.into_iter(), def_level_encoding.1 as u32);
+    let mut chunks = values_buffer[..length as usize * std::mem::size_of::<T>()]
+        .chunks_exact(std::mem::size_of::<T>());
 
-    let iterator = iterator.map(|maybe_chunk| {
-        validity.push(maybe_chunk.is_some());
-        match maybe_chunk {
-            Some(chunk) => {
-                let chunk: <T as NativeType>::Bytes = match chunk.try_into() {
-                    Ok(v) => v,
-                    Err(_) => panic!(),
-                };
-                T::from_le_bytes(chunk)
+    let validity_iterator = hybrid_rle::Decoder::new(&validity_buffer, 1);
+
+    validity.reserve(length);
+    values.reserve(length);
+    for run in validity_iterator {
+        match run {
+            hybrid_rle::HybridEncoded::Bitpacked(packed) => {
+                // bitpacked has the same representation as arrow's bitmaps and thus we can just copy
+                // them. Arrow2 has no API to extend from a slice, so we do it bit by bit
+                let len = std::cmp::min(packed.len() * 8, length);
+                for is_valid in BitmapIter::new(packed, 0, len) {
+                    validity.push(is_valid);
+                    let value = if is_valid {
+                        types::decode(chunks.next().unwrap())
+                    } else {
+                        T::default()
+                    };
+                    values.push(value);
+                }
             }
-            None => T::default(),
+            _ => todo!(),
         }
-    });
-    unsafe { values.extend_from_trusted_len_iter(iterator) }
+    }
 }
 
 pub fn iter_to_array<T, I>(
@@ -126,30 +140,30 @@ fn extend_from_page<T: NativeType + ArrowNativeType>(
     validity: &mut MutableBitmap,
 ) -> Result<()> {
     let page = decompress_page(page)?;
+    assert_eq!(descriptor.max_rep_level(), 0);
+    assert_eq!(descriptor.max_def_level(), 1);
+    let has_validity = descriptor.max_def_level() == 1;
     match page {
-        Page::V1(page) => match (&page.encoding, &page.dictionary_page) {
-            (Encoding::PlainDictionary, Some(dict)) => read_dict_buffer::<T>(
-                &page.buf,
-                page.num_values,
-                dict.as_any().downcast_ref().unwrap(),
-                (&page.rep_level_encoding, descriptor.max_rep_level()),
-                (&page.def_level_encoding, descriptor.max_def_level()),
-                values,
-                validity,
-            ),
-            (Encoding::Plain, None) => read_buffer::<T>(
-                &page.buf,
-                page.num_values,
-                (&page.rep_level_encoding, descriptor.max_rep_level()),
-                (&page.def_level_encoding, descriptor.max_def_level()),
-                values,
-                validity,
-            ),
-            (encoding, None) => {
-                return Err(general_err!("Encoding {:?} not yet implemented", encoding))
+        Page::V1(page) => {
+            assert_eq!(page.def_level_encoding, Encoding::Rle);
+            match (&page.encoding, &page.dictionary_page) {
+                (Encoding::PlainDictionary, Some(dict)) => read_dict_buffer::<T>(
+                    &page.buf,
+                    page.num_values,
+                    dict.as_any().downcast_ref().unwrap(),
+                    has_validity,
+                    values,
+                    validity,
+                ),
+                (Encoding::Plain, None) => {
+                    read_buffer::<T>(&page.buf, page.num_values, has_validity, values, validity)
+                }
+                (encoding, None) => {
+                    return Err(general_err!("Encoding {:?} not yet implemented", encoding))
+                }
+                _ => todo!(),
             }
-            _ => todo!(),
-        },
+        }
         Page::V2(_) => todo!(),
     };
     Ok(())

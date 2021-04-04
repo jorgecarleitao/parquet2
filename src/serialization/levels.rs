@@ -1,31 +1,30 @@
 use parquet_format::Encoding;
 
-use crate::encoding::{bitpacking, ceil8, get_length, hybrid_rle, log2};
+use crate::encoding::{bitpacking, get_length, hybrid_rle, log2};
 
 #[inline]
 fn get_bit_width(max_level: i16) -> u32 {
     log2(max_level as u64 + 1)
 }
 
-pub fn needed_bytes(values: &[u8], length: u32, a: (&Encoding, i16)) -> usize {
-    match a {
-        (_, 0) => 0, // no rep levels
+pub fn needed_bytes(values: &[u8], _length: u32, encoding: (&Encoding, i16)) -> usize {
+    match encoding {
+        (_, 0) => 0, // no levels
         (Encoding::Rle, _) => {
             let length = get_length(values);
             // 4 consumed to read `length`
             4 + length as usize
         }
-        (Encoding::BitPacked, max_level) => {
-            let bit_width = get_bit_width(max_level) as u8;
-            ceil8(length as usize * bit_width as usize)
+        (Encoding::BitPacked, _) => {
+            todo!()
         }
         _ => unreachable!(),
     }
 }
 
 #[inline]
-pub fn decode(values: &[u8], length: u32, a: (&Encoding, i16)) -> Vec<u32> {
-    match a {
+pub fn decode(values: &[u8], length: u32, encoding: (&Encoding, i16)) -> Vec<u32> {
+    match encoding {
         (_, 0) => vec![], // no levels
         (Encoding::Rle, max_length) => {
             let bit_width = get_bit_width(max_length);
