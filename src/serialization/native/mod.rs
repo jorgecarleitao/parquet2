@@ -207,7 +207,7 @@ mod tests {
     #[test]
     fn test_pyarrow_integration() -> Result<()> {
         let column = 0;
-        let path = "pyarrow3/basic_nulls_1.parquet";
+        let path = "pyarrow3/basic_nulls_10.parquet";
         let (descriptor, mut pages) = prepare(path, 0, column, "fixtures".into())?;
         assert_eq!(pages.len(), 1);
 
