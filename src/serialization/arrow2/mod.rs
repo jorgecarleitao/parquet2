@@ -1,9 +1,11 @@
 mod boolean;
 mod primitive;
+mod utf8;
+mod utils;
 
 use arrow2::{array::Array, datatypes::DataType};
 
-use crate::schema::types::{ParquetType, PhysicalType};
+use crate::schema::types::{LogicalType, ParquetType, PhysicalType, PrimitiveConvertedType};
 use crate::{
     errors::{ParquetError, Result},
     metadata::ColumnDescriptor,
@@ -45,6 +47,11 @@ pub fn page_iter_to_array<I: Iterator<Item = Result<Page>>>(
             (PhysicalType::Boolean, None, None) => {
                 Ok(Box::new(boolean::iter_to_array(iter, descriptor)?))
             }
+            (
+                PhysicalType::ByteArray,
+                Some(PrimitiveConvertedType::Utf8),
+                Some(LogicalType::STRING(_)),
+            ) => Ok(Box::new(utf8::iter_to_array::<i32, _>(iter, descriptor)?)),
             (p, c, l) => Err(general_err!(
                 "The conversion of ({:?}, {:?}, {:?}) to arrow still not implemented",
                 p,
@@ -72,7 +79,13 @@ mod tests {
             NativeArray::Float32(v) => Box::new(Primitive::from(&v).to(DataType::Float32)),
             NativeArray::Float64(v) => Box::new(Primitive::from(&v).to(DataType::Float64)),
             NativeArray::Boolean(v) => Box::new(BooleanArray::from(&v)),
-            NativeArray::Binary(_) => todo!(),
+            NativeArray::Binary(v) => {
+                let iter = v
+                    .into_iter()
+                    .map(|x| x.map(|x| std::str::from_utf8(&x).unwrap().to_string()));
+                let v = iter.collect();
+                Box::new(Utf8Array::<i32>::from(&v))
+            }
         }
     }
 
@@ -120,9 +133,7 @@ mod tests {
         Ok(())
     }
 
-    // todo: implement me
     #[test]
-    #[ignore]
     fn pyarrow_integration_string() -> Result<()> {
         let column = 2;
         let path = "fixtures/pyarrow3/basic_nulls_10.parquet";
