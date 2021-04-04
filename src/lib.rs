@@ -1,15 +1,11 @@
 #[macro_use]
 pub mod errors;
-
 pub mod schema;
-
-mod compression;
-mod encoding;
-mod metadata;
+pub mod compression;
+pub mod encoding;
+pub mod metadata;
 pub mod serialization;
-mod types;
-pub use types::int96_to_i64;
-
+pub mod types;
 pub mod read;
 
 const FOOTER_SIZE: u64 = 8;

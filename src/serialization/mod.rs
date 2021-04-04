@@ -1,4 +1,4 @@
-mod levels;
+pub mod levels;
 pub mod native;
 
 #[cfg(feature = "arrow2")]

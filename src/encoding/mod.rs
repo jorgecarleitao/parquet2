@@ -4,6 +4,8 @@ pub mod bitpacking;
 pub mod hybrid_rle;
 pub mod uleb128;
 
+pub use parquet_format::Encoding;
+
 /// # Panics
 /// This function panics iff `values.len() < 4`.
 pub fn get_length(values: &[u8]) -> u32 {
