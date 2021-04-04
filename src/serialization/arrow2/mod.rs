@@ -1,3 +1,4 @@
+mod boolean;
 mod primitive;
 
 use arrow2::{array::Array, datatypes::DataType};
@@ -41,6 +42,9 @@ pub fn page_iter_to_array<I: Iterator<Item = Result<Page>>>(
                 descriptor,
                 DataType::Float64,
             )?)),
+            (PhysicalType::Boolean, None, None) => {
+                Ok(Box::new(boolean::iter_to_array(iter, descriptor)?))
+            }
             (p, c, l) => Err(general_err!(
                 "The conversion of ({:?}, {:?}, {:?}) to arrow still not implemented",
                 p,
@@ -57,7 +61,7 @@ mod tests {
     use std::fs::File;
 
     use crate::serialization::native::Array as NativeArray;
-    use arrow2::array::Primitive;
+    use arrow2::array::*;
 
     fn native_to_arrow(array: NativeArray) -> Box<dyn Array> {
         match array {
@@ -67,7 +71,7 @@ mod tests {
             NativeArray::Int96(_) => todo!(),
             NativeArray::Float32(v) => Box::new(Primitive::from(&v).to(DataType::Float32)),
             NativeArray::Float64(v) => Box::new(Primitive::from(&v).to(DataType::Float64)),
-            NativeArray::Boolean(_) => todo!(),
+            NativeArray::Boolean(v) => Box::new(BooleanArray::from(&v)),
             NativeArray::Binary(_) => todo!(),
         }
     }
@@ -121,6 +125,19 @@ mod tests {
     #[ignore]
     fn pyarrow_integration_string() -> Result<()> {
         let column = 2;
+        let path = "fixtures/pyarrow3/basic_nulls_10.parquet";
+        let array = get_column(path, 0, column)?;
+
+        let expected = native_to_arrow(pyarrow_integration(column));
+
+        assert_eq!(expected.as_ref(), array.as_ref());
+
+        Ok(())
+    }
+
+    #[test]
+    fn pyarrow_integration_boolean() -> Result<()> {
+        let column = 3;
         let path = "fixtures/pyarrow3/basic_nulls_10.parquet";
         let array = get_column(path, 0, column)?;
 

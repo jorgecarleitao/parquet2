@@ -156,6 +156,18 @@ mod tests {
                 Some(b"def".to_vec()),
                 Some(b"aaa".to_vec()),
             ]),
+            3 => Array::Boolean(vec![
+                Some(true),
+                None,
+                Some(false),
+                Some(false),
+                None,
+                Some(true),
+                None,
+                None,
+                Some(true),
+                Some(true),
+            ]),
             _ => unreachable!(),
         }
     }

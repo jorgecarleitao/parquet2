@@ -7,14 +7,16 @@ PYARROW_PATH = "fixtures/pyarrow3"
 PYSPARK_PATH = "fixtures/pyspark3"
 
 def case1(size = 1):
-    int64 = [0, 1, None, 3, None, 5, 6, 7, None, 9] * size
-    float64 = [0.0, 1.0, None, 3.0, None, 5.0, 6.0, 7.0, None, 9.0] * size
-    string = ["Hello", None, "aa", "", None, "abc", None, None, "def", "aaa"] * size
+    int64 = [0, 1, None, 3, None, 5, 6, 7, None, 9]
+    float64 = [0.0, 1.0, None, 3.0, None, 5.0, 6.0, 7.0, None, 9.0]
+    string = ["Hello", None, "aa", "", None, "abc", None, None, "def", "aaa"]
+    boolean = [True, None, False, False, None, True, None, None, True, True]
 
     return {
-        "int64": int64,
-        "float64": float64,
-        "string": string,
+        "int64": int64 * size,
+        "float64": float64 * size,
+        "string": string * size,
+        "bool": boolean * size,
     }, f"basic_nulls_{size*10}.parquet"
 
 def write_case1_pyarrow(size = 1):
