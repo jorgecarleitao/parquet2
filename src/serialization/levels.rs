@@ -16,7 +16,7 @@ pub fn needed_bytes(values: &[u8], length: u32, a: (&Encoding, i16)) -> usize {
             4 + length as usize
         }
         (Encoding::BitPacked, max_level) => {
-            let bit_width = log2(max_level as u64 + 1) as u8;
+            let bit_width = get_bit_width(max_level) as u8;
             ceil8(length as usize * bit_width as usize)
         }
         _ => unreachable!(),
@@ -43,7 +43,7 @@ pub fn decode(values: &[u8], length: u32, a: (&Encoding, i16)) -> Vec<u32> {
 }
 
 #[inline]
-fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
+pub fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
     let length = length as usize;
     let runner = hybrid_rle::Decoder::new(&values, num_bits);
 
@@ -51,7 +51,7 @@ fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
     runner.for_each(|run| match run {
         hybrid_rle::HybridEncoded::Bitpacked(compressed) => {
             let previous_len = values.len();
-            let pack_length = compressed.len() as u32 * 8 / num_bits;
+            let pack_length = (compressed.len() as u32 / num_bits) * 8;
             values.extend(std::iter::repeat(0).take(bitpacking::required_capacity(pack_length)));
             bitpacking::decode(compressed, num_bits as u8, &mut values[previous_len..]);
             values.truncate(length);
@@ -65,7 +65,5 @@ fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
             values.extend(std::iter::repeat(value).take(items))
         }
     });
-
-    assert_eq!(values.len(), length as usize);
     values
 }

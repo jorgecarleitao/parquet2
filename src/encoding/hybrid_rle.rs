@@ -14,14 +14,16 @@ pub enum HybridEncoded<'a> {
 /// An iterator that, given a slice of bytes, returns `HybridEncoded`
 pub struct Decoder<'a> {
     values: &'a [u8],
-    rle_items: usize,
+    num_bits: u32,
+    rle_bytes: usize,
 }
 
 impl<'a> Decoder<'a> {
     pub fn new(values: &'a [u8], num_bits: u32) -> Self {
         Self {
             values,
-            rle_items: ceil8(num_bits as usize),
+            num_bits,
+            rle_bytes: ceil8(num_bits as usize),
         }
     }
 }
@@ -37,18 +39,18 @@ impl<'a> Iterator for Decoder<'a> {
         self.values = &self.values[consumed..];
         if indicator & 1 == 1 {
             // is bitpacking
-            let items = indicator as usize >> 1;
-            let result = Some(HybridEncoded::Bitpacked(&self.values[..items]));
-            self.values = &self.values[items..];
+            let bytes = (indicator as usize >> 1) * self.num_bits as usize;
+            let result = Some(HybridEncoded::Bitpacked(&self.values[..bytes]));
+            self.values = &self.values[bytes..];
             result
         } else {
             // is rle
             let decompressed_items = indicator as usize >> 1;
             let result = Some(HybridEncoded::Rle(
-                &self.values[..self.rle_items],
+                &self.values[..self.rle_bytes],
                 decompressed_items,
             ));
-            self.values = &self.values[self.rle_items..];
+            self.values = &self.values[self.rle_bytes..];
             result
         }
     }

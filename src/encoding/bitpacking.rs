@@ -8,29 +8,37 @@ pub fn required_capacity(length: u32) -> usize {
 }
 
 /// Decodes bitpacked bytes into `u32` values in `num_bits`.
-pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) {
+/// Returns the number of decoded values.
+pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usize {
     let bitpacker = BitPacker1x::new();
 
-    let chunks = compressed.chunks_exact(BitPacker1x::BLOCK_LEN);
+    let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
 
-    let remainder = chunks.remainder();
+    let compressed_chunks = compressed.chunks_exact(compressed_block_size);
+    let decompressed_chunks = decompressed.chunks_exact_mut(BitPacker1x::BLOCK_LEN);
 
-    let mut last_chunk = remainder.to_vec();
-    last_chunk.extend(std::iter::repeat(0).take(BitPacker1x::BLOCK_LEN - remainder.len()));
+    let remainder = compressed_chunks.remainder();
+    let last_compressed_chunk = if remainder.is_empty() {
+        vec![]
+    } else {
+        let mut last_compressed_chunk = compressed.to_vec();
+        last_compressed_chunk
+            .extend(std::iter::repeat(0).take(compressed_block_size - remainder.len()));
+        last_compressed_chunk
+    };
+    let last_compressed_chunks = last_compressed_chunk.chunks_exact(compressed_block_size);
+    debug_assert_eq!(last_compressed_chunks.remainder().len(), 0);
 
-    chunks
-        .chain(std::iter::once(last_chunk.as_ref()))
-        .enumerate()
-        .for_each(|(i, chunk)| {
-            bitpacker.decompress(
-                &chunk,
-                &mut decompressed[i * BitPacker1x::BLOCK_LEN..(i + 1) * BitPacker1x::BLOCK_LEN],
-                num_bits,
-            );
+    compressed_chunks
+        .chain(last_compressed_chunk.chunks_exact(compressed_block_size))
+        .zip(decompressed_chunks)
+        .for_each(|(c_chunk, d_chunk)| {
+            bitpacker.decompress(&c_chunk, d_chunk, num_bits);
         });
+    compressed.len() / num_bits as usize * 8
 }
 
-fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usize {
+pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usize {
     let bitpacker = BitPacker1x::new();
 
     let chunks = decompressed.chunks_exact(BitPacker1x::BLOCK_LEN);
@@ -38,20 +46,19 @@ fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usize {
     let remainder = chunks.remainder();
 
     let mut last_chunk = remainder.to_vec();
-    last_chunk.extend(std::iter::repeat(0).take(BitPacker1x::BLOCK_LEN - remainder.len()));
+    let trailing = BitPacker1x::BLOCK_LEN - remainder.len();
+    last_chunk.extend(std::iter::repeat(0).take(trailing));
 
     let mut compressed_len = 0;
     chunks
         .chain(std::iter::once(last_chunk.as_ref()))
-        .enumerate()
-        .for_each(|(i, chunk)| {
-            compressed_len += bitpacker.compress(
-                &chunk,
-                &mut compressed[i * BitPacker1x::BLOCK_LEN..(i + 1) * BitPacker1x::BLOCK_LEN],
-                num_bits,
-            );
+        .for_each(|chunk| {
+            let chunk_compressed =
+                &mut compressed[compressed_len..compressed_len + BitPacker1x::BLOCK_LEN];
+            compressed_len += bitpacker.compress(&chunk, chunk_compressed, num_bits);
         });
-    compressed_len
+    decompressed.len() * num_bits as usize / 8
+    //compressed_len - trailing * num_bits as usize / 8
 }
 
 #[cfg(test)]
@@ -81,31 +88,63 @@ mod tests {
         assert_eq!(decoded, vec![0, 1, 2, 3, 4, 5, 6, 7]);
     }
 
-    #[test]
-    fn test_encode_rle() {
+    fn case1() -> (u8, Vec<u32>, Vec<u8>) {
         let num_bits = 3;
+        let compressed = vec![
+            0b10001000u8,
+            0b11000110,
+            0b11111010,
+            0b10001000u8,
+            0b11000110,
+            0b11111010,
+            0b10001000u8,
+            0b11000110,
+            0b11111010,
+            0b10001000u8,
+            0b11000110,
+            0b11111010,
+            0b10001000u8,
+            0b11000110,
+            0b11111010,
+        ];
+        let decompressed = vec![
+            0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4,
+            5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7,
+        ];
+        (num_bits, decompressed, compressed)
+    }
 
+    #[test]
+    fn decode_large() {
+        let (num_bits, expected, data) = case1();
+
+        let mut decoded = vec![0; 2 * BitPacker1x::BLOCK_LEN];
+        let decoded_len = decode(&data, num_bits, &mut decoded);
+        decoded.truncate(decoded_len);
+        assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn encode_large() {
+        let (num_bits, data, expected) = case1();
+        let mut compressed = vec![0u8; 4 * BitPacker1x::BLOCK_LEN];
+
+        let compressed_len = encode(&data, num_bits, &mut compressed);
+        compressed.truncate(compressed_len);
+        assert_eq!(compressed, expected);
+    }
+
+    #[test]
+    fn test_encode() {
+        let num_bits = 3;
         let data = vec![0, 1, 2, 3, 4, 5, 6, 7];
 
         let mut compressed = vec![0u8; 4 * BitPacker1x::BLOCK_LEN];
 
-        let compressed_len = encode(data.as_ref(), num_bits, &mut compressed);
+        let compressed_len = encode(&data, num_bits, &mut compressed);
         compressed.truncate(compressed_len);
 
-        let expected = vec![
-            0b10001000u8,
-            0b11000110,
-            0b11111010,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-        ];
+        let expected = vec![0b10001000u8, 0b11000110, 0b11111010];
 
         assert_eq!(compressed, expected);
     }

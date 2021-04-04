@@ -6,7 +6,6 @@ use arrow2::{
 };
 use parquet_format::Encoding;
 
-use crate::encoding::{bitpacking, uleb128};
 use crate::types::NativeType;
 use crate::{
     errors::{ParquetError, Result},
@@ -31,19 +30,18 @@ fn read_dict_buffer<'a, T: NativeType + ArrowNativeType>(
     // skip bytes from levels
     let offset = levels::needed_bytes(buffer, length, def_level_encoding);
     let def_levels = levels::decode(buffer, length, def_level_encoding);
+    assert_eq!(def_levels.len(), length as usize);
     let buffer = &buffer[offset..];
     let offset = levels::needed_bytes(buffer, length, rep_level_encoding);
     let buffer = &buffer[offset..];
 
+    // SPEC: Data page format: the bit width used to encode the entry ids stored as 1 byte (max bit width = 32),
+    // SPEC: followed by the values encoded using RLE/Bit packed described above (with the given bit width).
     let bit_width = buffer[0];
     let buffer = &buffer[1..];
 
-    let (_, consumed) = uleb128::decode(&buffer);
-    let buffer = &buffer[consumed..];
-
-    let mut indices = vec![0; bitpacking::required_capacity(length)];
-    bitpacking::decode(&buffer, bit_width, &mut indices);
-    indices.truncate(length as usize);
+    let non_null_indices_len = (buffer.len() * 8 / bit_width as usize) as u32;
+    let indices = levels::rle_decode(&buffer, bit_width as u32, non_null_indices_len);
 
     let iterator = ValuesDef::new(
         indices.into_iter(),
