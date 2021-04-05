@@ -55,7 +55,7 @@ fn stream_len(seek: &mut impl Seek) -> std::result::Result<u64, std::io::Error> 
 //
 // The reader first reads DEFAULT_FOOTER_SIZE bytes from the end of the file.
 // If it is not enough according to the length indicated in the footer, it reads more bytes.
-pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<ParquetMetaData> {
+pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     // check file is large enough to hold footer
     let file_size = stream_len(reader)?;
     if file_size < FOOTER_SIZE {
@@ -127,15 +127,15 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<ParquetMetaData> 
         .column_orders
         .map(|orders| parse_column_orders(&orders, &schema_descr));
 
-    let file_metadata = FileMetaData::new(
+    Ok(FileMetaData::new(
         t_file_metadata.version,
         t_file_metadata.num_rows,
         t_file_metadata.created_by,
+        row_groups,
         t_file_metadata.key_value_metadata,
         schema_descr,
         column_orders,
-    );
-    Ok(ParquetMetaData::new(file_metadata, row_groups))
+    ))
 }
 
 /// Parses column orders from Thrift definition.
@@ -191,7 +191,7 @@ mod tests {
 
         let metadata = read_metadata(&mut file).unwrap();
 
-        let columns = metadata.file_metadata().schema_descr().columns();
+        let columns = metadata.schema_descr.columns();
 
         /*
         from pyarrow:

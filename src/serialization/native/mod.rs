@@ -101,8 +101,7 @@ mod tests {
         let mut file = File::open(testdata).unwrap();
 
         let metadata = read_metadata(&mut file)?;
-        let descriptor = metadata
-            .row_group(row_group)
+        let descriptor = metadata.row_groups[row_group]
             .column(column)
             .column_descriptor()
             .clone();

@@ -9,8 +9,8 @@ pub use metadata::read_metadata;
 
 use std::io::{Read, Seek, SeekFrom};
 
-use crate::error::Result;
-use crate::metadata::{ParquetMetaData, RowGroupMetaData};
+use crate::metadata::RowGroupMetaData;
+use crate::{error::Result, metadata::FileMetaData};
 
 pub use page::Page;
 pub use page_dict::{BinaryPageDict, PageDict, PrimitivePageDict};
@@ -19,25 +19,27 @@ pub use page_iterator::PageIterator;
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true
 pub fn filter_row_groups(
-    metadata: &ParquetMetaData,
+    metadata: &FileMetaData,
     predicate: &dyn Fn(&RowGroupMetaData, usize) -> bool,
-) -> ParquetMetaData {
+) -> FileMetaData {
     let mut filtered_row_groups = Vec::<RowGroupMetaData>::new();
-    for (i, row_group_metadata) in metadata.row_groups().iter().enumerate() {
+    for (i, row_group_metadata) in metadata.row_groups.iter().enumerate() {
         if predicate(row_group_metadata, i) {
             filtered_row_groups.push(row_group_metadata.clone());
         }
     }
-    ParquetMetaData::new(metadata.file_metadata().clone(), filtered_row_groups)
+    let mut metadata = metadata.clone();
+    metadata.row_groups = filtered_row_groups;
+    metadata
 }
 
 pub fn get_page_iterator<'b, RR: Read + Seek>(
-    metadata: &ParquetMetaData,
+    metadata: &FileMetaData,
     row_group: usize,
     column: usize,
     reader: &'b mut RR,
 ) -> Result<PageIterator<'b, RR>> {
-    let column_metadata = metadata.row_group(row_group).column(column);
+    let column_metadata = metadata.row_groups[row_group].column(column);
     let (col_start, _) = column_metadata.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
     PageIterator::try_new(
