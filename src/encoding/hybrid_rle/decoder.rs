@@ -1,16 +1,5 @@
-// See https://github.com/apache/parquet-format/blob/master/Encodings.md#run-length-encoding--bit-packing-hybrid-rle--3
-
-use super::ceil8;
-use super::uleb128;
-
-#[derive(Debug, PartialEq, Eq)]
-pub enum HybridEncoded<'a> {
-    /// A bitpacked slice. The consumer must know its bit-width to unpack it.
-    Bitpacked(&'a [u8]),
-    /// A RLE-encoded slice. The first attribute corresponds to the slice (that can be interpreted)
-    /// the second attribute corresponds to the number of repetitions.
-    Rle(&'a [u8], usize),
-}
+use super::super::uleb128;
+use super::{super::ceil8, HybridEncoded};
 
 /// An iterator that, given a slice of bytes, returns `HybridEncoded`
 pub struct Decoder<'a> {
@@ -61,7 +50,7 @@ impl<'a> Iterator for Decoder<'a> {
 mod tests {
     use super::*;
 
-    use super::super::bitpacking;
+    use super::super::super::bitpacking;
 
     #[test]
     fn basics_1() {
