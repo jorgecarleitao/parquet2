@@ -6,7 +6,7 @@ use thrift::protocol::TCompactInputProtocol;
 use crate::schema::types::ParquetType;
 use crate::{error::Result, metadata::ColumnDescriptor};
 
-use super::page::{Page, PageV1, PageV2};
+use super::page::{CompressedPage, PageV1, PageV2};
 use super::page_dict::{read_page_dict, PageDict};
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
@@ -61,7 +61,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
 }
 
 impl<'a, R: Read> Iterator for PageIterator<'a, R> {
-    type Item = Result<Page>;
+    type Item = Result<CompressedPage>;
 
     fn next(&mut self) -> Option<Self::Item> {
         next_page(self).transpose()
@@ -70,7 +70,7 @@ impl<'a, R: Read> Iterator for PageIterator<'a, R> {
 
 /// This function is lightweight and executes a minimal amount of work so that it is IO bounded.
 // Any un-necessary CPU-intensive tasks SHOULD be executed on individual pages.
-fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
+fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<CompressedPage>> {
     while reader.seen_num_values < reader.total_num_values {
         let page_header = reader.read_page_header()?;
 
@@ -104,7 +104,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
             PageType::DataPage => {
                 let header = page_header.data_page_header.unwrap();
                 reader.seen_num_values += header.num_values as i64;
-                Page::V1(PageV1 {
+                CompressedPage::V1(PageV1 {
                     buffer,
                     header,
                     compression: reader.compression,
@@ -115,7 +115,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
             PageType::DataPageV2 => {
                 let header = page_header.data_page_header_v2.unwrap();
                 reader.seen_num_values += header.num_values as i64;
-                Page::V2(PageV2 {
+                CompressedPage::V2(PageV2 {
                     buffer,
                     header,
                     compression: reader.compression,

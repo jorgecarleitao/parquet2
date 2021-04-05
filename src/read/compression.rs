@@ -1,7 +1,7 @@
 use crate::compression::{create_codec, Codec};
 use crate::error::{ParquetError, Result};
 
-use super::page::{PageV1, PageV2};
+use super::page::{CompressedPage, PageV1, PageV2};
 use super::Page;
 
 pub fn decompress(
@@ -66,13 +66,23 @@ fn decompress_v2(mut page: PageV2, decompressor: &mut dyn Codec) -> Result<PageV
 }
 
 /// decompresses a page in place. This only changes the pages' internal buffer.
-pub fn decompress_page(page: Page) -> Result<Page> {
-    let codec = create_codec(&page.compression().0)?;
-    match codec {
-        Some(mut codec) => match page {
-            Page::V1(page) => decompress_v1(page, codec.as_mut()).map(Page::V1),
-            Page::V2(page) => decompress_v2(page, codec.as_mut()).map(Page::V2),
-        },
-        None => Ok(page),
+pub fn decompress_page(page: CompressedPage) -> Result<Page> {
+    match page {
+        CompressedPage::V1(page) => {
+            let codec = create_codec(&page.compression)?;
+            if let Some(mut codec) = codec {
+                decompress_v1(page, codec.as_mut()).map(Page::V1)
+            } else {
+                Ok(Page::V1(page))
+            }
+        }
+        CompressedPage::V2(page) => {
+            let codec = create_codec(&page.compression)?;
+            if let Some(mut codec) = codec {
+                decompress_v2(page, codec.as_mut()).map(Page::V2)
+            } else {
+                Ok(Page::V2(page))
+            }
+        }
     }
 }

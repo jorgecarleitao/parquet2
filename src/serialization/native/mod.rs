@@ -11,7 +11,7 @@ use crate::schema::types::ParquetType;
 use crate::schema::types::PhysicalType;
 use crate::{
     metadata::ColumnDescriptor,
-    read::{decompress_page, Page},
+    read::{decompress_page, CompressedPage},
 };
 
 // The dynamic representation of values in native Rust. This is not exaustive and does not support
@@ -31,7 +31,7 @@ pub enum Array {
 
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
-pub fn page_to_array(page: Page, descriptor: &ColumnDescriptor) -> Result<Array> {
+pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Result<Array> {
     let page = decompress_page(page)?;
 
     match descriptor.type_() {
@@ -89,14 +89,14 @@ mod tests {
     use crate::types::int96_to_i64;
 
     use super::*;
-    use crate::{error::Result, metadata::ColumnDescriptor, read::Page};
+    use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage};
 
     fn prepare(
         path: &str,
         row_group: usize,
         column: usize,
         mut testdata: PathBuf,
-    ) -> Result<(ColumnDescriptor, Vec<Page>)> {
+    ) -> Result<(ColumnDescriptor, Vec<CompressedPage>)> {
         testdata.push(path);
         let mut file = File::open(testdata).unwrap();
 

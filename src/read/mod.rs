@@ -12,7 +12,7 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::metadata::RowGroupMetaData;
 use crate::{error::Result, metadata::FileMetaData};
 
-pub use page::Page;
+pub use page::{CompressedPage, Page};
 pub use page_dict::{BinaryPageDict, PageDict, PrimitivePageDict};
 pub use page_iterator::PageIterator;
 
@@ -54,8 +54,6 @@ pub fn get_page_iterator<'b, RR: Read + Seek>(
 mod tests {
     use std::fs::File;
 
-    use page::Page;
-
     use super::*;
 
     use crate::tests::get_path;
@@ -73,7 +71,7 @@ mod tests {
         let mut iter = get_page_iterator(&metadata, row_group, column, &mut file)?;
 
         let a = iter.next().unwrap().unwrap();
-        if let Page::V1(page) = &a {
+        if let CompressedPage::V1(page) = &a {
             assert_eq!(page.header.num_values, 8)
         } else {
             panic!("Page not a dict");
