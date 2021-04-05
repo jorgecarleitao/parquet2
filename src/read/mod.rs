@@ -74,7 +74,7 @@ mod tests {
 
         let a = iter.next().unwrap().unwrap();
         if let Page::V1(page) = &a {
-            assert_eq!(page.num_values, 8)
+            assert_eq!(page.header.num_values, 8)
         } else {
             panic!("Page not a dict");
         }

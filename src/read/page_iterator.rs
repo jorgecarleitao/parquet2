@@ -104,31 +104,24 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<Page>> {
             PageType::DataPage => {
                 let header = page_header.data_page_header.unwrap();
                 reader.seen_num_values += header.num_values as i64;
-                Page::V1(PageV1::new(
+                Page::V1(PageV1 {
                     buffer,
-                    header.num_values as u32,
-                    header.encoding,
-                    (
-                        reader.compression,
-                        page_header.uncompressed_page_size as usize,
-                    ),
-                    header.definition_level_encoding,
-                    header.repetition_level_encoding,
-                    reader.current_dictionary.clone(),
-                ))
+                    header,
+                    compression: reader.compression,
+                    uncompressed_page_size: page_header.uncompressed_page_size as usize,
+                    dictionary_page: reader.current_dictionary.clone(),
+                })
             }
             PageType::DataPageV2 => {
                 let header = page_header.data_page_header_v2.unwrap();
                 reader.seen_num_values += header.num_values as i64;
-                Page::V2(PageV2::new(
+                Page::V2(PageV2 {
                     buffer,
                     header,
-                    (
-                        reader.compression,
-                        page_header.uncompressed_page_size as usize,
-                    ),
-                    reader.current_dictionary.clone(),
-                ))
+                    compression: reader.compression,
+                    uncompressed_page_size: page_header.uncompressed_page_size as usize,
+                    dictionary_page: reader.current_dictionary.clone(),
+                })
             }
             PageType::IndexPage => {
                 continue;

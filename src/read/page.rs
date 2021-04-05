@@ -1,69 +1,29 @@
 use std::sync::Arc;
 
-use parquet_format::{CompressionCodec, DataPageHeaderV2, Encoding};
+use parquet_format::{CompressionCodec, DataPageHeader, DataPageHeaderV2};
 
 use super::page_dict::PageDict;
 
 /// a Page in the V1 of the format.
-/// `buf` is compressed.
+/// `buffer` is compressed.
 #[derive(Debug)]
 pub struct PageV1 {
-    pub buf: Vec<u8>,
-    pub num_values: u32,
-    pub encoding: Encoding,
-    pub compression: (CompressionCodec, usize),
-    pub def_level_encoding: Encoding,
-    pub rep_level_encoding: Encoding,
+    pub buffer: Vec<u8>,
+    pub header: DataPageHeader,
+    pub compression: CompressionCodec,
+    pub uncompressed_page_size: usize,
     pub dictionary_page: Option<Arc<dyn PageDict>>,
     //statistics: Option<Statistics>,
-}
-
-impl PageV1 {
-    pub fn new(
-        buf: Vec<u8>,
-        num_values: u32,
-        encoding: Encoding,
-        compression: (CompressionCodec, usize),
-        def_level_encoding: Encoding,
-        rep_level_encoding: Encoding,
-        dictionary_page: Option<Arc<dyn PageDict>>,
-    ) -> Self {
-        Self {
-            buf,
-            num_values,
-            encoding,
-            compression,
-            def_level_encoding,
-            rep_level_encoding,
-            dictionary_page,
-        }
-    }
 }
 
 #[derive(Debug)]
 pub struct PageV2 {
-    pub buf: Vec<u8>,
+    pub buffer: Vec<u8>,
     pub header: DataPageHeaderV2,
-    pub compression: (CompressionCodec, usize),
+    pub compression: CompressionCodec,
+    pub uncompressed_page_size: usize,
     pub dictionary_page: Option<Arc<dyn PageDict>>,
     //statistics: Option<Statistics>,
-}
-
-impl PageV2 {
-    #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        buf: Vec<u8>,
-        header: DataPageHeaderV2,
-        compression: (CompressionCodec, usize),
-        dictionary_page: Option<Arc<dyn PageDict>>,
-    ) -> Self {
-        Self {
-            buf,
-            header,
-            compression,
-            dictionary_page,
-        }
-    }
 }
 
 /// A [`Page`] is an uncompressed, encoded representation of a Parquet page. It holds actual data
@@ -83,10 +43,10 @@ impl Page {
         }
     }
 
-    pub fn compression(&self) -> &(CompressionCodec, usize) {
+    pub fn compression(&self) -> (CompressionCodec, usize) {
         match self {
-            Page::V1(page) => &page.compression,
-            Page::V2(page) => &page.compression,
+            Page::V1(page) => (page.compression, page.uncompressed_page_size),
+            Page::V2(page) => (page.compression, page.uncompressed_page_size),
         }
     }
 }

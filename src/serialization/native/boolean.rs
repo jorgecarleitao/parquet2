@@ -28,15 +28,15 @@ fn read_bitmap(values: &[u8], length: usize) -> Vec<Option<bool>> {
 
 pub fn page_to_vec(page: &Page, _: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
     match page {
-        Page::V1(page) => match page.encoding {
+        Page::V1(page) => match page.header.encoding {
             Encoding::Plain | Encoding::PlainDictionary => {
-                Ok(read_bitmap(&page.buf, page.num_values as usize))
+                Ok(read_bitmap(&page.buffer, page.header.num_values as usize))
             }
             _ => todo!(),
         },
         Page::V2(page) => match page.header.encoding {
             Encoding::Plain | Encoding::PlainDictionary => {
-                Ok(read_bitmap(&page.buf, page.header.num_values as usize))
+                Ok(read_bitmap(&page.buffer, page.header.num_values as usize))
             }
             _ => todo!(),
         },

@@ -51,13 +51,19 @@ pub fn page_dict_to_vec(
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<Vec<u8>>>> {
     match page {
-        Page::V1(page) => match (&page.encoding, &page.dictionary_page) {
+        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer(
-                &page.buf,
-                page.num_values,
+                &page.buffer,
+                page.header.num_values as u32,
                 dict.as_any().downcast_ref().unwrap(),
-                (&page.rep_level_encoding, descriptor.max_rep_level()),
-                (&page.def_level_encoding, descriptor.max_def_level()),
+                (
+                    &page.header.repetition_level_encoding,
+                    descriptor.max_rep_level(),
+                ),
+                (
+                    &page.header.definition_level_encoding,
+                    descriptor.max_def_level(),
+                ),
             )),
             (_, None) => Err(general_err!(
                 "Dictionary-encoded page requires a dictionary"

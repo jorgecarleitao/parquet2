@@ -22,15 +22,13 @@ pub fn decompress(
 }
 
 fn decompress_v1(mut page: PageV1, decompressor: &mut dyn Codec) -> Result<PageV1> {
-    let uncompressed_page_size = page.compression.1;
-
-    page.buf = decompress(&page.buf, uncompressed_page_size, decompressor)?;
+    page.buffer = decompress(&page.buffer, page.uncompressed_page_size, decompressor)?;
     Ok(page)
 }
 
 fn decompress_v2(mut page: PageV2, decompressor: &mut dyn Codec) -> Result<PageV2> {
     let page_header = &page.header;
-    let uncompressed_page_size = &page.compression.1;
+    let uncompressed_page_size = &page.uncompressed_page_size;
 
     // When processing data page v2, depending on enabled compression for the
     // page, we should account for uncompressed data ('offset') of
@@ -48,7 +46,7 @@ fn decompress_v2(mut page: PageV2, decompressor: &mut dyn Codec) -> Result<PageV
     if can_decompress {
         let mut decompressed_buffer = Vec::with_capacity(uncompressed_len);
         let decompressed_size =
-            decompressor.decompress(&page.buf[offset..], &mut decompressed_buffer)?;
+            decompressor.decompress(&page.buffer[offset..], &mut decompressed_buffer)?;
         if decompressed_size != uncompressed_len {
             return Err(general_err!(
                 "Actual decompressed size doesn't match the expected one ({} vs {})",
@@ -57,11 +55,11 @@ fn decompress_v2(mut page: PageV2, decompressor: &mut dyn Codec) -> Result<PageV
             ));
         }
         if offset == 0 {
-            page.buf = decompressed_buffer;
+            page.buffer = decompressed_buffer;
         } else {
             // Prepend saved offsets to the buffer
-            page.buf.truncate(offset);
-            page.buf.append(&mut decompressed_buffer);
+            page.buffer.truncate(offset);
+            page.buffer.append(&mut decompressed_buffer);
         }
     };
     Ok(page)

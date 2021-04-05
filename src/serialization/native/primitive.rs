@@ -87,13 +87,19 @@ pub fn page_dict_to_vec<T: NativeType>(
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<T>>> {
     match page {
-        Page::V1(page) => match (&page.encoding, &page.dictionary_page) {
+        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer::<T>(
-                &page.buf,
-                page.num_values,
+                &page.buffer,
+                page.header.num_values as u32,
                 dict.as_any().downcast_ref().unwrap(),
-                (&page.rep_level_encoding, descriptor.max_rep_level()),
-                (&page.def_level_encoding, descriptor.max_def_level()),
+                (
+                    &page.header.repetition_level_encoding,
+                    descriptor.max_rep_level(),
+                ),
+                (
+                    &page.header.definition_level_encoding,
+                    descriptor.max_def_level(),
+                ),
             )),
             (_, None) => Err(ParquetError::OutOfSpec(
                 "A dictionary-encoded page MUST be preceeded by a dictionary page".to_string(),
@@ -113,12 +119,18 @@ where
     <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
 {
     match page {
-        Page::V1(page) => match (&page.encoding, &page.dictionary_page) {
+        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
             (Encoding::Plain, None) => Ok(read_buffer::<T>(
-                &page.buf,
-                page.num_values,
-                (&page.rep_level_encoding, descriptor.max_rep_level()),
-                (&page.def_level_encoding, descriptor.max_def_level()),
+                &page.buffer,
+                page.header.num_values as u32,
+                (
+                    &page.header.repetition_level_encoding,
+                    descriptor.max_rep_level(),
+                ),
+                (
+                    &page.header.definition_level_encoding,
+                    descriptor.max_def_level(),
+                ),
             )),
             _ => todo!(),
         },

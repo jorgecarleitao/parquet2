@@ -115,42 +115,26 @@ impl ColumnChunkMetaData {
 
     /// Method to convert from Thrift.
     pub fn try_from_thrift(column_descr: ColumnDescriptor, cc: &ColumnChunk) -> Result<Self> {
-        if cc.meta_data.is_none() {
-            return Err(general_err!("Expected to have column metadata"));
-        }
-        let mut col_metadata = cc.meta_data.clone().unwrap();
-        let column_type = col_metadata.type_;
-        let column_path = ColumnPath::new(col_metadata.path_in_schema);
-        let encodings = col_metadata
-            .encodings
-            .drain(0..)
-            .map(Encoding::from)
-            .collect();
-        let compression = col_metadata.codec;
-        let file_path = cc.file_path.clone();
-        let file_offset = cc.file_offset;
-        let num_values = col_metadata.num_values;
-        let total_compressed_size = col_metadata.total_compressed_size;
-        let total_uncompressed_size = col_metadata.total_uncompressed_size;
-        let data_page_offset = col_metadata.data_page_offset;
-        let index_page_offset = col_metadata.index_page_offset;
-        let dictionary_page_offset = col_metadata.dictionary_page_offset;
-        let result = ColumnChunkMetaData {
-            column_type,
+        let col_metadata = cc
+            .meta_data
+            .as_ref()
+            .ok_or_else(|| general_err!("Expected to have column metadata"))?;
+        let column_path = ColumnPath::new(col_metadata.path_in_schema.clone());
+        Ok(Self {
+            column_type: col_metadata.type_,
             column_path,
             column_descr,
-            encodings,
-            file_path,
-            file_offset,
-            num_values,
-            compression,
-            total_compressed_size,
-            total_uncompressed_size,
-            data_page_offset,
-            index_page_offset,
-            dictionary_page_offset,
-        };
-        Ok(result)
+            encodings: col_metadata.encodings.clone(),
+            file_path: cc.file_path.clone(),
+            file_offset: cc.file_offset,
+            num_values: col_metadata.num_values,
+            compression: col_metadata.codec,
+            total_compressed_size: col_metadata.total_compressed_size,
+            total_uncompressed_size: col_metadata.total_uncompressed_size,
+            data_page_offset: col_metadata.data_page_offset,
+            index_page_offset: col_metadata.index_page_offset,
+            dictionary_page_offset: col_metadata.dictionary_page_offset,
+        })
     }
 
     /// Method to convert to Thrift.
