@@ -37,7 +37,7 @@ pub fn encode(mut value: u64, container: &mut [u8]) -> usize {
         *iter.next().unwrap() = byte;
         consumed += 1;
         if value == 0 {
-            break
+            break;
         }
     }
     consumed

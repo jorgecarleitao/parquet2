@@ -1,12 +1,12 @@
 #[macro_use]
 pub mod error;
-pub mod schema;
 pub mod compression;
 pub mod encoding;
 pub mod metadata;
+pub mod read;
+pub mod schema;
 pub mod serialization;
 pub mod types;
-pub mod read;
 
 const FOOTER_SIZE: u64 = 8;
 const PARQUET_MAGIC: [u8; 4] = [b'P', b'A', b'R', b'1'];
