@@ -20,6 +20,29 @@ pub fn decode(values: &[u8]) -> (u64, usize) {
     (result, consumed)
 }
 
+/// Encodes `value` in ULEB128 into `container`. The exact number of bytes written
+/// depends on `value`, and cannot be determined upfront. The maximum number of bytes
+/// required are 10.
+/// # Panic
+/// This function may panic if `container.len() < 10` and `value` requires more bytes.
+pub fn encode(mut value: u64, container: &mut [u8]) -> usize {
+    let mut consumed = 0;
+    let mut iter = container.iter_mut();
+    loop {
+        let mut byte = (value as u8) & !128;
+        value >>= 7;
+        if value != 0 {
+            byte |= 128;
+        }
+        *iter.next().unwrap() = byte;
+        consumed += 1;
+        if value == 0 {
+            break
+        }
+    }
+    consumed
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -38,5 +61,35 @@ mod tests {
         let (value, len) = decode(&data);
         assert_eq!(value, 16);
         assert_eq!(len, 1);
+    }
+
+    #[test]
+    fn round_trip() {
+        let original = 123124234u64;
+        let mut container = [0u8; 10];
+        let encoded_len = encode(original, &mut container);
+        let (value, len) = decode(&container);
+        assert_eq!(value, original);
+        assert_eq!(len, encoded_len);
+    }
+
+    #[test]
+    fn min_value() {
+        let original = u64::MIN;
+        let mut container = [0u8; 10];
+        let encoded_len = encode(original, &mut container);
+        let (value, len) = decode(&container);
+        assert_eq!(value, original);
+        assert_eq!(len, encoded_len);
+    }
+
+    #[test]
+    fn max_value() {
+        let original = u64::MAX;
+        let mut container = [0u8; 10];
+        let encoded_len = encode(original, &mut container);
+        let (value, len) = decode(&container);
+        assert_eq!(value, original);
+        assert_eq!(len, encoded_len);
     }
 }
