@@ -15,7 +15,7 @@ pub struct ColumnDescriptor {
     max_rep_level: i16,
 
     // The path of this column. For instance, "a.b.c.d".
-    path: Vec<String>,
+    path_in_schema: Vec<String>,
 }
 
 impl ColumnDescriptor {
@@ -24,13 +24,13 @@ impl ColumnDescriptor {
         primitive_type: ParquetType,
         max_def_level: i16,
         max_rep_level: i16,
-        path: Vec<String>,
+        path_in_schema: Vec<String>,
     ) -> Self {
         Self {
             primitive_type,
             max_def_level,
             max_rep_level,
-            path,
+            path_in_schema,
         }
     }
 
@@ -44,11 +44,11 @@ impl ColumnDescriptor {
         self.max_rep_level
     }
 
-    pub fn path(&self) -> &[String] {
-        &self.path
+    pub fn path_in_schema(&self) -> &[String] {
+        &self.path_in_schema
     }
 
-    /// Returns self type [`Type`](crate::schema::types::Type) for this leaf column.
+    /// Returns self type [`ParquetType`](crate::schema::types::ParquetType) for this leaf column.
     pub fn type_(&self) -> &ParquetType {
         &self.primitive_type
     }
