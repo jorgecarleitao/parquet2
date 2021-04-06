@@ -23,7 +23,7 @@ pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usiz
     let last_compressed_chunk = if remainder.is_empty() {
         vec![]
     } else {
-        let mut last_compressed_chunk = compressed.to_vec();
+        let mut last_compressed_chunk = remainder.to_vec();
         last_compressed_chunk
             .extend(std::iter::repeat(0).take(compressed_block_size - remainder.len()));
         last_compressed_chunk
@@ -32,7 +32,7 @@ pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usiz
     debug_assert_eq!(last_compressed_chunks.remainder().len(), 0);
 
     compressed_chunks
-        .chain(last_compressed_chunk.chunks_exact(compressed_block_size))
+        .chain(last_compressed_chunks)
         .zip(decompressed_chunks)
         .for_each(|(c_chunk, d_chunk)| {
             bitpacker.decompress(&c_chunk, d_chunk, num_bits);
@@ -40,8 +40,7 @@ pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usiz
     compressed.len() / num_bits as usize * 8
 }
 
-/// Decodes bitpacked bytes into `u32` values in `num_bits`.
-/// Returns the number of decoded values.
+/// Encodes `u32` values into a buffer using `num_bits`.
 pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usize {
     let bitpacker = BitPacker1x::new();
 
@@ -163,5 +162,53 @@ mod tests {
         decode(&data, num_bits, &mut decoded);
         decoded.truncate(length as usize);
         assert_eq!(decoded, vec![0, 1, 0, 1, 0, 1, 0, 1]);
+    }
+
+    #[test]
+    fn even_case() {
+        // [0, 1, 2, 3, 4, 5, 6, 0]x99
+        let data = &[0b10001000u8, 0b11000110, 0b00011010];
+        let num_bits = 3;
+        let copies = 99; // 8 * 99 % 32 != 0
+        let expected = std::iter::repeat(&[0u32, 1, 2, 3, 4, 5, 6, 0])
+            .take(copies)
+            .flatten()
+            .copied()
+            .collect::<Vec<_>>();
+        let data = std::iter::repeat(data)
+            .take(copies)
+            .flatten()
+            .copied()
+            .collect::<Vec<_>>();
+        let length = expected.len();
+        let mut decoded = vec![0; required_capacity(length as u32)];
+        decode(&data, num_bits, &mut decoded);
+        decoded.truncate(length as usize);
+        assert_eq!(decoded, expected);
+    }
+
+    #[test]
+    fn odd_case() {
+        // [0, 1, 2, 3, 4, 5, 6, 0]x4 + [2]
+        let data = &[0b10001000u8, 0b11000110, 0b00011010];
+        let num_bits = 3;
+        let copies = 4;
+        let expected = std::iter::repeat(&[0u32, 1, 2, 3, 4, 5, 6, 0])
+            .take(copies)
+            .flatten()
+            .copied()
+            .chain(std::iter::once(2))
+            .collect::<Vec<_>>();
+        let data = std::iter::repeat(data)
+            .take(copies)
+            .flatten()
+            .copied()
+            .chain(std::iter::once(0b00000010u8))
+            .collect::<Vec<_>>();
+        let length = expected.len();
+        let mut decoded = vec![0; required_capacity(length as u32)];
+        decode(&data, num_bits, &mut decoded);
+        decoded.truncate(length as usize);
+        assert_eq!(decoded, expected);
     }
 }
