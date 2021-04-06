@@ -118,7 +118,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
     let row_groups = t_file_metadata
         .row_groups
-        .iter()
+        .into_iter()
         .map(|rg| RowGroupMetaData::try_from_thrift(&schema_descr, rg))
         .collect::<Result<Vec<_>>>()?;
 

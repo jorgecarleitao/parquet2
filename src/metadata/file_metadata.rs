@@ -73,12 +73,16 @@ impl FileMetaData {
             .unwrap_or(ColumnOrder::Undefined)
     }
 
-    pub(crate) fn into_thrift(self) -> Result<parquet_format::FileMetaData> {
+    pub fn into_thrift(self) -> Result<parquet_format::FileMetaData> {
         Ok(parquet_format::FileMetaData {
             version: self.version,
             schema: self.schema().to_thrift()?,
             num_rows: self.num_rows as i64,
-            row_groups: self.row_groups.iter().map(|v| v.to_thrift()).collect(),
+            row_groups: self
+                .row_groups
+                .into_iter()
+                .map(|v| v.into_thrift())
+                .collect(),
             key_value_metadata: self.key_value_metadata,
             created_by: self.created_by,
             column_orders: None, // todo

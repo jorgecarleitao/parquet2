@@ -25,17 +25,33 @@ pub struct PageV2 {
 }
 
 /// A [`CompressedPage`] is compressed, encoded representation of a Parquet page. It holds actual data
-/// and thus cloning it is expensive.
-/// Parquet has two page versions, which this enum accounts for.
+/// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
+/// as soon as it is not needed, thereby reducing memory usage.
 #[derive(Debug)]
 pub enum CompressedPage {
     V1(PageV1),
     V2(PageV2),
 }
 
+impl CompressedPage {
+    pub fn compressed_size(&self) -> usize {
+        match self {
+            Self::V1(page) => page.buffer.len(),
+            Self::V2(page) => page.buffer.len(),
+        }
+    }
+
+    pub fn uncompressed_size(&self) -> usize {
+        match self {
+            Self::V1(page) => page.uncompressed_page_size,
+            Self::V2(page) => page.uncompressed_page_size,
+        }
+    }
+}
+
 /// A [`Page`] is an uncompressed, encoded representation of a Parquet page. It holds actual data
-/// and thus cloning it is expensive.
-/// Parquet has two page versions, which this enum accounts for.
+/// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
+/// as soon as it is not needed, thereby reducing memory usage.
 #[derive(Debug)]
 pub enum Page {
     V1(PageV1),
@@ -50,3 +66,6 @@ impl Page {
         }
     }
 }
+
+// read: CompressedPage -> Page
+// write: Page -> CompressedPage

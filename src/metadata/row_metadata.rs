@@ -45,13 +45,13 @@ impl RowGroupMetaData {
     /// Method to convert from Thrift.
     pub fn try_from_thrift(
         schema_descr: &SchemaDescriptor,
-        rg: &RowGroup,
+        rg: RowGroup,
     ) -> Result<RowGroupMetaData> {
         assert_eq!(schema_descr.num_columns(), rg.columns.len());
         let total_byte_size = rg.total_byte_size;
         let num_rows = rg.num_rows;
         let mut columns = vec![];
-        for (cc, d) in rg.columns.iter().zip(schema_descr.columns()) {
+        for (cc, d) in rg.columns.into_iter().zip(schema_descr.columns()) {
             let cc = ColumnChunkMetaData::try_from_thrift(d.clone(), cc)?;
             columns.push(cc);
         }
@@ -63,9 +63,9 @@ impl RowGroupMetaData {
     }
 
     /// Method to convert to Thrift.
-    pub fn to_thrift(&self) -> RowGroup {
+    pub fn into_thrift(self) -> RowGroup {
         RowGroup {
-            columns: self.columns().iter().map(|v| v.to_thrift()).collect(),
+            columns: self.columns.into_iter().map(|v| v.into_thrift()).collect(),
             total_byte_size: self.total_byte_size,
             num_rows: self.num_rows,
             sorting_columns: None,

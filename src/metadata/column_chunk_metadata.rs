@@ -1,26 +1,16 @@
-use parquet_format::{ColumnChunk, ColumnMetaData, Encoding};
+use parquet_format::{ColumnChunk, ColumnMetaData};
 
 use super::column_descriptor::ColumnDescriptor;
-use crate::error::{ParquetError, Result};
+use crate::error::Result;
 use crate::{compression::CompressionCodec, schema::types::Type};
 
 /// Metadata for a column chunk.
+// This contains the `ColumnDescriptor` associated with the chunk so that deserializers have
+// access to the descriptor (e.g. physical, converted, logical).
 #[derive(Debug, Clone)]
 pub struct ColumnChunkMetaData {
-    column_type: Type,
-    column_path: Vec<String>,
+    column_chunk: ColumnChunk,
     column_descr: ColumnDescriptor,
-    encodings: Vec<Encoding>,
-    file_path: Option<String>,
-    file_offset: i64,
-    num_values: i64,
-    compression: CompressionCodec,
-    total_compressed_size: i64,
-    total_uncompressed_size: i64,
-    data_page_offset: i64,
-    index_page_offset: Option<i64>,
-    dictionary_page_offset: Option<i64>,
-    //statistics: Option<Statistics>,
 }
 
 /// Represents common operations for a column chunk.
@@ -29,23 +19,22 @@ impl ColumnChunkMetaData {
     ///
     /// If not set, assumed to belong to the same file as the metadata.
     /// This path is relative to the current file.
-    pub fn file_path(&self) -> Option<&String> {
-        self.file_path.as_ref()
+    pub fn file_path(&self) -> &Option<String> {
+        &self.column_chunk.file_path
     }
 
     /// Byte offset in `file_path()`.
     pub fn file_offset(&self) -> i64 {
-        self.file_offset
+        self.column_chunk.file_offset
+    }
+
+    fn column_metadata(&self) -> &ColumnMetaData {
+        self.column_chunk.meta_data.as_ref().unwrap()
     }
 
     /// Type of this column. Must be primitive.
     pub fn column_type(&self) -> &Type {
-        &self.column_type
-    }
-
-    /// Path (or identifier) of this column.
-    pub fn column_path(&self) -> &[String] {
-        &self.column_path
+        &self.column_metadata().type_
     }
 
     /// Descriptor for this column.
@@ -53,49 +42,44 @@ impl ColumnChunkMetaData {
         &self.column_descr
     }
 
-    /// All encodings used for this column.
-    pub fn encodings(&self) -> &[Encoding] {
-        &self.encodings
-    }
-
     /// Total number of values in this column chunk.
     pub fn num_values(&self) -> i64 {
-        self.num_values
+        self.column_metadata().num_values
     }
 
     /// CompressionCodec for this column.
     pub fn compression(&self) -> &CompressionCodec {
-        &self.compression
+        &self.column_metadata().codec
     }
 
     /// Returns the total compressed data size of this column chunk.
     pub fn compressed_size(&self) -> i64 {
-        self.total_compressed_size
+        self.column_metadata().total_compressed_size
     }
 
     /// Returns the total uncompressed data size of this column chunk.
     pub fn uncompressed_size(&self) -> i64 {
-        self.total_uncompressed_size
+        self.column_metadata().total_uncompressed_size
     }
 
     /// Returns the offset for the column data.
     pub fn data_page_offset(&self) -> i64 {
-        self.data_page_offset
+        self.column_metadata().data_page_offset
     }
 
     /// Returns `true` if this column chunk contains a index page, `false` otherwise.
     pub fn has_index_page(&self) -> bool {
-        self.index_page_offset.is_some()
+        self.column_metadata().index_page_offset.is_some()
     }
 
     /// Returns the offset for the index page.
     pub fn index_page_offset(&self) -> Option<i64> {
-        self.index_page_offset
+        self.column_metadata().index_page_offset
     }
 
     /// Returns the offset for the dictionary page, if any.
     pub fn dictionary_page_offset(&self) -> Option<i64> {
-        self.dictionary_page_offset
+        self.column_metadata().dictionary_page_offset
     }
 
     /// Returns the offset and length in bytes of the column chunk within the file
@@ -114,55 +98,18 @@ impl ColumnChunkMetaData {
     }
 
     /// Method to convert from Thrift.
-    pub fn try_from_thrift(column_descr: ColumnDescriptor, cc: &ColumnChunk) -> Result<Self> {
-        let col_metadata = cc
-            .meta_data
-            .as_ref()
-            .ok_or_else(|| general_err!("Expected to have column metadata"))?;
-        let column_path = col_metadata.path_in_schema.clone();
+    pub fn try_from_thrift(
+        column_descr: ColumnDescriptor,
+        column_chunk: ColumnChunk,
+    ) -> Result<Self> {
         Ok(Self {
-            column_type: col_metadata.type_,
-            column_path,
+            column_chunk,
             column_descr,
-            encodings: col_metadata.encodings.clone(),
-            file_path: cc.file_path.clone(),
-            file_offset: cc.file_offset,
-            num_values: col_metadata.num_values,
-            compression: col_metadata.codec,
-            total_compressed_size: col_metadata.total_compressed_size,
-            total_uncompressed_size: col_metadata.total_uncompressed_size,
-            data_page_offset: col_metadata.data_page_offset,
-            index_page_offset: col_metadata.index_page_offset,
-            dictionary_page_offset: col_metadata.dictionary_page_offset,
         })
     }
 
     /// Method to convert to Thrift.
-    pub fn to_thrift(&self) -> ColumnChunk {
-        let column_metadata = ColumnMetaData {
-            type_: self.column_type,
-            encodings: self.encodings().to_vec(),
-            path_in_schema: Vec::from(self.column_path.as_ref()),
-            codec: self.compression,
-            num_values: self.num_values,
-            total_uncompressed_size: self.total_uncompressed_size,
-            total_compressed_size: self.total_compressed_size,
-            key_value_metadata: None,
-            data_page_offset: self.data_page_offset,
-            index_page_offset: self.index_page_offset,
-            dictionary_page_offset: self.dictionary_page_offset,
-            statistics: None,
-            encoding_stats: None,
-        };
-
-        ColumnChunk {
-            file_path: self.file_path().cloned(),
-            file_offset: self.file_offset,
-            meta_data: Some(column_metadata),
-            offset_index_offset: None,
-            offset_index_length: None,
-            column_index_offset: None,
-            column_index_length: None,
-        }
+    pub fn into_thrift(self) -> ColumnChunk {
+        self.column_chunk
     }
 }
