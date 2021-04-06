@@ -1,6 +1,6 @@
 use parquet_format::{ColumnChunk, ColumnMetaData, Encoding};
 
-use super::{column_descriptor::ColumnDescriptor, column_path::ColumnPath};
+use super::column_descriptor::ColumnDescriptor;
 use crate::error::{ParquetError, Result};
 use crate::{compression::CompressionCodec, schema::types::Type};
 
@@ -8,7 +8,7 @@ use crate::{compression::CompressionCodec, schema::types::Type};
 #[derive(Debug, Clone)]
 pub struct ColumnChunkMetaData {
     column_type: Type,
-    column_path: ColumnPath,
+    column_path: Vec<String>,
     column_descr: ColumnDescriptor,
     encodings: Vec<Encoding>,
     file_path: Option<String>,
@@ -44,7 +44,7 @@ impl ColumnChunkMetaData {
     }
 
     /// Path (or identifier) of this column.
-    pub fn column_path(&self) -> &ColumnPath {
+    pub fn column_path(&self) -> &[String] {
         &self.column_path
     }
 
@@ -119,7 +119,7 @@ impl ColumnChunkMetaData {
             .meta_data
             .as_ref()
             .ok_or_else(|| general_err!("Expected to have column metadata"))?;
-        let column_path = ColumnPath::new(col_metadata.path_in_schema.clone());
+        let column_path = col_metadata.path_in_schema.clone();
         Ok(Self {
             column_type: col_metadata.type_,
             column_path,

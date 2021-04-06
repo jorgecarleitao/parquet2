@@ -1,7 +1,6 @@
 use crate::schema::types::{ParquetType, Repetition};
 
 use super::column_descriptor::ColumnDescriptor;
-use super::column_path::ColumnPath;
 
 /// A schema descriptor. This encapsulates the top-level schemas for all the columns,
 /// as well as all descriptors for all the primitive columns.
@@ -109,7 +108,7 @@ fn build_tree<'a>(
                 tp.clone(),
                 max_def_level,
                 max_rep_level,
-                ColumnPath::new(path),
+                path,
             ));
             leaf_to_base.push(base_tp.clone());
         }

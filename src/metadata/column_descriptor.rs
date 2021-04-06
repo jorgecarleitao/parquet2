@@ -1,4 +1,3 @@
-use super::column_path::ColumnPath;
 use crate::schema::types::ParquetType;
 
 /// A descriptor for leaf-level primitive columns.
@@ -16,7 +15,7 @@ pub struct ColumnDescriptor {
     max_rep_level: i16,
 
     // The path of this column. For instance, "a.b.c.d".
-    path: ColumnPath,
+    path: Vec<String>,
 }
 
 impl ColumnDescriptor {
@@ -25,7 +24,7 @@ impl ColumnDescriptor {
         primitive_type: ParquetType,
         max_def_level: i16,
         max_rep_level: i16,
-        path: ColumnPath,
+        path: Vec<String>,
     ) -> Self {
         Self {
             primitive_type,
@@ -45,8 +44,7 @@ impl ColumnDescriptor {
         self.max_rep_level
     }
 
-    /// Returns [`ColumnPath`] for this column.
-    pub fn path(&self) -> &ColumnPath {
+    pub fn path(&self) -> &[String] {
         &self.path
     }
 
