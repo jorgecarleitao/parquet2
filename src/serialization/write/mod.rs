@@ -103,6 +103,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore = "Native boolean writer not yet implemented"]
     fn bool() -> Result<()> {
         test_column(1)
     }
