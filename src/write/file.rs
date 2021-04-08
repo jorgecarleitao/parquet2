@@ -61,7 +61,7 @@ where
     I: Iterator<Item = std::result::Result<CompressedPage, E>>,
     II: Iterator<Item = std::result::Result<I, E>>,
     III: Iterator<Item = std::result::Result<II, E>>,
-    E: Error + 'static,
+    E: Error + Send + Sync + 'static,
 {
     start_file(writer)?;
 

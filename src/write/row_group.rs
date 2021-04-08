@@ -40,7 +40,7 @@ where
     W: Write + Seek,
     I: Iterator<Item = std::result::Result<CompressedPage, E>>,
     II: Iterator<Item = std::result::Result<I, E>>,
-    E: Error + 'static,
+    E: Error + Send + Sync + 'static,
 {
     let descriptors = schema.columns();
     let column_iter = descriptors.iter().zip(columns);

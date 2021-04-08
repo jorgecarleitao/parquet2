@@ -17,7 +17,7 @@ use super::page::write_page;
 pub fn write_column_chunk<
     W: Write + Seek,
     I: Iterator<Item = std::result::Result<CompressedPage, E>>,
-    E: Error + 'static,
+    E: Error + Send + Sync + 'static,
 >(
     mut writer: &mut W,
     descriptor: &ColumnDescriptor,
