@@ -4,7 +4,10 @@ use crate::{compression::create_codec, encoding::hybrid_rle::encode, error::Resu
 use crate::{read::CompressedPage, types::NativeType};
 
 fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)> {
-    // leave some space for the first 4 bytes anouncing the length of the def level
+    // leave the first 4 bytes anouncing the length of the def level
+    // this will be overwritten at the end, once the length is known.
+    // This is unknown at this point because of the uleb128 encoding,
+    // whose length is variable.
     let mut validity = std::io::Cursor::new(vec![0; 4]);
     validity.set_position(4);
 
@@ -43,7 +46,7 @@ pub fn array_to_page_v1<T: NativeType>(
 
     let codec = create_codec(&compression)?;
     let buffer = if let Some(mut codec) = codec {
-        // todo: avoid this allocation by extending `buffer` directly.
+        // todo: remove this allocation by extending `buffer` directly.
         // needs refactoring `compress`'s API.
         let mut tmp = vec![];
         codec.compress(&values, &mut tmp)?;

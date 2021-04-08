@@ -8,8 +8,13 @@ use super::read::Array;
 
 pub fn array_to_page(array: &Array) -> Result<CompressedPage> {
     // using plain encoding format
+    let compression = CompressionCodec::Uncompressed;
     match array {
-        Array::Int32(array) => primitive::array_to_page_v1(&array, CompressionCodec::Uncompressed),
+        Array::Int32(array) => primitive::array_to_page_v1(&array, compression),
+        Array::Int64(array) => primitive::array_to_page_v1(&array, compression),
+        Array::Int96(array) => primitive::array_to_page_v1(&array, compression),
+        Array::Float32(array) => primitive::array_to_page_v1(&array, compression),
+        Array::Float64(array) => primitive::array_to_page_v1(&array, compression),
         _ => todo!(),
     }
 }
@@ -47,7 +52,7 @@ mod tests {
         ))
     }
 
-    fn get_column<R: Read + Seek>(reader: &mut R) -> Result<Array> {
+    fn read_column<R: Read + Seek>(reader: &mut R) -> Result<Array> {
         let (descriptor, mut pages) = get_pages(reader, 0, 0)?;
         assert_eq!(pages.len(), 1);
 
@@ -56,15 +61,26 @@ mod tests {
         page_to_array(page, &descriptor)
     }
 
-    #[test]
-    fn int32() -> Result<()> {
-        let array = alltypes_plain(0);
+    fn test_column(column: usize) -> Result<()> {
+        let array = alltypes_plain(column);
 
         let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(array_to_page(
             &array,
         ))))));
 
-        let schema = SchemaDescriptor::new(from_message("message schema { OPTIONAL INT32 col; }")?);
+        // prepare schema
+        let a = match array {
+            Array::Int32(_) => "INT32",
+            Array::Int64(_) => "INT64",
+            Array::Int96(_) => "INT96",
+            Array::Float32(_) => "FLOAT",
+            Array::Float64(_) => "DOUBLE",
+            _ => todo!(),
+        };
+        let schema = SchemaDescriptor::new(from_message(&format!(
+            "message schema {{ OPTIONAL {} col; }}",
+            a
+        ))?);
 
         let mut writer = Cursor::new(vec![]);
         write_file(
@@ -76,9 +92,48 @@ mod tests {
 
         let data = writer.into_inner();
 
-        let a = get_column(&mut Cursor::new(data))?;
-        assert_eq!(a, array);
-
+        let result = read_column(&mut Cursor::new(data))?;
+        assert_eq!(array, result);
         Ok(())
+    }
+
+    #[test]
+    fn int32() -> Result<()> {
+        test_column(0)
+    }
+
+    #[test]
+    fn bool() -> Result<()> {
+        test_column(1)
+    }
+
+    #[test]
+    fn tiny_int() -> Result<()> {
+        test_column(2)
+    }
+
+    #[test]
+    fn smallint_col() -> Result<()> {
+        test_column(3)
+    }
+
+    #[test]
+    fn int_col() -> Result<()> {
+        test_column(4)
+    }
+
+    #[test]
+    fn bigint_col() -> Result<()> {
+        test_column(5)
+    }
+
+    #[test]
+    fn float32_col() -> Result<()> {
+        test_column(6)
+    }
+
+    #[test]
+    fn float64_col() -> Result<()> {
+        test_column(7)
     }
 }
