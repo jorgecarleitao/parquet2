@@ -3,6 +3,7 @@
 /// but OTOH it has no external dependencies and is very familiar to Rust developers.
 mod binary;
 mod boolean;
+mod levels;
 mod primitive;
 mod utils;
 

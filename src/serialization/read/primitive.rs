@@ -2,7 +2,7 @@ use std::convert::{TryFrom, TryInto};
 
 use parquet_format::Encoding;
 
-use super::super::levels;
+use super::levels;
 use super::utils::ValuesDef;
 use crate::encoding::{bitpacking, uleb128};
 use crate::error::{ParquetError, Result};
