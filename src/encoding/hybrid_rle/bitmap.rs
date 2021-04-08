@@ -6,31 +6,6 @@ pub fn set(byte: u8, i: usize) -> u8 {
     byte | BIT_MASK[i]
 }
 
-pub struct Bitmap<'a>(&'a [u8], usize, usize);
-
-impl<'a> Bitmap<'a> {
-    #[inline]
-    pub fn new(bytes: &'a [u8], offset: usize, length: usize) -> Self {
-        assert!(offset + length <= bytes.len() * 8);
-        Self(bytes, offset, length)
-    }
-
-    #[inline]
-    pub fn bytes(&self) -> &[u8] {
-        self.0
-    }
-
-    #[inline]
-    pub fn offset(&self) -> usize {
-        self.1
-    }
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.2
-    }
-}
-
 /// An iterator of bits according to the LSB format
 pub struct BitmapIter<'a> {
     iter: std::slice::Iter<'a, u8>,
@@ -56,11 +31,6 @@ impl<'a> BitmapIter<'a> {
             index: 0,
             current_byte,
         }
-    }
-
-    #[inline]
-    pub fn from_bitmap(bitmap: &'a Bitmap) -> Self {
-        Self::new(bitmap.bytes(), bitmap.offset(), bitmap.len())
     }
 }
 

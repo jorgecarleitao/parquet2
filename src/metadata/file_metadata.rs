@@ -6,6 +6,8 @@ use crate::error::Result;
 pub type KeyValue = parquet_format::KeyValue;
 
 /// Metadata for a Parquet file.
+// This is almost equal to `parquet_format::FileMetaData` but contains the descriptors,
+// which are crucial to deserialize pages.
 #[derive(Debug, Clone)]
 pub struct FileMetaData {
     /// version of this file.

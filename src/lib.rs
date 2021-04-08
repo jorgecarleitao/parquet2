@@ -7,6 +7,7 @@ pub mod read;
 pub mod schema;
 pub mod serialization;
 pub mod types;
+pub mod write;
 
 const FOOTER_SIZE: u64 = 8;
 const PARQUET_MAGIC: [u8; 4] = [b'P', b'A', b'R', b'1'];
@@ -18,7 +19,7 @@ const DEFAULT_FOOTER_READ_SIZE: u64 = 64 * 1024;
 mod tests {
     use std::path::PathBuf;
 
-    use super::serialization::native::Array;
+    use crate::serialization::read::Array;
 
     pub fn get_path() -> PathBuf {
         let dir = env!("CARGO_MANIFEST_DIR");

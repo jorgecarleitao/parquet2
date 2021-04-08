@@ -1,9 +1,11 @@
-#[derive(Debug, PartialEq)]
+#[derive(Debug)]
 pub enum ParquetError {
     /// General Parquet error.
     General(String),
     /// When the parquet file is known to be out of spec.
     OutOfSpec(String),
+    // An error originating from a consumer or dependency
+    External(String, Box<dyn std::error::Error>),
 }
 
 impl std::error::Error for ParquetError {}
@@ -17,7 +19,17 @@ impl std::fmt::Display for ParquetError {
             ParquetError::OutOfSpec(message) => {
                 write!(fmt, "{}", message)
             }
+            ParquetError::External(message, err) => {
+                write!(fmt, "{}: {}", message, err)
+            }
         }
+    }
+}
+
+impl ParquetError {
+    /// Wraps an external error in an `ParquetError`.
+    pub fn from_external_error(error: impl std::error::Error + 'static) -> Self {
+        Self::External("".to_string(), Box::new(error))
     }
 }
 

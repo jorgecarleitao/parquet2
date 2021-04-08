@@ -3,7 +3,7 @@ mod bitmap;
 mod decoder;
 mod encoder;
 pub use decoder::Decoder;
-pub use encoder::BitmapEncoder;
+pub use encoder::encode;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum HybridEncoded<'a> {
