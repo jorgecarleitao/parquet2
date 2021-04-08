@@ -53,7 +53,7 @@ impl<'a, W: Write + Seek> BitmapEncoder<'a, W> {
         })
     }
 
-    fn extend_from_trusted_len_iter<I: IntoIterator<Item = bool>>(
+    pub fn extend_from_trusted_len_iter<I: IntoIterator<Item = bool>>(
         &mut self,
         iterator: I,
     ) -> std::io::Result<()> {
@@ -64,7 +64,7 @@ impl<'a, W: Write + Seek> BitmapEncoder<'a, W> {
 
         let bit_offset = self.length % 8;
 
-        if length <= 8 - bit_offset {
+        if length < 8 - bit_offset {
             if bit_offset == 0 {
                 self.buffer = 0;
             }
@@ -162,6 +162,20 @@ mod tests {
 
         let vec = container.into_inner();
         assert_eq!(vec, vec![3, 0, 0, 0, 0b10011101u8, 0b01011101, 0b00000001]);
+        Ok(())
+    }
+
+    #[test]
+    fn from_iter() -> std::io::Result<()> {
+        let mut container = std::io::Cursor::new(vec![]);
+
+        let mut encoder = BitmapEncoder::try_new(&mut container)?;
+
+        encoder.extend_from_trusted_len_iter(vec![true, true, true, true, true, true, true, true].into_iter())?;
+        encoder.finish()?;
+
+        let vec = container.into_inner();
+        assert_eq!(vec, vec![1, 0, 0, 0, 0b11111111]);
         Ok(())
     }
 }
