@@ -2,21 +2,26 @@
 
 This is a re-write of the official [`parquet` crate](https://crates.io/crates/parquet) with performance, parallelism and safety in mind.
 
-Its three main differentiators in comparison with `parquet` are:
+The four main differentiators in comparison with `parquet` are:
 * does not use `unsafe`
 * delegates parallelism downstream
 * decouples reading (IO intensive) from computing (CPU intensive)
 * deletages decompressing and decoding batches downstream
+* it is faster (10-20x when reading to arrow format)
 
 ## Organization
 
 * `read`: read metadata and pages
+* `write`: write metadata and pages
 * `metadata`: parquet files metadata (e.g. `FileMetaData`)
 * `schema`: types metadata declaration (e.g. `ConvertedType`)
 * `types`: physical type declaration (i.e. how things are represented in memory). So far unused.
 * `compression`: compression (e.g. Gzip)
 * `error`: errors declaration
-* `serialization`: convert from bytes to typed buffers (`Vec<T>`).
+* `serialization`: convert from bytes to rust native typed buffers (`Vec<Option<T>>`).
+
+Note that `serialization` is not very robust. It serves as a playground 
+to understand the specification and how to serialize and deserialize pages.
 
 ## How to use
 
