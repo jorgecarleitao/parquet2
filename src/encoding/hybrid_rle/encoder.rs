@@ -2,7 +2,7 @@ use crate::encoding::{ceil8, uleb128};
 
 use std::io::Write;
 
-use super::bitmap;
+use super::bitpacked_encode;
 
 /// the bitpacked part of the encoder.
 pub fn encode<W: Write, I: Iterator<Item = bool>>(
@@ -22,7 +22,7 @@ pub fn encode<W: Write, I: Iterator<Item = bool>>(
     writer.write_all(&container[..used])?;
 
     // encode the iterator
-    bitmap::encode(writer, iterator)
+    bitpacked_encode(writer, iterator)
 }
 
 #[cfg(test)]
