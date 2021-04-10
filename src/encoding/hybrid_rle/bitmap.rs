@@ -1,3 +1,5 @@
+use std::io::Write;
+
 const BIT_MASK: [u8; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
 
 /// Sets bit at position `i` in `byte`
@@ -60,5 +62,40 @@ impl<'a> Iterator for BitmapIter<'a> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.len - self.index, Some(self.len - self.index))
+    }
+}
+
+
+/// Writes an iterator of bools into writer, with LSB first.
+pub fn encode<W: Write, I: Iterator<Item = bool>>(
+    writer: &mut W,
+    mut iterator: I,
+) -> std::io::Result<()> {
+    // the length of the iterator.
+    let length = iterator.size_hint().1.unwrap();
+
+    let chunks = length / 8;
+    let reminder = length % 8;
+
+    (0..chunks).try_for_each(|_| {
+        let mut byte = 0u8;
+        (0..8).for_each(|i| {
+            if iterator.next().unwrap() {
+                byte = set(byte, i)
+            }
+        });
+        writer.write_all(&[byte])
+    })?;
+
+    if reminder != 0 {
+        let mut last = 0u8;
+        iterator.enumerate().for_each(|(i, value)| {
+            if value {
+                last = set(last, i)
+            }
+        });
+        writer.write_all(&[last])
+    } else {
+        Ok(())
     }
 }

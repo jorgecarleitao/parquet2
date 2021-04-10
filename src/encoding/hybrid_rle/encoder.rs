@@ -2,18 +2,15 @@ use crate::encoding::{ceil8, uleb128};
 
 use std::io::Write;
 
-use super::bitmap::set;
+use super::bitmap;
 
 /// the bitpacked part of the encoder.
 pub fn encode<W: Write, I: Iterator<Item = bool>>(
     writer: &mut W,
-    mut iterator: I,
+    iterator: I,
 ) -> std::io::Result<()> {
     // the length of the iterator.
     let length = iterator.size_hint().1.unwrap();
-
-    let chunks = length / 8;
-    let reminder = length % 8;
 
     // write the length + indicator
     let mut header = ceil8(length) as u64;
@@ -24,27 +21,8 @@ pub fn encode<W: Write, I: Iterator<Item = bool>>(
 
     writer.write_all(&container[..used])?;
 
-    (0..chunks).try_for_each(|_| {
-        let mut byte = 0u8;
-        (0..8).for_each(|i| {
-            if iterator.next().unwrap() {
-                byte = set(byte, i)
-            }
-        });
-        writer.write_all(&[byte])
-    })?;
-
-    if reminder != 0 {
-        let mut last = 0u8;
-        iterator.enumerate().for_each(|(i, value)| {
-            if value {
-                last = set(last, i)
-            }
-        });
-        writer.write_all(&[last])
-    } else {
-        Ok(())
-    }
+    // encode the iterator
+    bitmap::encode(writer, iterator)
 }
 
 #[cfg(test)]
