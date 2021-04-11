@@ -7,10 +7,6 @@ pub trait NativeType: Sized + Copy + std::fmt::Debug + 'static {
     fn to_le_bytes(&self) -> Self::Bytes;
 
     fn from_le_bytes(bytes: Self::Bytes) -> Self;
-
-    fn to_be_bytes(&self) -> Self::Bytes;
-
-    fn from_be_bytes(bytes: Self::Bytes) -> Self;
 }
 
 macro_rules! native {
@@ -23,18 +19,8 @@ macro_rules! native {
             }
 
             #[inline]
-            fn to_be_bytes(&self) -> Self::Bytes {
-                Self::to_be_bytes(*self)
-            }
-
-            #[inline]
             fn from_le_bytes(bytes: Self::Bytes) -> Self {
                 Self::from_le_bytes(bytes)
-            }
-
-            #[inline]
-            fn from_be_bytes(bytes: Self::Bytes) -> Self {
-                Self::from_be_bytes(bytes)
             }
         }
     };
@@ -49,12 +35,23 @@ impl NativeType for [u32; 3] {
     type Bytes = [u8; std::mem::size_of::<Self>()];
     #[inline]
     fn to_le_bytes(&self) -> Self::Bytes {
-        todo!()
-    }
-
-    #[inline]
-    fn to_be_bytes(&self) -> Self::Bytes {
-        todo!()
+        let mut bytes = [0; 12];
+        let first = self[0].to_le_bytes();
+        bytes[0] = first[0];
+        bytes[1] = first[1];
+        bytes[2] = first[2];
+        bytes[3] = first[3];
+        let second = self[1].to_le_bytes();
+        bytes[4] = second[0];
+        bytes[5] = second[1];
+        bytes[6] = second[2];
+        bytes[7] = second[3];
+        let third = self[2].to_le_bytes();
+        bytes[8] = third[0];
+        bytes[9] = third[1];
+        bytes[10] = third[2];
+        bytes[11] = third[3];
+        bytes
     }
 
     #[inline]
@@ -79,11 +76,6 @@ impl NativeType for [u32; 3] {
             u32::from_le_bytes(second),
             u32::from_le_bytes(third),
         ]
-    }
-
-    #[inline]
-    fn from_be_bytes(_: Self::Bytes) -> Self {
-        todo!()
     }
 }
 
