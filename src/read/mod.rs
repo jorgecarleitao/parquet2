@@ -13,7 +13,7 @@ use crate::metadata::RowGroupMetaData;
 use crate::{error::Result, metadata::FileMetaData};
 
 pub use page::{CompressedPage, Page, PageV1, PageV2};
-pub use page_dict::{BinaryPageDict, PageDict, PrimitivePageDict};
+pub use page_dict::{BinaryPageDict, FixedLenByteArrayPageDict, PageDict, PrimitivePageDict};
 pub use page_iterator::PageIterator;
 
 /// Filters row group metadata to only those row groups,

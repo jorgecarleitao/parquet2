@@ -2,9 +2,9 @@
 mod bitmap;
 mod decoder;
 mod encoder;
+pub use bitmap::encode as bitpacked_encode;
 pub use decoder::Decoder;
 pub use encoder::encode;
-pub use bitmap::encode as bitpacked_encode;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum HybridEncoded<'a> {

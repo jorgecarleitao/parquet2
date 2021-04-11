@@ -1,7 +1,9 @@
 mod binary;
+mod fixed_len_binary;
 mod primitive;
 
 pub use binary::BinaryPageDict;
+pub use fixed_len_binary::FixedLenByteArrayPageDict;
 pub use primitive::PrimitivePageDict;
 
 use std::{any::Any, sync::Arc};
@@ -9,7 +11,7 @@ use std::{any::Any, sync::Arc};
 use parquet_format::CompressionCodec;
 
 use crate::compression::create_codec;
-use crate::error::Result;
+use crate::error::{ParquetError, Result};
 use crate::schema::types::PhysicalType;
 
 use super::compression::decompress;
@@ -36,7 +38,9 @@ pub fn read_page_dict(
     };
 
     match physical_type {
-        PhysicalType::Boolean => todo!(),
+        PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
+            "Boolean physical type cannot be dictionary-encoded".to_string(),
+        )),
         PhysicalType::Int32 => {
             primitive::read_page_dict::<i32>(&buf, num_values, is_sorted, physical_type)
         }
@@ -53,6 +57,8 @@ pub fn read_page_dict(
             primitive::read_page_dict::<f64>(&buf, num_values, is_sorted, physical_type)
         }
         PhysicalType::ByteArray => binary::read_page_dict(&buf, num_values),
-        PhysicalType::FixedLenByteArray(_) => todo!(),
+        PhysicalType::FixedLenByteArray(_) => {
+            fixed_len_binary::read_page_dict(&buf, physical_type, num_values)
+        }
     }
 }

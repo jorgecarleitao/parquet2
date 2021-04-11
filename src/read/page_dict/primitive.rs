@@ -52,7 +52,7 @@ where
 
 pub fn read_page_dict<'a, T: NativeType>(
     buf: &'a [u8],
-    _num_values: u32,
+    num_values: u32,
     _is_sorted: bool,
     physical_type: PhysicalType,
 ) -> Result<Arc<dyn PageDict>>
@@ -60,6 +60,7 @@ where
     <T as NativeType>::Bytes: TryFrom<&'a [u8]>,
     <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
 {
-    let values = read_plain::<T>(buf);
+    let typed_size = num_values as usize * std::mem::size_of::<T>();
+    let values = read_plain::<T>(&buf[..typed_size]);
     Ok(Arc::new(PrimitivePageDict::new(values, physical_type)))
 }
