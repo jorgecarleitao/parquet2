@@ -153,4 +153,22 @@ impl ParquetType {
             physical_type,
         }
     }
+
+    pub fn try_from_group(
+        name: String,
+        repetition: Repetition,
+        converted_type: Option<GroupConvertedType>,
+        logical_type: Option<LogicalType>,
+        fields: Vec<ParquetType>,
+        id: Option<i32>,
+    ) -> Result<Self> {
+        let basic_info = BasicTypeInfo::new(name, repetition, id, false);
+
+        Ok(ParquetType::GroupType {
+            basic_info,
+            logical_type,
+            converted_type,
+            fields,
+        })
+    }
 }
