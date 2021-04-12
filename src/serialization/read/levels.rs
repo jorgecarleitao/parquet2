@@ -25,7 +25,7 @@ pub fn needed_bytes(values: &[u8], _length: u32, encoding: (&Encoding, i16)) -> 
 #[inline]
 pub fn decode(values: &[u8], length: u32, encoding: (&Encoding, i16)) -> Vec<u32> {
     match encoding {
-        (_, 0) => vec![], // no levels
+        (_, 0) => vec![0; length as usize], // no levels => required => all zero
         (Encoding::Rle, max_length) => {
             let bit_width = get_bit_width(max_length);
             rle_decode(

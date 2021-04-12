@@ -102,13 +102,13 @@ fn build_tree<'a>(
 
     match tp {
         ParquetType::PrimitiveType { .. } => {
-            let mut path: Vec<String> = vec![];
-            path.extend(path_so_far.iter().copied().map(String::from));
+            let path_in_schema = path_so_far.iter().copied().map(String::from).collect();
             leaves.push(ColumnDescriptor::new(
                 tp.clone(),
                 max_def_level,
                 max_rep_level,
-                path,
+                path_in_schema,
+                tp.clone(),
             ));
             leaf_to_base.push(base_tp.clone());
         }

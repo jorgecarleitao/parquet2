@@ -27,6 +27,13 @@ jobs:
           # these represent compiled steps of both dependencies and arrow
           # and thus are specific for a particular OS, arch and rust version.
           key: ${{ runner.os }}-amd64-target-cache-stable
+      - name: Setup parquet files
+        run: |
+          apt update && apt install python3-pip python3-venv -y -q
+          python3 -m venv venv
+          venv/bin/pip install pip --upgrade
+          venv/bin/pip install pyarrow==3
+          venv/bin/python integration/write_pyarrow.py
       - name: Setup toolchain
         run: |
           rustup toolchain install stable
@@ -91,6 +98,13 @@ jobs:
           path: /home/runner/target
           # this key is not equal because coverage uses different compilation flags.
           key: ${{ runner.os }}-amd64-target-coverage-cache-stable-
+      - name: Setup parquet files
+        run: |
+          apt update && apt install python3-pip python3-venv -y -q
+          python3 -m venv venv
+          venv/bin/pip install pip --upgrade
+          venv/bin/pip install pyarrow==3
+          venv/bin/python integration/write_pyarrow.py
       - name: Run coverage
         run: |
           export CARGO_HOME="/home/runner/.cargo"

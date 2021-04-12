@@ -51,7 +51,6 @@ fn read_dict_buffer<'a, T: NativeType>(
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Vec<Option<T>> {
-    // todo: `match` its encoding
     let dict_values = dict.values();
 
     // skip bytes from levels

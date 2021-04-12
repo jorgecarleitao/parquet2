@@ -114,4 +114,108 @@ mod tests {
             _ => unreachable!(),
         }
     }
+
+    // these values match the values in `integration`
+    pub fn pyarrow_optional(column: usize) -> Array {
+        let i64_values = &[
+            Some(0),
+            Some(1),
+            None,
+            Some(3),
+            None,
+            Some(5),
+            Some(6),
+            Some(7),
+            None,
+            Some(9),
+        ];
+        let f64_values = &[
+            Some(0.0),
+            Some(1.0),
+            None,
+            Some(3.0),
+            None,
+            Some(5.0),
+            Some(6.0),
+            Some(7.0),
+            None,
+            Some(9.0),
+        ];
+        let string_values = &[
+            Some(b"Hello".to_vec()),
+            None,
+            Some(b"aa".to_vec()),
+            Some(b"".to_vec()),
+            None,
+            Some(b"abc".to_vec()),
+            None,
+            None,
+            Some(b"def".to_vec()),
+            Some(b"aaa".to_vec()),
+        ];
+        let bool_values = &[
+            Some(true),
+            None,
+            Some(false),
+            Some(false),
+            None,
+            Some(true),
+            None,
+            None,
+            Some(true),
+            Some(true),
+        ];
+
+        match column {
+            0 => Array::Int64(i64_values.to_vec()),
+            1 => Array::Float64(f64_values.to_vec()),
+            2 => Array::Binary(string_values.to_vec()),
+            3 => Array::Boolean(bool_values.to_vec()),
+            4 => Array::Int64(i64_values.to_vec()),
+            _ => unreachable!(),
+        }
+    }
+
+    // these values match the values in `integration`
+    pub fn pyarrow_required(column: usize) -> Array {
+        let i64_values = &[
+            Some(0),
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(4),
+            Some(5),
+            Some(6),
+            Some(7),
+            Some(8),
+            Some(9),
+        ];
+
+        match column {
+            0 => Array::Int64(i64_values.to_vec()),
+            _ => unreachable!(),
+        }
+    }
+
+    // these values match the values in `integration`
+    pub fn pyarrow_nested_optional(column: usize) -> Array {
+        //    [[0, 1], None, [2, None, 3], [4, 5, 6], [], [7, 8, 9], None, [10]]
+        // def: 3, 3,  0,     3, 2,    3,   3, 3, 3,  1    3  3  3   0      3
+        // rep: 0, 1,  0,     0, 1,    1,   0, 1, 1,  0,   0, 1, 1,  0,     0
+        let data = vec![
+            Some(Array::Int64(vec![Some(0), Some(1)])),
+            None,
+            Some(Array::Int64(vec![Some(2), None, Some(3)])),
+            Some(Array::Int64(vec![Some(4), Some(5), Some(6)])),
+            Some(Array::Int64(vec![])),
+            Some(Array::Int64(vec![Some(7), Some(8), Some(9)])),
+            None,
+            Some(Array::Int64(vec![Some(10)])),
+        ];
+
+        match column {
+            0 => Array::List(data),
+            _ => unreachable!(),
+        }
+    }
 }

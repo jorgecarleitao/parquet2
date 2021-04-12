@@ -16,8 +16,7 @@ use crate::{
     read::{decompress_page, CompressedPage},
 };
 
-// The dynamic representation of values in native Rust. This is not exaustive and does not support
-// nested types
+// The dynamic representation of values in native Rust. This is not exaustive.
 // todo: maybe refactor this into serde/json?
 #[derive(Debug, PartialEq)]
 pub enum Array {
@@ -29,6 +28,7 @@ pub enum Array {
     Float64(Vec<Option<f64>>),
     Boolean(Vec<Option<bool>>),
     Binary(Vec<Option<Vec<u8>>>),
+    List(Vec<Option<Array>>),
 }
 
 /// Reads a page into an [`Array`].
@@ -36,8 +36,8 @@ pub enum Array {
 pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Result<Array> {
     let page = decompress_page(page)?;
 
-    match descriptor.type_() {
-        ParquetType::PrimitiveType { physical_type, .. } => match page.dictionary_page() {
+    match (descriptor.type_(), descriptor.max_rep_level()) {
+        (ParquetType::PrimitiveType { physical_type, .. }, 0) => match page.dictionary_page() {
             Some(_) => match physical_type {
                 PhysicalType::Int32 => Ok(Array::Int32(primitive::page_dict_to_vec(
                     &page, descriptor,
@@ -75,6 +75,13 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
                 _ => todo!(),
             },
         },
+        (ParquetType::PrimitiveType { physical_type, .. }, _) => match page.dictionary_page() {
+            None => match physical_type {
+                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(&page, descriptor)?)),
+                _ => todo!(),
+            },
+            _ => todo!(),
+        },
         _ => Err(general_err!(
             "Nested types are not supported by this in-memory format"
         )),
@@ -84,10 +91,9 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
 #[cfg(test)]
 mod tests {
     use std::fs::File;
-    use std::path::PathBuf;
 
     use crate::read::{get_page_iterator, read_metadata};
-    use crate::tests::{alltypes_plain, get_path};
+    use crate::tests::*;
     use crate::types::int96_to_i64;
 
     use super::*;
@@ -97,10 +103,8 @@ mod tests {
         path: &str,
         row_group: usize,
         column: usize,
-        mut testdata: PathBuf,
     ) -> Result<(ColumnDescriptor, Vec<CompressedPage>)> {
-        testdata.push(path);
-        let mut file = File::open(testdata).unwrap();
+        let mut file = File::open(path).unwrap();
 
         let metadata = read_metadata(&mut file)?;
         let descriptor = metadata.row_groups[row_group]
@@ -114,8 +118,8 @@ mod tests {
         ))
     }
 
-    fn get_column(column: usize) -> Result<Array> {
-        let (descriptor, mut pages) = prepare("alltypes_plain.parquet", 0, column, get_path())?;
+    fn get_column(path: &str, column: usize) -> Result<Array> {
+        let (descriptor, mut pages) = prepare(path, 0, column)?;
         assert_eq!(pages.len(), 1);
 
         let page = pages.pop().unwrap();
@@ -124,7 +128,10 @@ mod tests {
     }
 
     fn test_column(column: usize) -> Result<()> {
-        let result = get_column(column)?;
+        let mut path = get_path();
+        path.push("alltypes_plain.parquet");
+        let path = path.to_str().unwrap();
+        let result = get_column(path, column)?;
         assert_eq!(result, alltypes_plain(column));
         Ok(())
     }
@@ -181,6 +188,10 @@ mod tests {
 
     #[test]
     fn timestamp_col() -> Result<()> {
+        let mut path = get_path();
+        path.push("alltypes_plain.parquet");
+        let path = path.to_str().unwrap();
+
         let expected = vec![
             1235865600000i64,
             1235865660000,
@@ -193,7 +204,7 @@ mod tests {
         ];
 
         let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let result = get_column(10)?;
+        let result = get_column(&path, 10)?;
         if let Array::Int96(result) = result {
             let a = result
                 .into_iter()
@@ -204,5 +215,58 @@ mod tests {
             panic!("Timestamp expected");
         };
         Ok(())
+    }
+
+    fn test_pyarrow_integration(
+        file: &str,
+        column: usize,
+        version: usize,
+        required: bool,
+    ) -> Result<()> {
+        if std::env::var("PARQUET2_IGNORE_PYARROW_TESTS").is_ok() {
+            return Ok(());
+        }
+        let path = if required {
+            format!(
+                "fixtures/pyarrow3/v{}/{}_{}_10.parquet",
+                version, file, "required"
+            )
+        } else {
+            format!(
+                "fixtures/pyarrow3/v{}/{}_{}_10.parquet",
+                version, file, "nullable"
+            )
+        };
+        let array = get_column(&path, column)?;
+
+        let expected = if file == "basic" {
+            if required {
+                pyarrow_required(column)
+            } else {
+                pyarrow_optional(column)
+            }
+        } else {
+            pyarrow_nested_optional(column)
+        };
+
+        assert_eq!(expected, array);
+
+        Ok(())
+    }
+
+    #[test]
+    fn pyarrow_v1_int32_required() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, true)
+    }
+
+    #[test]
+    fn pyarrow_v1_int32_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, false)
+    }
+
+    #[test]
+    #[ignore = "Not yet implemented"]
+    fn pyarrow_v1_list_nullable() -> Result<()> {
+        test_pyarrow_integration("nested", 0, 1, false)
     }
 }
