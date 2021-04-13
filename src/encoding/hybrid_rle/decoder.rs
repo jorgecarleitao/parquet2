@@ -5,16 +5,11 @@ use super::{super::ceil8, HybridEncoded};
 pub struct Decoder<'a> {
     values: &'a [u8],
     num_bits: u32,
-    rle_bytes: usize,
 }
 
 impl<'a> Decoder<'a> {
     pub fn new(values: &'a [u8], num_bits: u32) -> Self {
-        Self {
-            values,
-            num_bits,
-            rle_bytes: ceil8(num_bits as usize),
-        }
+        Self { values, num_bits }
     }
 }
 
@@ -35,12 +30,11 @@ impl<'a> Iterator for Decoder<'a> {
             result
         } else {
             // is rle
-            let decompressed_items = indicator as usize >> 1;
-            let result = Some(HybridEncoded::Rle(
-                &self.values[..self.rle_bytes],
-                decompressed_items,
-            ));
-            self.values = &self.values[self.rle_bytes..];
+            let run_length = indicator as usize >> 1;
+            // repeated-value := value that is repeated, using a fixed-width of round-up-to-next-byte(bit-width)
+            let rle_bytes = ceil8(self.num_bits as usize);
+            let result = Some(HybridEncoded::Rle(&self.values[..rle_bytes], run_length));
+            self.values = &self.values[rle_bytes..];
             result
         }
     }

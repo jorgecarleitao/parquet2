@@ -12,11 +12,11 @@ pub fn get_length(values: &[u8]) -> u32 {
     u32::from_le_bytes(values[0..4].try_into().unwrap())
 }
 
-/// Returns ceil(log2(x))
+/// Returns floor(log2(x))
 #[inline]
 pub fn log2(mut x: u64) -> u32 {
     if x == 1 {
-        return 0;
+        return 1;
     }
     x -= 1;
     let mut result = 0;
