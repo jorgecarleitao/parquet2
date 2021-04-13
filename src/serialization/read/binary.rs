@@ -1,6 +1,6 @@
 use parquet_format::Encoding;
 
-use super::levels;
+use super::levels::consume_level;
 use crate::error::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
 use crate::read::Page;
@@ -13,17 +13,12 @@ fn read_dict_buffer(
     values: &[u8],
     length: u32,
     dict: &BinaryPageDict,
-    rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Vec<Option<Vec<u8>>> {
     let dict_values = dict.values();
     let dict_offsets = dict.offsets();
 
-    // skip bytes from levels
-    let offset = levels::needed_bytes(values, length, def_level_encoding);
-    let values = &values[offset..];
-    let offset = levels::needed_bytes(values, length, rep_level_encoding);
-    let values = &values[offset..];
+    let (values, _) = consume_level(values, length, def_level_encoding);
 
     let bit_width = values[0];
     let values = &values[1..];
@@ -50,16 +45,13 @@ pub fn page_dict_to_vec(
     page: &Page,
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<Vec<u8>>>> {
+    assert_eq!(descriptor.max_rep_level(), 0);
     match page {
         Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer(
                 &page.buffer,
                 page.header.num_values as u32,
                 dict.as_any().downcast_ref().unwrap(),
-                (
-                    &page.header.repetition_level_encoding,
-                    descriptor.max_rep_level(),
-                ),
                 (
                     &page.header.definition_level_encoding,
                     descriptor.max_def_level(),

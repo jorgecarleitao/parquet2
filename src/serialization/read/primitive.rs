@@ -1,8 +1,8 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryInto;
 
 use parquet_format::Encoding;
 
-use super::levels;
+use super::levels::consume_level;
 use super::utils::ValuesDef;
 use crate::encoding::{bitpacking, uleb128};
 use crate::error::{ParquetError, Result};
@@ -12,18 +12,12 @@ use crate::{
     types::NativeType,
 };
 
-fn read_buffer<'a, T: NativeType>(
-    values: &'a [u8],
+fn read_buffer<T: NativeType>(
+    values: &[u8],
     length: u32,
-    rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Vec<Option<T>> {
-    // skip bytes from levels
-    let offset = levels::needed_bytes(values, length, def_level_encoding);
-    let def_levels = levels::decode(values, length, def_level_encoding);
-    let values = &values[offset..];
-    let offset = levels::needed_bytes(values, length, rep_level_encoding);
-    let values = &values[offset..];
+    let (values, def_levels) = consume_level(values, length, def_level_encoding);
 
     let chunks = values.chunks_exact(std::mem::size_of::<T>());
     assert_eq!(chunks.remainder().len(), 0);
@@ -48,17 +42,12 @@ fn read_dict_buffer<'a, T: NativeType>(
     values: &'a [u8],
     length: u32,
     dict: &'a PrimitivePageDict<T>,
-    rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Vec<Option<T>> {
     let dict_values = dict.values();
 
     // skip bytes from levels
-    let offset = levels::needed_bytes(values, length, def_level_encoding);
-    let def_levels = levels::decode(values, length, def_level_encoding);
-    let values = &values[offset..];
-    let offset = levels::needed_bytes(values, length, rep_level_encoding);
-    let values = &values[offset..];
+    let (values, def_levels) = consume_level(values, length, def_level_encoding);
 
     let bit_width = values[0];
     let values = &values[1..];
@@ -85,16 +74,13 @@ pub fn page_dict_to_vec<T: NativeType>(
     page: &Page,
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<T>>> {
+    assert_eq!(descriptor.max_rep_level(), 0);
     match page {
         Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer::<T>(
                 &page.buffer,
                 page.header.num_values as u32,
                 dict.as_any().downcast_ref().unwrap(),
-                (
-                    &page.header.repetition_level_encoding,
-                    descriptor.max_rep_level(),
-                ),
                 (
                     &page.header.definition_level_encoding,
                     descriptor.max_def_level(),
@@ -109,23 +95,16 @@ pub fn page_dict_to_vec<T: NativeType>(
     }
 }
 
-pub fn page_to_vec<'a, T: NativeType>(
-    page: &'a Page,
+pub fn page_to_vec<T: NativeType>(
+    page: &Page,
     descriptor: &ColumnDescriptor,
-) -> Result<Vec<Option<T>>>
-where
-    <T as NativeType>::Bytes: TryFrom<&'a [u8]>,
-    <<T as NativeType>::Bytes as TryFrom<&'a [u8]>>::Error: std::fmt::Debug,
-{
+) -> Result<Vec<Option<T>>> {
+    assert_eq!(descriptor.max_rep_level(), 0);
     match page {
         Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
             (Encoding::Plain, None) => Ok(read_buffer::<T>(
                 &page.buffer,
                 page.header.num_values as u32,
-                (
-                    &page.header.repetition_level_encoding,
-                    descriptor.max_rep_level(),
-                ),
                 (
                     &page.header.definition_level_encoding,
                     descriptor.max_def_level(),

@@ -4,7 +4,7 @@ use crate::encoding::{bitpacking, get_length, hybrid_rle, log2};
 
 #[inline]
 fn get_bit_width(max_level: i16) -> u32 {
-    log2(max_level as u64 + 1)
+    log2(max_level as u64)
 }
 
 pub fn needed_bytes(values: &[u8], _length: u32, encoding: (&Encoding, i16)) -> usize {
@@ -65,4 +65,18 @@ pub fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
         }
     });
     values
+}
+
+pub fn consume_level<'a>(
+    values: &'a [u8],
+    length: u32,
+    level_encoding: (&Encoding, i16),
+) -> (&'a [u8], Vec<u32>) {
+    if level_encoding.1 > 0 {
+        let offset = needed_bytes(values, length, level_encoding);
+        let def_levels = decode(values, length, level_encoding);
+        (&values[offset..], def_levels)
+    } else {
+        (values, vec![0; length as usize])
+    }
 }
