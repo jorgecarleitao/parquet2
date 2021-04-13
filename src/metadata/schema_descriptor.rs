@@ -108,7 +108,7 @@ fn build_tree<'a>(
                 max_def_level,
                 max_rep_level,
                 path_in_schema,
-                tp.clone(),
+                base_tp.clone(),
             ));
             leaf_to_base.push(base_tp.clone());
         }
