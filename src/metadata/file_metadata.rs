@@ -66,6 +66,11 @@ impl FileMetaData {
         self.schema_descr.root_schema()
     }
 
+    /// returns the metadata
+    pub fn key_value_metadata(&self) -> &Option<Vec<KeyValue>> {
+        &self.key_value_metadata
+    }
+
     /// Returns column order for `i`th column in this file.
     /// If column orders are not available, returns undefined (legacy) column order.
     pub fn column_order(&self, i: usize) -> ColumnOrder {
