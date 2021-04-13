@@ -4,6 +4,7 @@
 mod binary;
 mod boolean;
 mod primitive;
+mod primitive_nested;
 mod utils;
 
 pub mod levels;
@@ -77,10 +78,17 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
         },
         (ParquetType::PrimitiveType { physical_type, .. }, _) => match page.dictionary_page() {
             None => match physical_type {
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(&page, descriptor)?)),
+                PhysicalType::Int64 => {
+                    Ok(primitive_nested::page_to_array::<i64>(&page, descriptor)?)
+                }
                 _ => todo!(),
             },
-            _ => todo!(),
+            Some(_) => match physical_type {
+                PhysicalType::Int64 => Ok(primitive_nested::page_dict_to_array::<i64>(
+                    &page, descriptor,
+                )?),
+                _ => todo!(),
+            },
         },
         _ => Err(general_err!(
             "Nested types are not supported by this in-memory format"
@@ -265,7 +273,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Not yet implemented"]
     fn pyarrow_v1_list_nullable() -> Result<()> {
         test_pyarrow_integration("nested", 0, 1, false)
     }
