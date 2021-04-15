@@ -46,8 +46,60 @@ use super::super::types::{
     converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,
     ParquetType,
 };
-use super::super::{Repetition, Type};
+use super::super::*;
 use crate::error::{ParquetError, Result};
+
+fn is_logical_type(s: &str) -> bool {
+    match s {
+        "INTEGER" | "MAP" | "LIST" | "ENUM" | "DECIMAL" | "DATE" | "TIME" | "TIMESTAMP"
+        | "STRING" | "JSON" | "BSON" | "UUID" | "UNKNOWN" | "INTERVAL" => true,
+        _ => false,
+    }
+}
+
+fn is_converted_type(s: &str) -> bool {
+    match s {
+        "UTF8" | "ENUM" | "DECIMAL" | "DATE" | "TIME_MILLIS" | "TIME_MICROS"
+        | "TIMESTAMP_MILLIS" | "TIMESTAMP_MICROS" | "UINT_8" | "UINT_16" | "UINT_32"
+        | "UINT_64" | "INT_8" | "INT_16" | "INT_32" | "INT_64" | "JSON" | "BSON" | "INTERVAL" => {
+            true
+        }
+        _ => false,
+    }
+}
+
+fn logical_type_from_str(s: &str) -> Result<Option<LogicalType>> {
+    Ok(Some(match s {
+        // The type is a placeholder that gets updated elsewhere
+        "INTEGER" => LogicalType::INTEGER(IntType {
+            bit_width: 8,
+            is_signed: false,
+        }),
+        "MAP" => LogicalType::MAP(MapType {}),
+        "LIST" => LogicalType::LIST(ListType {}),
+        "ENUM" => LogicalType::ENUM(EnumType {}),
+        "DECIMAL" => LogicalType::DECIMAL(DecimalType {
+            precision: -1,
+            scale: -1,
+        }),
+        "DATE" => LogicalType::DATE(DateType {}),
+        "TIME" => LogicalType::TIME(TimeType {
+            is_adjusted_to_u_t_c: false,
+            unit: TimeUnit::MILLIS(MilliSeconds {}),
+        }),
+        "TIMESTAMP" => LogicalType::TIMESTAMP(TimestampType {
+            is_adjusted_to_u_t_c: false,
+            unit: TimeUnit::MILLIS(MilliSeconds {}),
+        }),
+        "STRING" => LogicalType::STRING(StringType {}),
+        "JSON" => LogicalType::JSON(JsonType {}),
+        "BSON" => LogicalType::BSON(BsonType {}),
+        "UUID" => LogicalType::UUID(UUIDType {}),
+        "UNKNOWN" => LogicalType::UNKNOWN(NullType {}),
+        "INTERVAL" => return Err(general_err!("Interval logical type not yet supported")),
+        _ => return Ok(None),
+    }))
+}
 
 fn converted_group_from_str(s: &str) -> Result<parquet_format::ConvertedType> {
     use parquet_format::ConvertedType::*;
@@ -59,9 +111,9 @@ fn converted_group_from_str(s: &str) -> Result<parquet_format::ConvertedType> {
     })
 }
 
-fn converted_primitive_from_str(s: &str) -> Result<parquet_format::ConvertedType> {
+fn converted_primitive_from_str(s: &str) -> Option<parquet_format::ConvertedType> {
     use parquet_format::ConvertedType::*;
-    Ok(match s {
+    Some(match s {
         "UTF8" => Utf8,
         "ENUM" => Enum,
         "DECIMAL" => Decimal,
@@ -81,7 +133,7 @@ fn converted_primitive_from_str(s: &str) -> Result<parquet_format::ConvertedType
         "JSON" => Json,
         "BSON" => Bson,
         "INTERVAL" => Interval,
-        other => return Err(general_err!("Invalid converted type {}", other)),
+        _ => return None,
     })
 }
 
@@ -216,6 +268,34 @@ fn parse_i32(value: Option<&str>, not_found_msg: &str, parse_fail_msg: &str) -> 
         .and_then(|v| v.parse::<i32>().map_err(|_| general_err!(parse_fail_msg)))
 }
 
+// Utility function to parse boolean or return general error.
+#[inline]
+fn parse_bool(value: Option<&str>, not_found_msg: &str, parse_fail_msg: &str) -> Result<bool> {
+    value
+        .ok_or_else(|| general_err!(not_found_msg))
+        .and_then(|v| {
+            v.to_lowercase()
+                .parse::<bool>()
+                .map_err(|_| general_err!(parse_fail_msg))
+        })
+}
+
+// Utility function to parse TimeUnit or return general error.
+fn parse_timeunit(
+    value: Option<&str>,
+    not_found_msg: &str,
+    parse_fail_msg: &str,
+) -> Result<TimeUnit> {
+    value
+        .ok_or_else(|| general_err!(not_found_msg))
+        .and_then(|v| match v.to_uppercase().as_str() {
+            "MILLIS" => Ok(TimeUnit::MILLIS(Default::default())),
+            "MICROS" => Ok(TimeUnit::MICROS(Default::default())),
+            "NANOS" => Ok(TimeUnit::NANOS(Default::default())),
+            _ => Err(general_err!(parse_fail_msg)),
+        })
+}
+
 impl<'a> Parser<'a> {
     // Entry function to parse message type, uses internal tokenizer.
     fn parse_message_type(&mut self) -> Result<ParquetType> {
@@ -333,52 +413,46 @@ impl<'a> Parser<'a> {
             .next()
             .ok_or_else(|| general_err!("Expected name, found None"))?;
 
-        // Parse converted type
-        let converted_type = if let Some("(") = self.tokenizer.next() {
-            let tpe = self
+        // Parse logical types
+        let (converted_type, logical_type) = if let Some("(") = self.tokenizer.next() {
+            let (is_logical_type, converted_type, token) = self
                 .tokenizer
                 .next()
-                .ok_or_else(|| general_err!("Expected converted type, found None"))
-                .and_then(|v| converted_primitive_from_str(&v.to_uppercase()))?;
-
-            let (converted_type, maybe_decimal) = match tpe {
-                parquet_format::ConvertedType::Decimal => {
-                    assert_token(self.tokenizer.next(), "(")?;
-                    // Parse precision
-                    let precision = parse_i32(
-                        self.tokenizer.next(),
-                        "Expected precision, found None",
-                        "Failed to parse precision for DECIMAL type",
-                    )?;
-
-                    // Parse scale
-                    let scale = if let Some(",") = self.tokenizer.next() {
-                        parse_i32(
-                            self.tokenizer.next(),
-                            "Expected scale, found None",
-                            "Failed to parse scale for DECIMAL type",
-                        )?
+                .ok_or_else(|| general_err!("Expected converted or logical type, found None"))
+                .and_then(|v| {
+                    let string = v.to_uppercase();
+                    Ok(if is_logical_type(&string) {
+                        (true, None, string)
+                    } else if is_converted_type(&string) {
+                        (false, converted_primitive_from_str(&string), string)
                     } else {
-                        // Scale is not provided, set it to 0.
-                        self.tokenizer.backtrack();
-                        0
-                    };
+                        return Err(general_err!(
+                            "Expected converted or logical type, found {}",
+                            string
+                        ));
+                    })
+                })?;
 
-                    assert_token(self.tokenizer.next(), ")")?;
-                    (
-                        parquet_format::ConvertedType::Decimal,
-                        Some((precision, scale)),
-                    )
-                }
+            let logical_type = if is_logical_type {
+                Some(self.parse_logical_type(&token)?)
+            } else {
+                None
+            };
+
+            // converted type decimal
+            let (converted_type, maybe_decimal) = match converted_type {
+                Some(parquet_format::ConvertedType::Decimal) => self.parse_converted_decimal()?,
                 other => (other, None),
             };
-            let tpe = converted_to_primitive_converted(&converted_type, maybe_decimal)?;
+            let converted_type = converted_type
+                .map(|x| converted_to_primitive_converted(&x, maybe_decimal))
+                .transpose()?;
 
             assert_token(self.tokenizer.next(), ")")?;
-            Some(tpe)
+            (converted_type, logical_type)
         } else {
             self.tokenizer.backtrack();
-            None
+            (None, None)
         };
 
         // Parse optional id
@@ -397,9 +471,166 @@ impl<'a> Parser<'a> {
             physical_type,
             repetition,
             converted_type,
-            None,
+            logical_type,
             id,
         )
+    }
+
+    fn parse_converted_decimal(&mut self) -> Result<(Option<ConvertedType>, Option<(i32, i32)>)> {
+        assert_token(self.tokenizer.next(), "(")?;
+        // Parse precision
+        let precision = parse_i32(
+            self.tokenizer.next(),
+            "Expected precision, found None",
+            "Failed to parse precision for DECIMAL type",
+        )?;
+
+        // Parse scale
+        let scale = if let Some(",") = self.tokenizer.next() {
+            parse_i32(
+                self.tokenizer.next(),
+                "Expected scale, found None",
+                "Failed to parse scale for DECIMAL type",
+            )?
+        } else {
+            // Scale is not provided, set it to 0.
+            self.tokenizer.backtrack();
+            0
+        };
+
+        assert_token(self.tokenizer.next(), ")")?;
+        Ok((
+            Some(parquet_format::ConvertedType::Decimal),
+            Some((precision, scale)),
+        ))
+    }
+
+    fn parse_logical_type(&mut self, tpe: &str) -> Result<LogicalType> {
+        Ok(match tpe {
+            "MAP" => LogicalType::MAP(MapType {}),
+            "LIST" => LogicalType::LIST(ListType {}),
+            "ENUM" => LogicalType::ENUM(EnumType {}),
+            "DATE" => LogicalType::DATE(DateType {}),
+            "DECIMAL" => {
+                let (precision, scale) = if let Some("(") = self.tokenizer.next() {
+                    let precision = parse_i32(
+                        self.tokenizer.next(),
+                        "Expected precision, found None",
+                        "Failed to parse precision for DECIMAL type",
+                    )?;
+                    let scale = if let Some(",") = self.tokenizer.next() {
+                        parse_i32(
+                            self.tokenizer.next(),
+                            "Expected scale, found None",
+                            "Failed to parse scale for DECIMAL type",
+                        )?
+                    } else {
+                        self.tokenizer.backtrack();
+                        0
+                    };
+                    assert_token(self.tokenizer.next(), ")")?;
+                    (precision, scale)
+                } else {
+                    self.tokenizer.backtrack();
+                    (-1, -1)
+                };
+                LogicalType::DECIMAL(DecimalType { precision, scale })
+            }
+            "TIME" => {
+                let (unit, is_adjusted_to_u_t_c) = if let Some("(") = self.tokenizer.next() {
+                    let unit = parse_timeunit(
+                        self.tokenizer.next(),
+                        "Invalid timeunit found",
+                        "Failed to parse timeunit for TIME type",
+                    )?;
+                    let is_adjusted_to_u_t_c = if let Some(",") = self.tokenizer.next() {
+                        parse_bool(
+                            self.tokenizer.next(),
+                            "Invalid boolean found",
+                            "Failed to parse timezone info for TIME type",
+                        )?
+                    } else {
+                        self.tokenizer.backtrack();
+                        false
+                    };
+                    assert_token(self.tokenizer.next(), ")")?;
+                    (unit, is_adjusted_to_u_t_c)
+                } else {
+                    self.tokenizer.backtrack();
+                    (TimeUnit::MILLIS(MilliSeconds {}), false)
+                };
+                LogicalType::TIME(TimeType {
+                    unit,
+                    is_adjusted_to_u_t_c,
+                })
+            }
+            "TIMESTAMP" => {
+                let (unit, is_adjusted_to_u_t_c) = if let Some("(") = self.tokenizer.next() {
+                    let unit = parse_timeunit(
+                        self.tokenizer.next(),
+                        "Invalid timeunit found",
+                        "Failed to parse timeunit for TIMESTAMP type",
+                    )?;
+                    let is_adjusted_to_u_t_c = if let Some(",") = self.tokenizer.next() {
+                        parse_bool(
+                            self.tokenizer.next(),
+                            "Invalid boolean found",
+                            "Failed to parse timezone info for TIMESTAMP type",
+                        )?
+                    } else {
+                        // Invalid token for unit
+                        self.tokenizer.backtrack();
+                        false
+                    };
+                    assert_token(self.tokenizer.next(), ")")?;
+                    (unit, is_adjusted_to_u_t_c)
+                } else {
+                    self.tokenizer.backtrack();
+                    (TimeUnit::MILLIS(MilliSeconds {}), false)
+                };
+                LogicalType::TIMESTAMP(TimestampType {
+                    unit,
+                    is_adjusted_to_u_t_c,
+                })
+            }
+            "INTEGER" => {
+                let (bit_width, is_signed) = if let Some("(") = self.tokenizer.next() {
+                    let bit_width = parse_i32(
+                        self.tokenizer.next(),
+                        "Invalid bit_width found",
+                        "Failed to parse bit_width for INTEGER type",
+                    )? as i8;
+                    let is_signed = if let Some(",") = self.tokenizer.next() {
+                        parse_bool(
+                            self.tokenizer.next(),
+                            "Invalid boolean found",
+                            "Failed to parse is_signed for INTEGER type",
+                        )?
+                    } else {
+                        // Invalid token for unit
+                        self.tokenizer.backtrack();
+                        return Err(general_err!("INTEGER requires sign"));
+                    };
+                    assert_token(self.tokenizer.next(), ")")?;
+                    (bit_width, is_signed)
+                } else {
+                    // Invalid token for unit
+                    self.tokenizer.backtrack();
+                    return Err(general_err!("INTEGER requires width and sign"));
+                };
+                LogicalType::INTEGER(IntType {
+                    bit_width,
+                    is_signed,
+                })
+            }
+            "STRING" => LogicalType::STRING(StringType {}),
+            "JSON" => LogicalType::JSON(JsonType {}),
+            "BSON" => LogicalType::BSON(BsonType {}),
+            "UUID" => LogicalType::UUID(UUIDType {}),
+            "UNKNOWN" => LogicalType::UNKNOWN(NullType {}),
+            "INTERVAL" => return Err(general_err!("Interval logical type not yet supported")),
+            _ => unreachable!(),
+        })
     }
 }
 
@@ -649,16 +880,22 @@ mod tests {
                 "f1".to_string(),
                 PhysicalType::FixedLenByteArray(5),
                 Repetition::Optional,
-                Some(PrimitiveConvertedType::Decimal(9, 3)),
                 None,
+                Some(LogicalType::DECIMAL(DecimalType {
+                    precision: 9,
+                    scale: 3,
+                })),
                 None,
             )?,
             ParquetType::try_from_primitive(
                 "f2".to_string(),
                 PhysicalType::FixedLenByteArray(16),
                 Repetition::Optional,
-                Some(PrimitiveConvertedType::Decimal(38, 18)),
                 None,
+                Some(LogicalType::DECIMAL(DecimalType {
+                    precision: 38,
+                    scale: 18,
+                })),
                 None,
             )?,
         ];
@@ -795,8 +1032,8 @@ mod tests {
             "_5".to_string(),
             PhysicalType::Int32,
             Repetition::Optional,
-            Some(PrimitiveConvertedType::Date),
             None,
+            Some(LogicalType::DATE(Default::default())),
             None,
         )?;
         let f6 = ParquetType::try_from_primitive(
@@ -809,6 +1046,135 @@ mod tests {
         )?;
 
         let fields = vec![f1, f2, f3, f4, f5, f6];
+
+        let expected = ParquetType::new_root("root".to_string(), fields);
+        assert_eq!(message, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn test_parse_message_type_compare_4() -> Result<()> {
+        let schema = "
+    message root {
+      required int32 _1 (INTEGER(8,true));
+      required int32 _2 (INTEGER(16,false));
+      required float _3;
+      required double _4;
+      optional int32 _5 (DATE);
+      optional int32 _6 (TIME(MILLIS,false));
+      optional int64 _7 (TIME(MICROS,true));
+      optional int64 _8 (TIMESTAMP(MILLIS,true));
+      optional int64 _9 (TIMESTAMP(NANOS,false));
+      optional binary _10 (STRING);
+    }
+    ";
+        let mut iter = Tokenizer::from_str(schema);
+        let message = Parser {
+            tokenizer: &mut iter,
+        }
+        .parse_message_type()?;
+
+        let f1 = ParquetType::try_from_primitive(
+            "_1".to_string(),
+            PhysicalType::Int32,
+            Repetition::Required,
+            None,
+            Some(LogicalType::INTEGER(IntType {
+                bit_width: 8,
+                is_signed: true,
+            })),
+            None,
+        )?;
+        let f2 = ParquetType::try_from_primitive(
+            "_2".to_string(),
+            PhysicalType::Int32,
+            Repetition::Required,
+            None,
+            Some(LogicalType::INTEGER(IntType {
+                bit_width: 16,
+                is_signed: false,
+            })),
+            None,
+        )?;
+        let f3 = ParquetType::try_from_primitive(
+            "_3".to_string(),
+            PhysicalType::Float,
+            Repetition::Required,
+            None,
+            None,
+            None,
+        )?;
+        let f4 = ParquetType::try_from_primitive(
+            "_4".to_string(),
+            PhysicalType::Double,
+            Repetition::Required,
+            None,
+            None,
+            None,
+        )?;
+        let f5 = ParquetType::try_from_primitive(
+            "_5".to_string(),
+            PhysicalType::Int32,
+            Repetition::Optional,
+            None,
+            Some(LogicalType::DATE(Default::default())),
+            None,
+        )?;
+        let f6 = ParquetType::try_from_primitive(
+            "_6".to_string(),
+            PhysicalType::Int32,
+            Repetition::Optional,
+            None,
+            Some(LogicalType::TIME(TimeType {
+                is_adjusted_to_u_t_c: false,
+                unit: TimeUnit::MILLIS(Default::default()),
+            })),
+            None,
+        )?;
+        let f7 = ParquetType::try_from_primitive(
+            "_7".to_string(),
+            PhysicalType::Int64,
+            Repetition::Optional,
+            None,
+            Some(LogicalType::TIME(TimeType {
+                is_adjusted_to_u_t_c: true,
+                unit: TimeUnit::MICROS(Default::default()),
+            })),
+            None,
+        )?;
+        let f8 = ParquetType::try_from_primitive(
+            "_8".to_string(),
+            PhysicalType::Int64,
+            Repetition::Optional,
+            None,
+            Some(LogicalType::TIMESTAMP(TimestampType {
+                is_adjusted_to_u_t_c: true,
+                unit: TimeUnit::MILLIS(Default::default()),
+            })),
+            None,
+        )?;
+        let f9 = ParquetType::try_from_primitive(
+            "_9".to_string(),
+            PhysicalType::Int64,
+            Repetition::Optional,
+            None,
+            Some(LogicalType::TIMESTAMP(TimestampType {
+                is_adjusted_to_u_t_c: false,
+                unit: TimeUnit::NANOS(Default::default()),
+            })),
+            None,
+        )?;
+
+        let f10 = ParquetType::try_from_primitive(
+            "_10".to_string(),
+            PhysicalType::ByteArray,
+            Repetition::Optional,
+            None,
+            Some(LogicalType::STRING(Default::default())),
+            None,
+        )?;
+
+        let fields = vec![f1, f2, f3, f4, f5, f6, f7, f8, f9, f10];
 
         let expected = ParquetType::new_root("root".to_string(), fields);
         assert_eq!(message, expected);
