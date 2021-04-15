@@ -23,10 +23,7 @@ pub fn array_to_page(array: &Array) -> Result<CompressedPage> {
 mod tests {
     use std::io::{Cursor, Read, Seek};
 
-    use io_message::from_message;
-
     use crate::read::{get_page_iterator, read_metadata};
-    use crate::schema::io_message;
     use crate::tests::alltypes_plain;
     use crate::write::write_file;
 
@@ -77,15 +74,15 @@ mod tests {
             Array::Float64(_) => "DOUBLE",
             _ => todo!(),
         };
-        let schema = SchemaDescriptor::new(from_message(&format!(
+        let schema = SchemaDescriptor::try_from_message(&format!(
             "message schema {{ OPTIONAL {} col; }}",
             a
-        ))?);
+        ))?;
 
         let mut writer = Cursor::new(vec![]);
         write_file(
             &mut writer,
-            &schema,
+            schema,
             CompressionCodec::Uncompressed,
             row_groups,
         )?;

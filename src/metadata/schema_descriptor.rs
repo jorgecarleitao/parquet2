@@ -1,4 +1,13 @@
-use crate::schema::types::{ParquetType, Repetition};
+use parquet_format::SchemaElement;
+
+use crate::{
+    error::ParquetError,
+    schema::{
+        io_message::from_message,
+        types::{ParquetType, Repetition},
+    },
+};
+use crate::{error::Result, schema::types::BasicTypeInfo};
 
 use super::column_descriptor::ColumnDescriptor;
 
@@ -7,42 +16,27 @@ use super::column_descriptor::ColumnDescriptor;
 #[derive(Debug, Clone)]
 pub struct SchemaDescriptor {
     // The top-level schema (the "message" type).
-    // This must be a `GroupType` where each field is a root column type in the schema.
-    schema: ParquetType,
+    fields: Vec<ParquetType>,
+    name: String,
 
     // All the descriptors for primitive columns in this schema, constructed from
     // `schema` in DFS order.
     leaves: Vec<ColumnDescriptor>,
-
-    // Mapping from a leaf column's index to the root column type that it
-    // comes from. For instance: the leaf `a.b.c.d` would have a link back to `a`:
-    // -- a  <-----+
-    // -- -- b     |
-    // -- -- -- c  |
-    // -- -- -- -- d
-    leaf_to_base: Vec<ParquetType>,
 }
 
 impl SchemaDescriptor {
     /// Creates new schema descriptor from Parquet schema.
-    pub fn new(type_: ParquetType) -> Self {
-        assert!(type_.is_root());
-        match type_ {
-            ParquetType::GroupType { ref fields, .. } => {
-                let mut leaves = vec![];
-                let mut leaf_to_base = Vec::new();
-                for f in fields {
-                    let mut path = vec![];
-                    build_tree(f, f, 0, 0, &mut leaves, &mut leaf_to_base, &mut path);
-                }
+    pub fn new(name: String, fields: Vec<ParquetType>) -> Self {
+        let mut leaves = vec![];
+        for f in &fields {
+            let mut path = vec![];
+            build_tree(f, f, 0, 0, &mut leaves, &mut path);
+        }
 
-                Self {
-                    schema: type_,
-                    leaves,
-                    leaf_to_base,
-                }
-            }
-            ParquetType::PrimitiveType { .. } => unreachable!(),
+        Self {
+            name,
+            fields,
+            leaves,
         }
     }
 
@@ -61,21 +55,44 @@ impl SchemaDescriptor {
         self.leaves.len()
     }
 
-    /// Returns column root [`ParquetType`](crate::schema::types::ParquetType) for a field position.
-    pub fn get_column_root(&self, i: usize) -> &ParquetType {
-        self.leaf_to_base
-            .get(i)
-            .unwrap_or_else(|| panic!("Expected a value for index {} but found None", i))
-    }
-
-    /// Returns schema as [`Type`](crate::schema::types::Type).
-    pub fn root_schema(&self) -> &ParquetType {
-        &self.schema
-    }
-
     /// Returns schema name.
     pub fn name(&self) -> &str {
-        self.schema.name()
+        &self.name
+    }
+
+    pub fn fields(&self) -> &[ParquetType] {
+        &self.fields
+    }
+
+    pub(crate) fn into_thrift(self) -> Result<Vec<SchemaElement>> {
+        ParquetType::GroupType {
+            basic_info: BasicTypeInfo::new(self.name, Repetition::Optional, None, true),
+            logical_type: None,
+            converted_type: None,
+            fields: self.fields,
+        }
+        .to_thrift()
+    }
+
+    fn try_from_type(type_: ParquetType) -> Result<Self> {
+        match type_ {
+            ParquetType::GroupType {
+                basic_info, fields, ..
+            } => Ok(Self::new(basic_info.name().to_string(), fields)),
+            _ => Err(ParquetError::OutOfSpec(
+                "The parquet schema MUST be a group type".to_string(),
+            )),
+        }
+    }
+
+    pub(crate) fn try_from_thrift(elements: &[&SchemaElement]) -> Result<Self> {
+        let schema = ParquetType::try_from_thrift(elements)?;
+        Self::try_from_type(schema)
+    }
+
+    pub fn try_from_message(message: &str) -> Result<Self> {
+        let schema = from_message(message)?;
+        Self::try_from_type(schema)
     }
 }
 
@@ -85,7 +102,6 @@ fn build_tree<'a>(
     mut max_rep_level: i16,
     mut max_def_level: i16,
     leaves: &mut Vec<ColumnDescriptor>,
-    leaf_to_base: &mut Vec<ParquetType>,
     path_so_far: &mut Vec<&'a str>,
 ) {
     path_so_far.push(tp.name());
@@ -110,7 +126,6 @@ fn build_tree<'a>(
                 path_in_schema,
                 base_tp.clone(),
             ));
-            leaf_to_base.push(base_tp.clone());
         }
         ParquetType::GroupType { ref fields, .. } => {
             for f in fields {
@@ -120,7 +135,6 @@ fn build_tree<'a>(
                     max_rep_level,
                     max_def_level,
                     leaves,
-                    leaf_to_base,
                     path_so_far,
                 );
                 path_so_far.pop();

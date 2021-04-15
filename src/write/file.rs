@@ -52,7 +52,7 @@ pub fn write_file<
     E,   // external error any of the iterators may emit
 >(
     writer: &mut W,
-    schema: &SchemaDescriptor,
+    schema: SchemaDescriptor,
     codec: CompressionCodec,
     row_groups: III,
 ) -> Result<()>
@@ -69,7 +69,7 @@ where
         .map(|row_group| {
             write_row_group(
                 writer,
-                schema,
+                &schema,
                 codec,
                 row_group.map_err(ParquetError::from_external_error)?,
             )
@@ -81,7 +81,7 @@ where
 
     let metadata = FileMetaData::new(
         1,
-        schema.root_schema().to_thrift()?,
+        schema.into_thrift()?,
         num_rows,
         row_groups,
         None,

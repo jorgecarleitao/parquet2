@@ -32,6 +32,10 @@ use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_M
 use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
 
+fn metadata_len(buffer: &[u8], len: usize) -> i32 {
+    i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
+}
+
 // see (unstable) Seek::stream_len
 fn stream_len(seek: &mut impl Seek) -> std::result::Result<u64, std::io::Error> {
     let old_pos = seek.seek(SeekFrom::Current(0))?;
@@ -75,12 +79,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         return Err(general_err!("Invalid Parquet file. Corrupt footer"));
     }
 
-    // get the metadata length from the footer
-    let metadata_len = i32::from_le_bytes(
-        default_len_end_buf[default_end_len - 8..default_end_len - 4]
-            .try_into()
-            .unwrap(),
-    );
+    let metadata_len = metadata_len(&default_len_end_buf, default_end_len);
 
     if metadata_len < 0 {
         return Err(general_err!(
@@ -113,8 +112,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     .map_err(|e| ParquetError::General(format!("Could not parse metadata: {}", e)))?;
 
     let schema = t_file_metadata.schema.iter().collect::<Vec<_>>();
-    let schema = ParquetType::try_from_thrift(&schema)?;
-    let schema_descr = SchemaDescriptor::new(schema);
+    let schema_descr = SchemaDescriptor::try_from_thrift(&schema)?;
 
     let row_groups = t_file_metadata
         .row_groups

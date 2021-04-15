@@ -1,5 +1,3 @@
-use crate::schema::types::ParquetType;
-
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
 use crate::error::Result;
 
@@ -61,9 +59,9 @@ impl FileMetaData {
         }
     }
 
-    /// Returns Parquet ['ParquetType`] that describes schema in this file.
-    pub fn schema(&self) -> &ParquetType {
-        self.schema_descr.root_schema()
+    /// Returns the ['SchemaDescriptor`] that describes schema of this file.
+    pub fn schema(&self) -> &SchemaDescriptor {
+        &self.schema_descr
     }
 
     /// returns the metadata
@@ -83,7 +81,7 @@ impl FileMetaData {
     pub fn into_thrift(self) -> Result<parquet_format::FileMetaData> {
         Ok(parquet_format::FileMetaData {
             version: self.version,
-            schema: self.schema().to_thrift()?,
+            schema: self.schema_descr.into_thrift()?,
             num_rows: self.num_rows as i64,
             row_groups: self
                 .row_groups
