@@ -26,12 +26,9 @@ fn read_dict_buffer(
     let (_, consumed) = uleb128::decode(&values);
     let values = &values[consumed..];
 
-    let mut decompressed = vec![0; bitpacking::required_capacity(length)];
-    bitpacking::decode(&values, bit_width, &mut decompressed);
-    decompressed.truncate(length as usize);
+    let indices = bitpacking::Decoder::new(values, bit_width, length as usize);
 
-    decompressed
-        .into_iter()
+    indices
         .map(|id| {
             let id = id as usize;
             let start = dict_offsets[id] as usize;

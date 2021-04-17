@@ -2,44 +2,6 @@
 use bitpacking::BitPacker;
 use bitpacking::BitPacker1x;
 
-pub fn required_capacity(length: u32) -> usize {
-    let chunks_n = (length as usize + BitPacker1x::BLOCK_LEN - 1) / BitPacker1x::BLOCK_LEN;
-    chunks_n * BitPacker1x::BLOCK_LEN
-}
-
-/// Decodes bitpacked bytes of `num_bits` into `u32`.
-/// Returns the number of decoded values.
-/// # Panics
-/// Panics if `decompressed` has less than [`required_capacity`]
-pub fn decode(compressed: &[u8], num_bits: u8, decompressed: &mut [u32]) -> usize {
-    let bitpacker = BitPacker1x::new();
-
-    let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
-
-    let compressed_chunks = compressed.chunks_exact(compressed_block_size);
-    let decompressed_chunks = decompressed.chunks_exact_mut(BitPacker1x::BLOCK_LEN);
-
-    let remainder = compressed_chunks.remainder();
-    let last_compressed_chunk = if remainder.is_empty() {
-        vec![]
-    } else {
-        let mut last_compressed_chunk = remainder.to_vec();
-        last_compressed_chunk
-            .extend(std::iter::repeat(0).take(compressed_block_size - remainder.len()));
-        last_compressed_chunk
-    };
-    let last_compressed_chunks = last_compressed_chunk.chunks_exact(compressed_block_size);
-    debug_assert_eq!(last_compressed_chunks.remainder().len(), 0);
-
-    compressed_chunks
-        .chain(last_compressed_chunks)
-        .zip(decompressed_chunks)
-        .for_each(|(c_chunk, d_chunk)| {
-            bitpacker.decompress(&c_chunk, d_chunk, num_bits);
-        });
-    compressed.len() / num_bits as usize * 8
-}
-
 /// Encodes `u32` values into a buffer using `num_bits`.
 pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usize {
     let bitpacker = BitPacker1x::new();
@@ -63,6 +25,74 @@ pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usiz
     decompressed.len() * num_bits as usize / 8
 }
 
+pub struct Decoder<'a> {
+    compressed_chunks: std::slice::Chunks<'a, u8>,
+    num_bits: u8,
+    remaining: usize,
+    current_pack_index: usize, // invariant: <BitPacker1x::BLOCK_LEN
+    current_pack: [u32; BitPacker1x::BLOCK_LEN],
+}
+
+#[inline]
+fn decode_pack(compressed: &[u8], num_bits: u8, pack: &mut [u32; BitPacker1x::BLOCK_LEN]) {
+    let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
+
+    if compressed.len() < compressed_block_size {
+        let mut last_compressed_chunk = compressed.to_vec();
+        last_compressed_chunk
+            .extend(std::iter::repeat(0).take(compressed_block_size - compressed.len()));
+        BitPacker1x::new().decompress(&last_compressed_chunk, pack, num_bits);
+    } else {
+        BitPacker1x::new().decompress(compressed, pack, num_bits);
+    }
+}
+
+impl<'a> Decoder<'a> {
+    pub fn new(compressed: &'a [u8], num_bits: u8, length: usize) -> Self {
+        let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
+
+        let mut compressed_chunks = compressed.chunks(compressed_block_size);
+        let mut current_pack = [0; BitPacker1x::BLOCK_LEN];
+        decode_pack(
+            compressed_chunks.next().unwrap(),
+            num_bits,
+            &mut current_pack,
+        );
+
+        Self {
+            remaining: length,
+            compressed_chunks,
+            num_bits,
+            current_pack,
+            current_pack_index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for Decoder<'a> {
+    type Item = u32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            return None;
+        }
+        let result = self.current_pack[self.current_pack_index];
+        self.current_pack_index += 1;
+        if self.current_pack_index == BitPacker1x::BLOCK_LEN {
+            if let Some(chunk) = self.compressed_chunks.next() {
+                decode_pack(chunk, self.num_bits, &mut self.current_pack);
+                self.current_pack_index = 0;
+            }
+        }
+        self.remaining -= 1;
+        Some(result)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, Some(self.remaining))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,10 +113,7 @@ mod tests {
         // encoded: 0b10001000u8, 0b11000110, 0b11111010
         let data = vec![0b10001000u8, 0b11000110, 0b11111010];
 
-        let mut decoded = vec![0; required_capacity(length)];
-
-        decode(&data, num_bits, &mut decoded);
-        decoded.truncate(length as usize);
+        let decoded = Decoder::new(&data, num_bits, length).collect::<Vec<_>>();
         assert_eq!(decoded, vec![0, 1, 2, 3, 4, 5, 6, 7]);
     }
 
@@ -120,9 +147,7 @@ mod tests {
     fn decode_large() {
         let (num_bits, expected, data) = case1();
 
-        let mut decoded = vec![0; 2 * BitPacker1x::BLOCK_LEN];
-        let decoded_len = decode(&data, num_bits, &mut decoded);
-        decoded.truncate(decoded_len);
+        let decoded = Decoder::new(&data, num_bits, expected.len()).collect::<Vec<_>>();
         assert_eq!(decoded, expected);
     }
 
@@ -157,10 +182,7 @@ mod tests {
         let length = 8;
         let data = vec![0b10101010];
 
-        let mut decoded = vec![0; required_capacity(length)];
-
-        decode(&data, num_bits, &mut decoded);
-        decoded.truncate(length as usize);
+        let decoded = Decoder::new(&data, num_bits, length).collect::<Vec<_>>();
         assert_eq!(decoded, vec![0, 1, 0, 1, 0, 1, 0, 1]);
     }
 
@@ -181,9 +203,8 @@ mod tests {
             .copied()
             .collect::<Vec<_>>();
         let length = expected.len();
-        let mut decoded = vec![0; required_capacity(length as u32)];
-        decode(&data, num_bits, &mut decoded);
-        decoded.truncate(length as usize);
+
+        let decoded = Decoder::new(&data, num_bits, length).collect::<Vec<_>>();
         assert_eq!(decoded, expected);
     }
 
@@ -206,9 +227,8 @@ mod tests {
             .chain(std::iter::once(0b00000010u8))
             .collect::<Vec<_>>();
         let length = expected.len();
-        let mut decoded = vec![0; required_capacity(length as u32)];
-        decode(&data, num_bits, &mut decoded);
-        decoded.truncate(length as usize);
+
+        let decoded = Decoder::new(&data, num_bits, length).collect::<Vec<_>>();
         assert_eq!(decoded, expected);
     }
 }

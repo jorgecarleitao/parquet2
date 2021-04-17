@@ -123,11 +123,9 @@ fn read_dict_array<'a>(
     let (_, consumed) = uleb128::decode(&values);
     let values = &values[consumed..];
 
-    let mut indices = vec![0; bitpacking::required_capacity(length)];
-    bitpacking::decode(&values, bit_width, &mut indices);
-    indices.truncate(length as usize);
+    let indices = bitpacking::Decoder::new(values, bit_width, length as usize);
 
-    let values = indices.into_iter().map(|id| dict_values[id as usize]);
+    let values = indices.map(|id| dict_values[id as usize]);
 
     compose_array(
         rep_levels.into_iter(),

@@ -50,10 +50,14 @@ pub fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
     runner.for_each(|run| match run {
         hybrid_rle::HybridEncoded::Bitpacked(compressed) => {
             let previous_len = values.len();
-            let pack_length = (compressed.len() as u32 / num_bits) * 8;
-            values.extend(std::iter::repeat(0).take(bitpacking::required_capacity(pack_length)));
-            bitpacking::decode(compressed, num_bits as u8, &mut values[previous_len..]);
-            values.truncate(length);
+            let pack_length = (compressed.len() as usize / num_bits as usize) * 8;
+            let additional = std::cmp::min(previous_len + pack_length, length - previous_len);
+            values.extend(bitpacking::Decoder::new(
+                compressed,
+                num_bits as u8,
+                additional,
+            ));
+            debug_assert_eq!(previous_len + additional, values.len());
         }
         hybrid_rle::HybridEncoded::Rle(pack, items) => {
             let mut bytes = [0u8; std::mem::size_of::<u32>()];

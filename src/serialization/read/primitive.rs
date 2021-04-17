@@ -55,15 +55,9 @@ fn read_dict_buffer<'a, T: NativeType>(
     let (_, consumed) = uleb128::decode(&values);
     let values = &values[consumed..];
 
-    let mut new_values = vec![0; bitpacking::required_capacity(length)];
-    bitpacking::decode(&values, bit_width, &mut new_values);
-    new_values.truncate(length as usize);
+    let indices = bitpacking::Decoder::new(values, bit_width, length as usize);
 
-    let iterator = ValuesDef::new(
-        new_values.into_iter(),
-        def_levels.into_iter(),
-        def_level_encoding.1 as u32,
-    );
+    let iterator = ValuesDef::new(indices, def_levels.into_iter(), def_level_encoding.1 as u32);
 
     iterator
         .map(|maybe_id| maybe_id.map(|id| dict_values[id as usize]))

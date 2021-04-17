@@ -61,9 +61,8 @@ mod tests {
 
         if let HybridEncoded::Bitpacked(values) = run {
             assert_eq!(values, &[0b00001011]);
-            let mut de = vec![0; 32];
-            bitpacking::decode(&values, bit_width as u8, &mut de);
-            let result = &de[..length];
+            let result =
+                bitpacking::Decoder::new(values, bit_width as u8, length).collect::<Vec<_>>();
             assert_eq!(result, &[1, 1, 0, 1, 0]);
         } else {
             panic!()
@@ -87,9 +86,7 @@ mod tests {
 
         if let HybridEncoded::Bitpacked(values) = run {
             assert_eq!(values, &[0b11101011, 0b00000010]);
-            let mut de = vec![0; 32];
-            bitpacking::decode(&values, bit_width as u8, &mut de);
-            let result = &de[..10];
+            let result = bitpacking::Decoder::new(values, bit_width as u8, 10).collect::<Vec<_>>();
             assert_eq!(result, expected);
         } else {
             panic!()
