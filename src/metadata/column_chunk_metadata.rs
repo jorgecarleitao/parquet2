@@ -1,4 +1,4 @@
-use parquet_format::{ColumnChunk, ColumnMetaData};
+use parquet_format::{ColumnChunk, ColumnMetaData, Encoding, Statistics};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::error::Result;
@@ -80,6 +80,16 @@ impl ColumnChunkMetaData {
     /// Returns the offset for the dictionary page, if any.
     pub fn dictionary_page_offset(&self) -> Option<i64> {
         self.column_metadata().dictionary_page_offset
+    }
+
+    /// Returns the encoding for this column
+    pub fn column_encoding(&self) -> &Vec<Encoding> {
+        &self.column_metadata().encodings
+    }
+
+    /// Returns statistics from this column
+    pub fn column_statistics(&self) -> &Option<Statistics> {
+        &self.column_metadata().statistics
     }
 
     /// Returns the offset and length in bytes of the column chunk within the file
