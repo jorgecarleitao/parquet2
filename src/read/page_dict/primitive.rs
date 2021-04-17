@@ -8,15 +8,11 @@ use super::PageDict;
 #[derive(Debug)]
 pub struct PrimitivePageDict<T: NativeType> {
     values: Vec<T>,
-    physical_type: PhysicalType,
 }
 
 impl<T: NativeType> PrimitivePageDict<T> {
-    pub fn new(values: Vec<T>, physical_type: PhysicalType) -> Self {
-        Self {
-            values,
-            physical_type,
-        }
+    pub fn new(values: Vec<T>) -> Self {
+        Self { values }
     }
 
     pub fn values(&self) -> &[T] {
@@ -30,7 +26,7 @@ impl<T: NativeType> PageDict for PrimitivePageDict<T> {
     }
 
     fn physical_type(&self) -> &PhysicalType {
-        &self.physical_type
+        &T::TYPE
     }
 }
 
@@ -41,13 +37,12 @@ fn read_plain<T: NativeType>(values: &[u8]) -> Vec<T> {
     chunks.map(|chunk| types::decode(chunk)).collect()
 }
 
-pub fn read_page_dict<T: NativeType>(
+pub fn read<T: NativeType>(
     buf: &[u8],
     num_values: u32,
     _is_sorted: bool,
-    physical_type: PhysicalType,
 ) -> Result<Arc<dyn PageDict>> {
     let typed_size = num_values as usize * std::mem::size_of::<T>();
     let values = read_plain::<T>(&buf[..typed_size]);
-    Ok(Arc::new(PrimitivePageDict::new(values, physical_type)))
+    Ok(Arc::new(PrimitivePageDict::new(values)))
 }

@@ -1,16 +1,20 @@
 use std::convert::{TryFrom, TryInto};
 
+use crate::schema::types::PhysicalType;
+
 /// A physical native representation of a Parquet fixed-sized type.
-pub trait NativeType: Sized + Copy + std::fmt::Debug + 'static {
+pub trait NativeType: Sized + Copy + std::fmt::Debug + Send + Sync + 'static {
     type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
 
     fn from_le_bytes(bytes: Self::Bytes) -> Self;
+
+    const TYPE: PhysicalType;
 }
 
 macro_rules! native {
-    ($type:ty) => {
+    ($type:ty, $physical_type:expr) => {
         impl NativeType for $type {
             type Bytes = [u8; std::mem::size_of::<Self>()];
             #[inline]
@@ -22,16 +26,20 @@ macro_rules! native {
             fn from_le_bytes(bytes: Self::Bytes) -> Self {
                 Self::from_le_bytes(bytes)
             }
+
+            const TYPE: PhysicalType = $physical_type;
         }
     };
 }
 
-native!(i32);
-native!(i64);
-native!(f32);
-native!(f64);
+native!(i32, PhysicalType::Int32);
+native!(i64, PhysicalType::Int64);
+native!(f32, PhysicalType::Float);
+native!(f64, PhysicalType::Double);
 
 impl NativeType for [u32; 3] {
+    const TYPE: PhysicalType = PhysicalType::Int96;
+
     type Bytes = [u8; std::mem::size_of::<Self>()];
     #[inline]
     fn to_le_bytes(&self) -> Self::Bytes {

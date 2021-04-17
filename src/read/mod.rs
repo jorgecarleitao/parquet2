@@ -4,6 +4,7 @@ mod metadata;
 mod page;
 mod page_dict;
 mod page_iterator;
+mod statistics;
 
 pub use metadata::read_metadata;
 
@@ -15,6 +16,7 @@ use crate::{error::Result, metadata::FileMetaData};
 pub use page::{CompressedPage, Page, PageV1, PageV2};
 pub use page_dict::{BinaryPageDict, FixedLenByteArrayPageDict, PageDict, PrimitivePageDict};
 pub use page_iterator::PageIterator;
+pub use statistics::*;
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true

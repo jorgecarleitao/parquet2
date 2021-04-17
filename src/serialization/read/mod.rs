@@ -32,6 +32,21 @@ pub enum Array {
     List(Vec<Option<Array>>),
 }
 
+// The dynamic representation of values in native Rust. This is not exaustive.
+// todo: maybe refactor this into serde/json?
+#[derive(Debug, PartialEq)]
+pub enum Value {
+    UInt32(Option<u32>),
+    Int32(Option<i32>),
+    Int64(Option<i64>),
+    Int96(Option<[u32; 3]>),
+    Float32(Option<f32>),
+    Float64(Option<f64>),
+    Boolean(Option<bool>),
+    Binary(Option<Vec<u8>>),
+    List(Option<Array>),
+}
+
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
 pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Result<Array> {
@@ -100,7 +115,7 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
 mod tests {
     use std::fs::File;
 
-    use crate::read::{get_page_iterator, read_metadata};
+    use crate::read::{get_page_iterator, read_metadata, PrimitiveStatistics, Statistics};
     use crate::tests::*;
     use crate::types::int96_to_i64;
 
@@ -126,20 +141,25 @@ mod tests {
         ))
     }
 
-    fn get_column(path: &str, column: usize) -> Result<Array> {
+    fn get_column(
+        path: &str,
+        column: usize,
+    ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let (descriptor, mut pages) = prepare(path, 0, column)?;
         assert_eq!(pages.len(), 1);
 
         let page = pages.pop().unwrap();
 
-        page_to_array(page, &descriptor)
+        let statistics = page.statistics().cloned();
+
+        Ok((page_to_array(page, &descriptor)?, statistics))
     }
 
     fn test_column(column: usize) -> Result<()> {
         let mut path = get_path();
         path.push("alltypes_plain.parquet");
         let path = path.to_str().unwrap();
-        let result = get_column(path, column)?;
+        let (result, _) = get_column(path, column)?;
         assert_eq!(result, alltypes_plain(column));
         Ok(())
     }
@@ -212,9 +232,9 @@ mod tests {
         ];
 
         let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let result = get_column(&path, 10)?;
-        if let Array::Int96(result) = result {
-            let a = result
+        let (array, _) = get_column(&path, 10)?;
+        if let Array::Int96(array) = array {
+            let a = array
                 .into_iter()
                 .map(|x| x.map(int96_to_i64))
                 .collect::<Vec<_>>();
@@ -223,6 +243,40 @@ mod tests {
             panic!("Timestamp expected");
         };
         Ok(())
+    }
+
+    fn assert_eq_stats(expected: (Option<i64>, Value, Value), stats: &dyn Statistics) {
+        match (expected.1, expected.2) {
+            (Value::Int32(min), Value::Int32(max)) => {
+                let s = stats
+                    .as_any()
+                    .downcast_ref::<PrimitiveStatistics<i32>>()
+                    .unwrap();
+                assert_eq!(expected.0, s.null_count);
+                assert_eq!(s.min_value, min);
+                assert_eq!(s.max_value, max);
+            }
+            (Value::Int64(min), Value::Int64(max)) => {
+                let s = stats
+                    .as_any()
+                    .downcast_ref::<PrimitiveStatistics<i64>>()
+                    .unwrap();
+                assert_eq!(expected.0, s.null_count);
+                assert_eq!(s.min_value, min);
+                assert_eq!(s.max_value, max);
+            }
+            (Value::Float64(min), Value::Float64(max)) => {
+                let s = stats
+                    .as_any()
+                    .downcast_ref::<PrimitiveStatistics<f64>>()
+                    .unwrap();
+                assert_eq!(expected.0, s.null_count);
+                assert_eq!(s.min_value, min);
+                assert_eq!(s.max_value, max);
+            }
+
+            _ => todo!(),
+        }
     }
 
     fn test_pyarrow_integration(
@@ -245,7 +299,7 @@ mod tests {
                 version, file, "nullable"
             )
         };
-        let array = get_column(&path, column)?;
+        let (array, statistics) = get_column(&path, column)?;
 
         let expected = if file == "basic" {
             if required {
@@ -258,6 +312,18 @@ mod tests {
         };
 
         assert_eq!(expected, array);
+
+        let expected_stats = if file == "basic" {
+            if required {
+                pyarrow_required_stats(column)
+            } else {
+                pyarrow_optional_stats(column)
+            }
+        } else {
+            (Some(1), Value::Int64(Some(0)), Value::Int64(Some(10)))
+        };
+
+        assert_eq_stats(expected_stats, statistics.unwrap().as_ref());
 
         Ok(())
     }

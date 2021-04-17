@@ -8,6 +8,7 @@ use crate::{error::Result, metadata::ColumnDescriptor};
 
 use super::page::{CompressedPage, PageV1, PageV2};
 use super::page_dict::{read_page_dict, PageDict};
+use super::statistics::read_statistics;
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -77,15 +78,15 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<CompressedP
         let mut buffer = vec![0; page_header.compressed_page_size as usize];
         reader.reader.read_exact(&mut buffer)?;
 
+        let physical_type = match reader.descriptor.type_() {
+            ParquetType::PrimitiveType { physical_type, .. } => physical_type,
+            _ => unreachable!(),
+        };
+
         let result = match page_header.type_ {
             PageType::DictionaryPage => {
                 let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
                 let is_sorted = dict_header.is_sorted.unwrap_or(false);
-
-                let physical = match reader.descriptor.type_() {
-                    ParquetType::PrimitiveType { physical_type, .. } => physical_type,
-                    _ => unreachable!(),
-                };
 
                 let page = read_page_dict(
                     buffer,
@@ -95,7 +96,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<CompressedP
                         page_header.uncompressed_page_size as usize,
                     ),
                     is_sorted,
-                    *physical,
+                    *physical_type,
                 )?;
 
                 reader.current_dictionary = Some(page);
@@ -104,23 +105,39 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<CompressedP
             PageType::DataPage => {
                 let header = page_header.data_page_header.unwrap();
                 reader.seen_num_values += header.num_values as i64;
+
+                let statistics = header
+                    .statistics
+                    .as_ref()
+                    .map(|s| read_statistics(s, physical_type))
+                    .transpose()?;
+
                 CompressedPage::V1(PageV1 {
                     buffer,
                     header,
                     compression: reader.compression,
                     uncompressed_page_size: page_header.uncompressed_page_size as usize,
                     dictionary_page: reader.current_dictionary.clone(),
+                    statistics,
                 })
             }
             PageType::DataPageV2 => {
                 let header = page_header.data_page_header_v2.unwrap();
                 reader.seen_num_values += header.num_values as i64;
+
+                let statistics = header
+                    .statistics
+                    .as_ref()
+                    .map(|s| read_statistics(s, physical_type))
+                    .transpose()?;
+
                 CompressedPage::V2(PageV2 {
                     buffer,
                     header,
                     compression: reader.compression,
                     uncompressed_page_size: page_header.uncompressed_page_size as usize,
                     dictionary_page: reader.current_dictionary.clone(),
+                    statistics,
                 })
             }
             PageType::IndexPage => {

@@ -3,6 +3,7 @@ use std::sync::Arc;
 use parquet_format::{CompressionCodec, DataPageHeader, DataPageHeaderV2};
 
 use super::page_dict::PageDict;
+use super::statistics::Statistics;
 
 #[derive(Debug)]
 pub struct PageV1 {
@@ -11,7 +12,7 @@ pub struct PageV1 {
     pub compression: CompressionCodec,
     pub uncompressed_page_size: usize,
     pub dictionary_page: Option<Arc<dyn PageDict>>,
-    //statistics: Option<Statistics>,
+    pub statistics: Option<Arc<dyn Statistics>>,
 }
 
 #[derive(Debug)]
@@ -21,7 +22,7 @@ pub struct PageV2 {
     pub compression: CompressionCodec,
     pub uncompressed_page_size: usize,
     pub dictionary_page: Option<Arc<dyn PageDict>>,
-    //statistics: Option<Statistics>,
+    pub statistics: Option<Arc<dyn Statistics>>,
 }
 
 /// A [`CompressedPage`] is compressed, encoded representation of a Parquet page. It holds actual data
@@ -45,6 +46,13 @@ impl CompressedPage {
         match self {
             Self::V1(page) => page.uncompressed_page_size,
             Self::V2(page) => page.uncompressed_page_size,
+        }
+    }
+
+    pub fn statistics(&self) -> Option<&Arc<dyn Statistics>> {
+        match self {
+            Self::V1(page) => page.statistics.as_ref(),
+            Self::V2(page) => page.statistics.as_ref(),
         }
     }
 }

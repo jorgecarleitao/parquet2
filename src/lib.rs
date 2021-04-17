@@ -19,7 +19,7 @@ const DEFAULT_FOOTER_READ_SIZE: u64 = 64 * 1024;
 mod tests {
     use std::path::PathBuf;
 
-    use crate::serialization::read::Array;
+    use crate::serialization::read::{Array, Value};
 
     pub fn get_path() -> PathBuf {
         let dir = env!("CARGO_MANIFEST_DIR");
@@ -176,6 +176,29 @@ mod tests {
         }
     }
 
+    pub fn pyarrow_optional_stats(column: usize) -> (Option<i64>, Value, Value) {
+        match column {
+            0 => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+            1 => (
+                Some(3),
+                Value::Float64(Some(0.0)),
+                Value::Float64(Some(9.0)),
+            ),
+            2 => (
+                Some(4),
+                Value::Binary(Some(b"".to_vec())),
+                Value::Binary(Some(b"Hello".to_vec())),
+            ),
+            3 => (
+                Some(4),
+                Value::Boolean(Some(false)),
+                Value::Boolean(Some(true)),
+            ),
+            4 => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+            _ => unreachable!(),
+        }
+    }
+
     // these values match the values in `integration`
     pub fn pyarrow_required(column: usize) -> Array {
         let i64_values = &[
@@ -193,6 +216,13 @@ mod tests {
 
         match column {
             0 => Array::Int64(i64_values.to_vec()),
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn pyarrow_required_stats(column: usize) -> (Option<i64>, Value, Value) {
+        match column {
+            0 => (Some(0), Value::Int64(Some(0)), Value::Int64(Some(9))),
             _ => unreachable!(),
         }
     }
