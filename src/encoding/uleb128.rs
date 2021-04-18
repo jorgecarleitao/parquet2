@@ -9,9 +9,9 @@ pub fn decode(values: &[u8]) -> (u64, usize) {
             panic!()
         };
 
-        result |= u64::from(byte & 0x7f) << shift;
+        result |= u64::from(byte & 0b01111111) << shift;
 
-        if byte & 0x80 == 0 {
+        if byte & 0b10000000 == 0 {
             break;
         }
 
