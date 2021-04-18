@@ -25,6 +25,7 @@ pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usiz
     decompressed.len() * num_bits as usize / 8
 }
 
+#[derive(Debug)]
 pub struct Decoder<'a> {
     compressed_chunks: std::slice::Chunks<'a, u8>,
     num_bits: u8,

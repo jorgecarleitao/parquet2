@@ -84,8 +84,4 @@ write_pyarrow(case_basic_nullable, 1, 2)  # V2
 write_pyarrow(case_basic_required, 1, 1)  # V1
 write_pyarrow(case_basic_required, 1, 2)  # V2
 
-# for read benchmarks
-for i in [10, 100, 1000, 10000]:
-    write_pyarrow(case_basic_nullable, i, 1)  # V1
-
 write_pyarrow(case_nested, 1, 1)

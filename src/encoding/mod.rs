@@ -1,8 +1,10 @@
 use std::convert::TryInto;
 
 pub mod bitpacking;
+pub mod delta_bitpacked;
 pub mod hybrid_rle;
 pub mod uleb128;
+pub mod zigzag_leb128;
 
 pub use parquet_format::Encoding;
 
