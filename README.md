@@ -8,12 +8,47 @@ The five main differentiators in comparison with `parquet` are:
 * decouples reading (IO intensive) from computing (CPU intensive)
 * deletages decompressing and decoding batches downstream
 * it is faster (10-20x when reading to arrow format)
+* Is integration-tested against pyarrow 3 and (py)spark 3
 
 The overall idea is to offer the ability to read compressed parquet pages
 and a toolkit to decompress them to their favourite in-memory format.
 
 This allows this crate's iterators to perform _minimal_ CPU work, thereby maximizing throughput. It is up to the consumers to decide whether they want 
 to take advantage of this through parallelism at the expense of memory usage (e.g. decompress and deserialize pages in threads) or not.
+
+## Functionality implemented
+
+* Read dictionary pages
+* Read and write V1 pages
+* Read and write V2 pages
+* Compression and de-compression (all)
+
+## Functionality not (yet) implemented
+
+* [Index pages](https://github.com/apache/parquet-format/blob/master/PageIndex.md)
+* [Bit-packed (Deprecated)](https://github.com/apache/parquet-format/blob/master/Encodings.md#bit-packed-deprecated-bit_packed--4)
+* [Byte Stream Split](https://github.com/apache/parquet-format/blob/master/Encodings.md#byte-stream-split-byte_stream_split--9)
+
+The parquet format has multiple encoding strategies for the different physical types.
+This crate currently reads from almost all of them, and supports encoding to a subset
+of them. They are:
+
+#### Supported decoding
+
+* [PLAIN](https://github.com/apache/parquet-format/blob/master/Encodings.md#plain-plain--0)
+* [RLE dictionary](https://github.com/apache/parquet-format/blob/master/Encodings.md#dictionary-encoding-plain_dictionary--2-and-rle_dictionary--8)
+* [RLE hybrid](https://github.com/apache/parquet-format/blob/master/Encodings.md#run-length-encoding--bit-packing-hybrid-rle--3)
+* [Delta-encoding](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-encoding-delta_binary_packed--5)
+* [Delta length byte array](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-length-byte-array-delta_length_byte_array--6)
+* [Delta strings](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-strings-delta_byte_array--7)
+
+Delta-encodings are still experimental, as I have been unable to generate large pages encoded
+with them from spark, thereby hindering robust integration tests.
+
+#### Encoding
+
+* [PLAIN](https://github.com/apache/parquet-format/blob/master/Encodings.md#plain-plain--0)
+* [RLE hybrid](https://github.com/apache/parquet-format/blob/master/Encodings.md#run-length-encoding--bit-packing-hybrid-rle--3)
 
 ## Organization
 
@@ -28,26 +63,6 @@ to take advantage of this through parallelism at the expense of memory usage (e.
 
 Note that `serialization` is not very robust. It serves as a playground 
 to understand the specification and how to serialize and deserialize pages.
-
-## Supported encoding
-
-The parquet format has multiple encoding strategies for the different physical types.
-This crate currently reads from almost all of them, and supports encoding to a subset
-of them. They are:
-
-#### Decoding
-
-* [PLAIN](https://github.com/apache/parquet-format/blob/master/Encodings.md#plain-plain--0)
-* [RLE dictionary](https://github.com/apache/parquet-format/blob/master/Encodings.md#dictionary-encoding-plain_dictionary--2-and-rle_dictionary--8)
-* [RLE hybrid](https://github.com/apache/parquet-format/blob/master/Encodings.md#run-length-encoding--bit-packing-hybrid-rle--3)
-* [Delta-encoding](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-encoding-delta_binary_packed--5)
-* [Delta length byte array](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-length-byte-array-delta_length_byte_array--6)
-* [Delta strings](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-strings-delta_byte_array--7)
-
-#### Encoding
-
-* [PLAIN](https://github.com/apache/parquet-format/blob/master/Encodings.md#plain-plain--0)
-* [RLE hybrid](https://github.com/apache/parquet-format/blob/master/Encodings.md#run-length-encoding--bit-packing-hybrid-rle--3)
 
 ## Run unit tests
 
@@ -94,14 +109,13 @@ let array = page_to_array(page, &descriptor).unwrap();
 
 ### How to implement page readers
 
-In general, the in-memory format used to consume parquet pages strongly influences how the pages
-should be deserialized. As such, this crate does not commit to a particular in-memory format.Consumers are responsible for converting pages to their target in-memory format.
+In general, the in-memory format used to consume parquet pages strongly influences how the pages should be deserialized. As such, this crate does not commit to a particular in-memory format. Consumers are responsible for converting pages to their target in-memory format.
 
 There is an implementation that uses the arrow format [here](https://github.com/jorgecarleitao/arrow2).
 
 ### Higher Parallelism
 
-The function above creates an iterator over a row group, `iter`. In arrow, this
+The function above creates an iterator over a row group, `iter`. In Arrow, this
 corresponds to a `RecordBatch`, divided in Parquet pages. Typically, 
 converting a page into in-memory is expensive and thus consider how to 
 distribute work across threads. E.g.
@@ -121,13 +135,20 @@ let columns_from_all_groups = handles.join_all();
 
 this will read the file as quickly as possible in the main thread and send CPU-intensive work to other threads, thereby maximizing IO reads (at the cost of storing multiple compressed pages in memory; buffering is also an option here).
 
-## General data flow
+## Decoding flow
 
-`parquet -> decompress -> decode -> deserialize`
+Generally, a parquet file is read as follows:
 
-* `decompress`: e.g. `gzip`
-* `decode`: e.g. `RLE`
-* `deserialize`: e.g. `&[u8] -> &[i32]`
+1. Read metadata
+2. Seek a row group and column
+3. iterate over (compressed) pages within that (group, column)
+
+This is IO-intensive, requires parsing thrift, and seeking within a file.
+
+Once a compressed page is loaded into memory, it can be decompressed, decoded and deserialized into a specific in-memory format. All of these operations are CPU-intensive
+and are thus left to consumers to perform, as they may want to send this work to threads.
+
+`read -> compressed page -> decompressed page -> decoded bytes -> deserialized`
 
 ## License
 
