@@ -2,6 +2,8 @@ use std::convert::TryInto;
 
 pub mod bitpacking;
 pub mod delta_bitpacked;
+pub mod delta_byte_array;
+pub mod delta_length_byte_array;
 pub mod hybrid_rle;
 pub mod uleb128;
 pub mod zigzag_leb128;

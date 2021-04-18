@@ -14,14 +14,18 @@ struct Block<'a> {
     current_index: usize, // invariant: < values_per_mini_block
     // None represents a relative delta of zero, in which case there is no miniblock.
     current_miniblock: Option<bitpacking::Decoder<'a>>,
+    consumed_bytes: usize,
 }
 
 impl<'a> Block<'a> {
     pub fn new(mut values: &'a [u8], num_mini_blocks: usize, values_per_mini_block: usize) -> Self {
+        let mut consumed_bytes = 0;
         let (min_delta, consumed) = zigzag_leb128::decode(values);
+        consumed_bytes += consumed;
         values = &values[consumed..];
 
         let mut bitwidths = &values[..num_mini_blocks];
+        consumed_bytes += num_mini_blocks;
         values = &values[num_mini_blocks..];
 
         // read first bitwidth
@@ -29,6 +33,7 @@ impl<'a> Block<'a> {
         bitwidths = &bitwidths[1..];
 
         let current_miniblock = if num_bits > 0 {
+            consumed_bytes += values_per_mini_block * num_bits as usize / 8;
             Some(bitpacking::Decoder::new(
                 values,
                 num_bits,
@@ -47,6 +52,7 @@ impl<'a> Block<'a> {
             values,
             current_index: 0,
             current_miniblock,
+            consumed_bytes,
         }
     }
 }
@@ -70,6 +76,7 @@ impl<'a> Iterator for Block<'a> {
             let num_bits = self.bitwidths[0];
             self.bitwidths = &self.bitwidths[1..];
             self.current_miniblock = if num_bits > 0 {
+                self.consumed_bytes += self.values_per_mini_block * num_bits as usize / 8;
                 Some(bitpacking::Decoder::new(
                     self.values,
                     num_bits,
@@ -96,24 +103,31 @@ pub struct Decoder<'a> {
     first_value: i64, // the cumulative
     values: &'a [u8],
     current_block: Block<'a>,
+    consumed_bytes: usize,
 }
 
 impl<'a> Decoder<'a> {
     pub fn new(mut values: &'a [u8]) -> Self {
+        let mut consumed_bytes = 0;
         let (block_size, consumed) = uleb128::decode(values);
+        consumed_bytes += consumed;
         assert_eq!(block_size % 128, 0);
         values = &values[consumed..];
         let (num_mini_blocks, consumed) = uleb128::decode(values);
+        consumed_bytes += consumed;
         values = &values[consumed..];
         let (total_count, consumed) = uleb128::decode(values);
+        consumed_bytes += consumed;
         values = &values[consumed..];
         let (first_value, consumed) = zigzag_leb128::decode(values);
+        consumed_bytes += consumed;
         values = &values[consumed..];
 
         let values_per_mini_block = (block_size / num_mini_blocks) as usize;
         assert_eq!(values_per_mini_block % 8, 0);
 
         let current_block = Block::new(values, num_mini_blocks as usize, values_per_mini_block);
+        consumed_bytes += current_block.consumed_bytes;
 
         Self {
             block_size,
@@ -123,7 +137,12 @@ impl<'a> Decoder<'a> {
             values_per_mini_block,
             first_value,
             current_block,
+            consumed_bytes,
         }
+    }
+
+    pub fn consumed_bytes(&self) -> usize {
+        self.consumed_bytes
     }
 }
 
@@ -139,6 +158,10 @@ impl<'a> Iterator for Decoder<'a> {
         let result = Some(self.first_value as u32);
         self.first_value += delta as i64;
         result
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.total_count as usize, Some(self.total_count as usize))
     }
 }
 
@@ -160,9 +183,12 @@ mod tests {
         // bit_width: 0
         let data = &[128, 1, 4, 5, 2, 2, 0, 0, 0, 0];
 
-        let r = Decoder::new(data).collect::<Vec<_>>();
+        let mut decoder = Decoder::new(data);
+        let r = decoder.by_ref().collect::<Vec<_>>();
 
         assert_eq!(expected, r);
+
+        assert_eq!(decoder.consumed_bytes, 10);
     }
 
     #[test]
@@ -184,10 +210,14 @@ mod tests {
         // ]                  <=b> [3, 3, 3, 3, 0]
         let data = &[
             128, 1, 4, 6, 2, 7, 3, 0, 0, 0, 0b01101101, 0b00001011, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            // these should not be consumed
+            1, 2, 3,
         ];
 
-        let r = Decoder::new(data).collect::<Vec<_>>();
+        let mut decoder = Decoder::new(data);
+        let r = decoder.by_ref().collect::<Vec<_>>();
 
         assert_eq!(expected, r);
+        assert_eq!(decoder.consumed_bytes, data.len() - 3);
     }
 }
