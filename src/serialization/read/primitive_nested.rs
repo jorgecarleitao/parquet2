@@ -35,8 +35,8 @@ fn compose_array<I: Iterator<Item = u32>, F: Iterator<Item = u32>, G: Iterator<I
     let mut inner = vec![];
 
     assert_eq!(max_rep, 1);
-    assert_eq!(max_def, 3);
-    let mut prev_def = 0;
+    assert!(max_def >= 1);
+    let mut first = true;
     rep_levels
         .into_iter()
         .zip(def_levels.into_iter())
@@ -44,21 +44,21 @@ fn compose_array<I: Iterator<Item = u32>, F: Iterator<Item = u32>, G: Iterator<I
             match rep {
                 1 => {}
                 0 => {
-                    if prev_def > 1 {
+                    if !first {
                         let old = std::mem::take(&mut inner);
                         outer.push(Some(Array::Int64(old)));
                     }
                 }
                 _ => unreachable!(),
             }
-            match def {
-                3 => inner.push(Some(values.next().unwrap())),
-                2 => inner.push(None),
-                1 => outer.push(Some(Array::Int64(vec![]))),
-                0 => outer.push(None),
+            match max_def - def {
+                0 => inner.push(Some(values.next().unwrap())),
+                1 => inner.push(None),
+                2 => outer.push(Some(Array::Int64(vec![]))),
+                3 => outer.push(None),
                 _ => unreachable!(),
             }
-            prev_def = def;
+            first = false;
         });
     outer.push(Some(Array::Int64(inner)));
     Array::List(outer)
