@@ -3,18 +3,19 @@
 This is a re-write of the official [`parquet` crate](https://crates.io/crates/parquet) with performance, parallelism and safety in mind.
 
 The five main differentiators in comparison with `parquet` are:
-* does not use `unsafe`
+* it uses `#![forbid(unsafe_code)]`
 * delegates parallelism downstream
 * decouples reading (IO intensive) from computing (CPU intensive)
-* deletages decompressing and decoding batches downstream
 * it is faster (10-20x when reading to arrow format)
 * Is integration-tested against pyarrow 3 and (py)spark 3
 
 The overall idea is to offer the ability to read compressed parquet pages
 and a toolkit to decompress them to their favourite in-memory format.
 
-This allows this crate's iterators to perform _minimal_ CPU work, thereby maximizing throughput. It is up to the consumers to decide whether they want 
-to take advantage of this through parallelism at the expense of memory usage (e.g. decompress and deserialize pages in threads) or not.
+This allows this crate's iterators to perform _minimal_ CPU work, thereby maximizing throughput.
+It is up to the consumers to decide whether they want to take advantage of this
+through parallelism at the expense of memory usage (e.g. decompress and deserialize
+pages in threads) or not.
 
 ## Functionality implemented
 

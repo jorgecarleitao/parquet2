@@ -1,3 +1,5 @@
+#![forbid(unsafe_code)]
+
 #[macro_use]
 pub mod error;
 pub mod compression;
