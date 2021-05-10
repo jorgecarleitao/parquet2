@@ -1,4 +1,5 @@
 mod binary;
+mod boolean;
 mod fixed_len_binary;
 mod primitive;
 
@@ -24,7 +25,7 @@ pub fn read_statistics(
     physical_type: &PhysicalType,
 ) -> Result<Arc<dyn Statistics>> {
     match physical_type {
-        PhysicalType::Boolean => todo!(),
+        PhysicalType::Boolean => boolean::read(statistics),
         PhysicalType::Int32 => primitive::read::<i32>(statistics),
         PhysicalType::Int64 => primitive::read::<i64>(statistics),
         PhysicalType::Int96 => primitive::read::<[u32; 3]>(statistics),
