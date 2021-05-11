@@ -88,6 +88,9 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
                 PhysicalType::Double => {
                     Ok(Array::Float64(primitive::page_to_vec(&page, descriptor)?))
                 }
+                PhysicalType::ByteArray => {
+                    Ok(Array::Binary(binary::page_to_vec(&page, descriptor)?))
+                }
                 _ => todo!(),
             },
         },
