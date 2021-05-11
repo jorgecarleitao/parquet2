@@ -1,4 +1,4 @@
-mod primitive;
+pub(crate) mod primitive;
 
 use parquet_format::CompressionCodec;
 

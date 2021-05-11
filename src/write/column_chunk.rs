@@ -35,13 +35,16 @@ pub fn write_column_chunk<
         .collect::<Result<Vec<_>>>()?;
 
     // compute stats to build header at the end of the chunk
+
+    // SPEC: the total compressed size is the total compressed size of each page + the header size
     let total_compressed_size = specs
         .iter()
-        .map(|x| x.header.compressed_page_size as i64)
+        .map(|x| x.header_size as i64 + x.header.compressed_page_size as i64)
         .sum();
+    // SPEC: the total compressed size is the total compressed size of each page + the header size
     let total_uncompressed_size = specs
         .iter()
-        .map(|x| x.header.uncompressed_page_size as i64)
+        .map(|x| x.header_size as i64 + x.header.uncompressed_page_size as i64)
         .sum();
     let data_page_offset = specs.first().map(|spec| spec.offset).unwrap_or(0) as i64;
     let num_values = specs
