@@ -4,8 +4,9 @@ use super::levels::consume_level;
 use crate::error::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
 use crate::read::Page;
+use crate::serialization::read::utils::ValuesDef;
 use crate::{
-    encoding::{bitpacking, uleb128},
+    encoding::{bitpacking, plain_byte_array, uleb128},
     read::BinaryPageDict,
 };
 
@@ -56,6 +57,41 @@ pub fn page_dict_to_vec(
             )),
             (_, None) => Err(general_err!(
                 "Dictionary-encoded page requires a dictionary"
+            )),
+            _ => todo!(),
+        },
+        _ => todo!(),
+    }
+}
+
+fn read_plain_buffer(
+    values: &[u8],
+    length: u32,
+    def_level_encoding: (&Encoding, i16),
+) -> Vec<Option<Vec<u8>>> {
+    let (values, def_levels) = consume_level(values, length, def_level_encoding);
+
+    let decoded_values = plain_byte_array::Decoder::new(values).map(|bytes| bytes.to_vec());
+
+    ValuesDef::new(
+        decoded_values,
+        def_levels.into_iter(),
+        def_level_encoding.1 as u32,
+    )
+    .collect()
+}
+
+pub fn page_to_vec(page: &Page, descriptor: &ColumnDescriptor) -> Result<Vec<Option<Vec<u8>>>> {
+    assert_eq!(descriptor.max_rep_level(), 0);
+    match page {
+        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+            (Encoding::Plain, None) => Ok(read_plain_buffer(
+                &page.buffer,
+                page.header.num_values as u32,
+                (
+                    &page.header.definition_level_encoding,
+                    descriptor.max_def_level(),
+                ),
             )),
             _ => todo!(),
         },
