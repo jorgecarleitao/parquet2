@@ -71,7 +71,8 @@ fn read_plain_buffer(
 ) -> Vec<Option<Vec<u8>>> {
     let (values, def_levels) = consume_level(values, length, def_level_encoding);
 
-    let decoded_values = plain_byte_array::Decoder::new(values).map(|bytes| bytes.to_vec());
+    let decoded_values =
+        plain_byte_array::Decoder::new(values, length as usize).map(|bytes| bytes.to_vec());
 
     ValuesDef::new(
         decoded_values,

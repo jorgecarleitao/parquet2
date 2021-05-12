@@ -7,31 +7,40 @@ use crate::encoding::get_length;
 #[derive(Debug)]
 pub struct Decoder<'a> {
     values: &'a [u8],
-    index: usize,
+    remaining: usize,
 }
 
 impl<'a> Decoder<'a> {
-    pub fn new(values: &'a [u8]) -> Self {
-        Self { values, index: 0 }
+    #[inline]
+    pub fn new(values: &'a [u8], length: usize) -> Self {
+        Self {
+            values,
+            remaining: length,
+        }
     }
 }
 
 impl<'a> Iterator for Decoder<'a> {
     type Item = &'a [u8];
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let values = self.values;
-        let index = self.index;
-        if index + 4 < values.len() {
+        if values.len() >= 4 {
             let next_len = get_length(values) as usize;
-            let next_index = index + 4 + next_len;
+            let values = &values[4..];
 
-            let result = Some(&values[index + 4..next_index]);
-            self.index = next_index;
+            let result = Some(&values[0..next_len]);
+            self.values = &values[next_len..];
+            self.remaining -= 1;
 
             result
         } else {
             None
         }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.remaining, None)
     }
 }
