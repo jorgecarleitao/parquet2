@@ -38,7 +38,7 @@ mod tests {
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
 
         let mut writer = Cursor::new(vec![]);
-        write_file(&mut writer, schema, compression, row_groups)?;
+        write_file(&mut writer, row_groups, schema, compression, None, None)?;
 
         let data = writer.into_inner();
         let mut reader = Cursor::new(data);

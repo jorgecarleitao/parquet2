@@ -8,6 +8,7 @@ use parquet_format::{CompressionCodec, FileMetaData};
 use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
 
+pub use crate::metadata::KeyValue;
 use crate::{
     error::{ParquetError, Result},
     metadata::SchemaDescriptor,
@@ -52,9 +53,11 @@ pub fn write_file<
     E,   // external error any of the iterators may emit
 >(
     writer: &mut W,
+    row_groups: III,
     schema: SchemaDescriptor,
     codec: CompressionCodec,
-    row_groups: III,
+    created_by: Option<String>,
+    key_value_metadata: Option<Vec<KeyValue>>,
 ) -> Result<()>
 where
     W: Write + Seek,
@@ -84,8 +87,8 @@ where
         schema.into_thrift()?,
         num_rows,
         row_groups,
-        None,
-        None,
+        key_value_metadata,
+        created_by,
         None,
     );
 
