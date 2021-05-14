@@ -82,9 +82,11 @@ mod tests {
         let mut writer = Cursor::new(vec![]);
         write_file(
             &mut writer,
+            row_groups,
             schema,
             CompressionCodec::Uncompressed,
-            row_groups,
+            None,
+            None,
         )?;
 
         let data = writer.into_inner();
