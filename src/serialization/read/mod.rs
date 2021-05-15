@@ -118,7 +118,9 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
 mod tests {
     use std::fs::File;
 
-    use crate::read::{get_page_iterator, read_metadata, PrimitiveStatistics, Statistics};
+    use crate::read::{
+        get_page_iterator, read_metadata, BinaryStatistics, PrimitiveStatistics, Statistics,
+    };
     use crate::tests::*;
     use crate::types::int96_to_i64;
 
@@ -277,6 +279,12 @@ mod tests {
                 assert_eq!(s.min_value, min);
                 assert_eq!(s.max_value, max);
             }
+            (Value::Binary(min), Value::Binary(max)) => {
+                let s = stats.as_any().downcast_ref::<BinaryStatistics>().unwrap();
+
+                assert_eq!(s.min_value, min);
+                assert_eq!(s.max_value, max);
+            }
 
             _ => todo!(),
         }
@@ -339,6 +347,28 @@ mod tests {
     #[test]
     fn pyarrow_v1_int32_optional() -> Result<()> {
         test_pyarrow_integration("basic", 0, 1, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_dict_string_required() -> Result<()> {
+        test_pyarrow_integration("basic", 2, 1, true)
+    }
+
+    #[test]
+    #[ignore = "optional strings are not yet supported, see https://github.com/jorgecarleitao/parquet2/pull/7"]
+    fn pyarrow_v1_dict_string_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 2, 1, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_non_dict_string_required() -> Result<()> {
+        test_pyarrow_integration("basic", 6, 1, true)
+    }
+
+    #[test]
+    #[ignore = "optional non dictionary encoded strings seem to be written incorrectly by pyarrow, neither pyarrow itself nor rust parquet1 can read the generated file"]
+    fn pyarrow_v1_non_dict_string_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 6, 1, false)
     }
 
     #[test]
