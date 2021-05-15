@@ -174,6 +174,7 @@ mod tests {
             2 => Array::Binary(string_values.to_vec()),
             3 => Array::Boolean(bool_values.to_vec()),
             4 => Array::Int64(i64_values.to_vec()),
+            6 => Array::Binary(string_values.to_vec()),
             _ => unreachable!(),
         }
     }
@@ -203,21 +204,33 @@ mod tests {
 
     // these values match the values in `integration`
     pub fn pyarrow_required(column: usize) -> Array {
-        let i64_values = &[
-            Some(0),
-            Some(1),
-            Some(2),
-            Some(3),
-            Some(4),
-            Some(5),
-            Some(6),
-            Some(7),
-            Some(8),
-            Some(9),
+        let i64_values = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        let f64_values = &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
+        let string_values = &[
+            "Hello", "bbb", "aa", "", "bbb", "abc", "bbb", "bbb", "def", "aaa",
+        ];
+        let bool_values = &[
+            true, true, false, false, false, true, true, true, true, true,
         ];
 
         match column {
-            0 => Array::Int64(i64_values.to_vec()),
+            0 => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
+            1 => Array::Float64(f64_values.iter().map(|f| Some(*f)).collect()),
+            2 => Array::Binary(
+                string_values
+                    .iter()
+                    .map(|s| Some(s.as_bytes().to_vec()))
+                    .collect(),
+            ),
+            3 => Array::Boolean(bool_values.iter().map(|b| Some(*b)).collect()),
+            4 => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
+            5 => Array::Int32(i64_values.iter().map(|i| Some(*i as i32)).collect()),
+            6 => Array::Binary(
+                string_values
+                    .iter()
+                    .map(|s| Some(s.as_bytes().to_vec()))
+                    .collect(),
+            ),
             _ => unreachable!(),
         }
     }
@@ -225,6 +238,28 @@ mod tests {
     pub fn pyarrow_required_stats(column: usize) -> (Option<i64>, Value, Value) {
         match column {
             0 => (Some(0), Value::Int64(Some(0)), Value::Int64(Some(9))),
+            1 => (
+                Some(3),
+                Value::Float64(Some(0.0)),
+                Value::Float64(Some(9.0)),
+            ),
+            2 => (
+                Some(4),
+                Value::Binary(Some(b"".to_vec())),
+                Value::Binary(Some(b"def".to_vec())),
+            ),
+            3 => (
+                Some(4),
+                Value::Boolean(Some(false)),
+                Value::Boolean(Some(true)),
+            ),
+            4 => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+            5 => (Some(0), Value::Int32(Some(0)), Value::Int32(Some(9))),
+            6 => (
+                Some(4),
+                Value::Binary(Some(b"".to_vec())),
+                Value::Binary(Some(b"def".to_vec())),
+            ),
             _ => unreachable!(),
         }
     }

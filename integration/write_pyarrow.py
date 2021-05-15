@@ -18,6 +18,7 @@ def case_basic_nullable(size = 1):
         pa.field('bool', pa.bool_()),
         pa.field('date', pa.timestamp('ms')),
         pa.field('uint32', pa.uint32()),
+        pa.field('string_non_dict', pa.utf8(), nullable=False),
     ]
     schema = pa.schema(fields)
 
@@ -28,6 +29,7 @@ def case_basic_nullable(size = 1):
         "bool": boolean * size,
         "date": int64 * size,
         "uint32": int64 * size,
+        "string_non_dict": string * size,
     }, schema, f"basic_nullable_{size*10}.parquet"
 
 
@@ -44,6 +46,7 @@ def case_basic_required(size = 1):
         pa.field('bool', pa.bool_(), nullable=False),
         pa.field('date', pa.timestamp('ms'), nullable=False),
         pa.field('uint32', pa.uint32(), nullable=False),
+        pa.field('string_non_dict', pa.utf8(), nullable=False),
     ]
     schema = pa.schema(fields)
 
@@ -54,6 +57,7 @@ def case_basic_required(size = 1):
         "bool": boolean * size,
         "date": int64 * size,
         "uint32": int64 * size,
+        "string_non_dict": string * size,
     }, schema, f"basic_required_{size*10}.parquet"
 
 
@@ -75,7 +79,7 @@ def write_pyarrow(case, size = 1, page_version = 1):
 
     t = pa.table(data, schema=schema)
     os.makedirs(base_path, exist_ok=True)
-    pa.parquet.write_table(t, f"{base_path}/{path}", data_page_version=f"{page_version}.0")
+    pa.parquet.write_table(t, f"{base_path}/{path}", data_page_version=f"{page_version}.0", use_dictionary=["string"])
 
 
 write_pyarrow(case_basic_nullable, 1, 1)  # V1
@@ -85,3 +89,9 @@ write_pyarrow(case_basic_required, 1, 1)  # V1
 write_pyarrow(case_basic_required, 1, 2)  # V2
 
 write_pyarrow(case_nested, 1, 1)
+
+# pyarrow seems to write corrupt file when disabling dictionary encoding for nullable strings
+# pyarrow can't read the column itself
+# rust parquet1 also fails
+# parquet2 seems to skip the null values and instead returns them at the end
+# print(pa.parquet.read_table(f"{PYARROW_PATH}/v1/basic_nullable_10.parquet", columns=["string_non_dict"]))
