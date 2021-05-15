@@ -41,6 +41,6 @@ impl<'a> Iterator for Decoder<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.remaining, None)
+        (self.remaining, Some(self.remaining))
     }
 }
