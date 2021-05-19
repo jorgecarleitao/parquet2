@@ -33,13 +33,18 @@ impl ColumnChunkMetaData {
     }
 
     /// Type of this column. Must be primitive.
-    pub fn column_type(&self) -> &Type {
+    pub fn type_(&self) -> &Type {
         &self.column_metadata().type_
     }
 
     /// Descriptor for this column.
     pub fn column_descriptor(&self) -> &ColumnDescriptor {
         &self.column_descr
+    }
+
+    /// Descriptor for this column.
+    pub(crate) fn statistics(&self) -> &Option<Statistics> {
+        &self.column_metadata().statistics
     }
 
     /// Total number of values in this column chunk.

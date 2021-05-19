@@ -8,7 +8,7 @@ use crate::{error::Result, metadata::ColumnDescriptor};
 
 use super::page::{CompressedPage, PageV1, PageV2};
 use super::page_dict::{read_page_dict, PageDict};
-use super::statistics::read_statistics;
+use super::statistics::deserialize_statistics;
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -109,7 +109,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<CompressedP
                 let statistics = header
                     .statistics
                     .as_ref()
-                    .map(|s| read_statistics(s, physical_type))
+                    .map(|s| deserialize_statistics(s, physical_type))
                     .transpose()?;
 
                 CompressedPage::V1(PageV1 {
@@ -128,7 +128,7 @@ fn next_page<R: Read>(reader: &mut PageIterator<R>) -> Result<Option<CompressedP
                 let statistics = header
                     .statistics
                     .as_ref()
-                    .map(|s| read_statistics(s, physical_type))
+                    .map(|s| deserialize_statistics(s, physical_type))
                     .transpose()?;
 
                 CompressedPage::V2(PageV2 {
