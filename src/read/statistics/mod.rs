@@ -53,7 +53,7 @@ pub fn deserialize_statistics(
 pub fn deserialize_column_statistics(
     column: &ColumnChunkMetaData,
 ) -> Result<Option<Arc<dyn Statistics>>> {
-    let physical_type = match column.column_descriptor().type_() {
+    let physical_type = match column.descriptor().type_() {
         ParquetType::PrimitiveType { physical_type, .. } => physical_type,
         _ => unreachable!(),
     };
