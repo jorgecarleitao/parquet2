@@ -15,9 +15,9 @@ use super::column_descriptor::ColumnDescriptor;
 /// as well as all descriptors for all the primitive columns.
 #[derive(Debug, Clone)]
 pub struct SchemaDescriptor {
+    name: String,
     // The top-level schema (the "message" type).
     fields: Vec<ParquetType>,
-    name: String,
 
     // All the descriptors for primitive columns in this schema, constructed from
     // `schema` in DFS order.
