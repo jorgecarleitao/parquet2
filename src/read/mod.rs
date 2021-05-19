@@ -48,7 +48,7 @@ pub fn get_page_iterator<'b, RR: Read + Seek>(
         reader,
         column_metadata.num_values(),
         *column_metadata.compression(),
-        column_metadata.column_descriptor().clone(),
+        column_metadata.descriptor().clone(),
     )
 }
 

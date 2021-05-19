@@ -37,8 +37,9 @@ impl ColumnChunkMetaData {
         &self.column_metadata().type_
     }
 
-    /// Descriptor for this column.
-    pub fn column_descriptor(&self) -> &ColumnDescriptor {
+    /// The [`ColumnDescriptor`] for this column. This descriptor contains the physical and logical type
+    /// of the pages.
+    pub fn descriptor(&self) -> &ColumnDescriptor {
         &self.column_descr
     }
 

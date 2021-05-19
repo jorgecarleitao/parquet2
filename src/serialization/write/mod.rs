@@ -41,7 +41,7 @@ mod tests {
         let metadata = read_metadata(reader)?;
         let descriptor = metadata.row_groups[row_group]
             .column(column)
-            .column_descriptor()
+            .descriptor()
             .clone();
         Ok((
             descriptor,
