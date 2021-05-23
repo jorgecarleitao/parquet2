@@ -122,7 +122,7 @@ mod tests {
         get_page_iterator, read_metadata, BinaryStatistics, PrimitiveStatistics, Statistics,
     };
     use crate::tests::*;
-    use crate::types::int96_to_i64;
+    use crate::types::int96_to_i64_ns;
 
     use super::*;
     use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage};
@@ -226,14 +226,14 @@ mod tests {
         let path = path.to_str().unwrap();
 
         let expected = vec![
-            1235865600000i64,
-            1235865660000,
-            1238544000000,
-            1238544060000,
-            1233446400000,
-            1233446460000,
-            1230768000000,
-            1230768060000,
+            1235865600000000000i64,
+            1235865660000000000,
+            1238544000000000000,
+            1238544060000000000,
+            1233446400000000000,
+            1233446460000000000,
+            1230768000000000000,
+            1230768060000000000,
         ];
 
         let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
@@ -241,7 +241,7 @@ mod tests {
         if let Array::Int96(array) = array {
             let a = array
                 .into_iter()
-                .map(|x| x.map(int96_to_i64))
+                .map(|x| x.map(int96_to_i64_ns))
                 .collect::<Vec<_>>();
             assert_eq!(expected, a);
         } else {
