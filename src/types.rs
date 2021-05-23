@@ -87,16 +87,16 @@ impl NativeType for [u32; 3] {
     }
 }
 
-pub fn int96_to_i64(value: [u32; 3]) -> i64 {
+pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
     const JULIAN_DAY_OF_EPOCH: i64 = 2_440_588;
     const SECONDS_PER_DAY: i64 = 86_400;
-    const MILLIS_PER_SECOND: i64 = 1_000;
+    const NANOS_PER_SECOND: i64 = 1_000_000_000;
 
     let day = value[2] as i64;
     let nanoseconds = ((value[1] as i64) << 32) + value[0] as i64;
     let seconds = (day - JULIAN_DAY_OF_EPOCH) * SECONDS_PER_DAY;
 
-    seconds * MILLIS_PER_SECOND + nanoseconds / 1_000_000
+    seconds * NANOS_PER_SECOND + nanoseconds
 }
 
 #[inline]
