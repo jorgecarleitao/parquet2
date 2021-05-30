@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::{
     compression::{create_codec, Codec},
-    read::{CompressedPage, Page, PageV1, PageV2},
+    read::{CompressedPage, Page, PageHeader},
 };
 
 fn compress_(buffer: &[u8], decompressor: &mut dyn Codec) -> Result<Vec<u8>> {

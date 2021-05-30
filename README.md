@@ -73,7 +73,7 @@ use `PARQUET2_IGNORE_PYARROW_TESTS= cargo test`. To run then, you will need to r
 ```bash
 python3 -m venv venv
 venv/bin/pip install pip --upgrade
-venv/bin/pip install pyarrow==3
+venv/bin/pip install pyarrow==4
 venv/bin/python integration/write_pyarrow.py
 ```
 

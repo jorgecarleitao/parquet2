@@ -3,6 +3,7 @@ use parquet_format::Encoding;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 use crate::read::Page;
+use crate::read::PageHeader;
 
 const BIT_MASK: [u8; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
 
@@ -27,16 +28,16 @@ fn read_bitmap(values: &[u8], length: usize) -> Vec<Option<bool>> {
 }
 
 pub fn page_to_vec(page: &Page, _: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
-    match page {
-        Page::V1(page) => match page.header.encoding {
+    match page.header() {
+        PageHeader::V1(_) => match page.encoding() {
             Encoding::Plain | Encoding::PlainDictionary => {
-                Ok(read_bitmap(&page.buffer, page.header.num_values as usize))
+                Ok(read_bitmap(page.buffer(), page.num_values()))
             }
             _ => todo!(),
         },
-        Page::V2(page) => match page.header.encoding {
+        PageHeader::V2(_) => match page.encoding() {
             Encoding::Plain | Encoding::PlainDictionary => {
-                Ok(read_bitmap(&page.buffer, page.header.num_values as usize))
+                Ok(read_bitmap(page.buffer(), page.num_values()))
             }
             _ => todo!(),
         },

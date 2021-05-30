@@ -2,6 +2,7 @@ use parquet_format::{ColumnChunk, ColumnMetaData, Encoding, Statistics};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::error::Result;
+use crate::schema::types::{ParquetType, PhysicalType};
 use crate::{compression::CompressionCodec, schema::types::Type};
 
 /// Metadata for a column chunk.
@@ -41,6 +42,15 @@ impl ColumnChunkMetaData {
     /// of the pages.
     pub fn descriptor(&self) -> &ColumnDescriptor {
         &self.column_descr
+    }
+
+    /// The [`ColumnDescriptor`] for this column. This descriptor contains the physical and logical type
+    /// of the pages.
+    pub fn physical_type(&self) -> PhysicalType {
+        match self.descriptor().type_() {
+            ParquetType::PrimitiveType { physical_type, .. } => *physical_type,
+            _ => unreachable!(),
+        }
     }
 
     /// Descriptor for this column.

@@ -1,5 +1,5 @@
 mod column_chunk;
-mod compression;
+//mod compression;
 mod file;
 mod page;
 mod row_group;

@@ -3,7 +3,7 @@ use parquet_format::Encoding;
 use super::levels::consume_level;
 use crate::error::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
-use crate::read::Page;
+use crate::read::{Page, PageHeader};
 use crate::serialization::read::utils::ValuesDef;
 use crate::{
     encoding::{bitpacking, plain_byte_array, uleb128},
@@ -44,14 +44,14 @@ pub fn page_dict_to_vec(
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
-    match page {
-        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+    match page.header() {
+        PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer(
-                &page.buffer,
-                page.header.num_values as u32,
+                page.buffer(),
+                page.num_values() as u32,
                 dict.as_any().downcast_ref().unwrap(),
                 (
-                    &page.header.definition_level_encoding,
+                    &header.definition_level_encoding,
                     descriptor.max_def_level(),
                 ),
             )),
@@ -84,13 +84,13 @@ fn read_plain_buffer(
 
 pub fn page_to_vec(page: &Page, descriptor: &ColumnDescriptor) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
-    match page {
-        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+    match page.header() {
+        PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::Plain, None) => Ok(read_plain_buffer(
-                &page.buffer,
-                page.header.num_values as u32,
+                page.buffer(),
+                page.num_values() as u32,
                 (
-                    &page.header.definition_level_encoding,
+                    &header.definition_level_encoding,
                     descriptor.max_def_level(),
                 ),
             )),
