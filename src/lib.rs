@@ -174,7 +174,6 @@ mod tests {
             2 => Array::Binary(string_values.to_vec()),
             3 => Array::Boolean(bool_values.to_vec()),
             4 => Array::Int64(i64_values.to_vec()),
-            6 => Array::Binary(string_values.to_vec()),
             _ => unreachable!(),
         }
     }
@@ -190,7 +189,7 @@ mod tests {
             2 => (
                 Some(4),
                 Value::Binary(Some(b"".to_vec())),
-                Value::Binary(Some(b"Hello".to_vec())),
+                Value::Binary(Some(b"def".to_vec())),
             ),
             3 => (
                 Some(4),

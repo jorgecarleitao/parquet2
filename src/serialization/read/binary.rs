@@ -19,7 +19,7 @@ fn read_dict_buffer(
     let dict_values = dict.values();
     let dict_offsets = dict.offsets();
 
-    let (values, _) = consume_level(values, length, def_level_encoding);
+    let (values, levels) = consume_level(values, length, def_level_encoding);
 
     let bit_width = values[0];
     let values = &values[1..];
@@ -27,14 +27,19 @@ fn read_dict_buffer(
     let (_, consumed) = uleb128::decode(&values);
     let values = &values[consumed..];
 
-    let indices = bitpacking::Decoder::new(values, bit_width, length as usize);
+    let mut indices = bitpacking::Decoder::new(values, bit_width, length as usize);
 
-    indices
-        .map(|id| {
-            let id = id as usize;
-            let start = dict_offsets[id] as usize;
-            let end = dict_offsets[id + 1] as usize;
-            Some(dict_values[start..end].to_vec())
+    let is_valid = levels.into_iter().map(|x| x == def_level_encoding.1 as u32);
+    is_valid
+        .map(|is_valid| {
+            if is_valid {
+                let id = indices.next().unwrap() as usize;
+                let start = dict_offsets[id] as usize;
+                let end = dict_offsets[id + 1] as usize;
+                Some(dict_values[start..end].to_vec())
+            } else {
+                None
+            }
         })
         .collect()
 }
