@@ -29,7 +29,7 @@ pub trait Codec: std::fmt::Debug {
 
     /// Decompresses data stored in slice `input_buf` and writes output to `output_buf`.
     /// Returns the total number of bytes written.
-    fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize>;
+    fn decompress(&mut self, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()>;
 }
 
 /// Given the compression type `codec`, returns a codec used to compress and decompress
@@ -81,12 +81,13 @@ mod snappy_codec {
     }
 
     impl Codec for SnappyCodec {
-        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize> {
+        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
             let len = decompress_len(input_buf)?;
-            output_buf.resize(len, 0);
+            assert!(len <= output_buf.len());
             self.decoder
                 .decompress(input_buf, output_buf)
                 .map_err(|e| e.into())
+                .map(|_| ())
         }
 
         fn compress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<()> {
@@ -126,9 +127,9 @@ mod gzip_codec {
     }
 
     impl Codec for GZipCodec {
-        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize> {
+        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
             let mut decoder = read::GzDecoder::new(input_buf);
-            decoder.read_to_end(output_buf).map_err(|e| e.into())
+            decoder.read_exact(output_buf).map_err(|e| e.into())
         }
 
         fn compress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<()> {
@@ -165,9 +166,9 @@ mod brotli_codec {
     }
 
     impl Codec for BrotliCodec {
-        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize> {
+        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
             brotli::Decompressor::new(input_buf, BROTLI_DEFAULT_BUFFER_SIZE)
-                .read_to_end(output_buf)
+                .read_exact(output_buf)
                 .map_err(|e| e.into())
         }
 
@@ -207,21 +208,9 @@ mod lz4_codec {
     }
 
     impl Codec for Lz4Codec {
-        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize> {
+        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
             let mut decoder = lz4::Decoder::new(input_buf)?;
-            let mut total_len = 0;
-            loop {
-                let previous_len = output_buf.len();
-                output_buf.extend(std::iter::repeat(0).take(LZ4_BUFFER_SIZE));
-                let len =
-                    decoder.read(&mut output_buf[previous_len..previous_len + LZ4_BUFFER_SIZE])?;
-                total_len += len;
-                if len < LZ4_BUFFER_SIZE {
-                    output_buf.truncate(total_len);
-                    break;
-                }
-            }
-            Ok(total_len)
+            decoder.read_exact(output_buf).map_err(|e| e.into())
         }
 
         fn compress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<()> {
@@ -244,7 +233,8 @@ pub use lz4_codec::*;
 
 #[cfg(feature = "zstd")]
 mod zstd_codec {
-    use std::io::{self, Write};
+    use std::io::Read;
+    use std::io::Write;
 
     use crate::compression::Codec;
     use crate::error::Result;
@@ -264,12 +254,9 @@ mod zstd_codec {
     const ZSTD_COMPRESSION_LEVEL: i32 = 1;
 
     impl Codec for ZstdCodec {
-        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<usize> {
+        fn decompress(&mut self, input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
             let mut decoder = zstd::Decoder::new(input_buf)?;
-            match io::copy(&mut decoder, output_buf) {
-                Ok(n) => Ok(n as usize),
-                Err(e) => Err(e.into()),
-            }
+            decoder.read_exact(output_buf).map_err(|e| e.into())
         }
 
         fn compress(&mut self, input_buf: &[u8], output_buf: &mut Vec<u8>) -> Result<()> {
@@ -295,16 +282,13 @@ mod tests {
 
         // Compress with c1
         let mut compressed = Vec::new();
-        let mut decompressed = Vec::new();
         c1.compress(data, &mut compressed)
             .expect("Error when compressing");
 
         // Decompress with c2
-        let mut decompressed_size = c2
-            .decompress(compressed.as_slice(), &mut decompressed)
+        let mut decompressed = vec![0; data.len()];
+        c2.decompress(compressed.as_slice(), &mut decompressed)
             .expect("Error when decompressing");
-        assert_eq!(data.len(), decompressed_size);
-        decompressed.truncate(decompressed_size);
         assert_eq!(data, decompressed.as_slice());
 
         compressed.clear();
@@ -314,11 +298,8 @@ mod tests {
             .expect("Error when compressing");
 
         // Decompress with c1
-        decompressed_size = c1
-            .decompress(compressed.as_slice(), &mut decompressed)
+        c1.decompress(compressed.as_slice(), &mut decompressed)
             .expect("Error when decompressing");
-        assert_eq!(data.len(), decompressed_size);
-        decompressed.truncate(decompressed_size);
         assert_eq!(data, decompressed.as_slice());
     }
 

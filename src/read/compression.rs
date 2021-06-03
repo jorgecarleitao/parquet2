@@ -1,35 +1,21 @@
+use parquet_format::DataPageHeaderV2;
+
 use crate::compression::{create_codec, Codec};
-use crate::error::{ParquetError, Result};
+use crate::error::Result;
 
-use super::page::{CompressedPage, PageV1, PageV2};
-use super::Page;
+use super::page::{CompressedPage, PageHeader};
+use super::{Page, PageIterator, StreamingIterator};
 
-pub fn decompress(
-    buf: &[u8],
-    uncompressed_page_size: usize,
+fn decompress_v1(compressed: &[u8], decompressor: &mut dyn Codec, buffer: &mut [u8]) -> Result<()> {
+    decompressor.decompress(compressed, buffer)
+}
+
+fn decompress_v2(
+    compressed: &[u8],
+    page_header: &DataPageHeaderV2,
     decompressor: &mut dyn Codec,
-) -> Result<Vec<u8>> {
-    let mut decompressed_buffer = Vec::with_capacity(uncompressed_page_size);
-    let decompressed_size = decompressor.decompress(buf, &mut decompressed_buffer)?;
-    if decompressed_size != uncompressed_page_size {
-        return Err(general_err!(
-            "Actual decompressed size doesn't match the expected one ({} vs {})",
-            decompressed_size,
-            uncompressed_page_size
-        ));
-    }
-    Ok(decompressed_buffer)
-}
-
-fn decompress_v1(mut page: PageV1, decompressor: &mut dyn Codec) -> Result<PageV1> {
-    page.buffer = decompress(&page.buffer, page.uncompressed_page_size, decompressor)?;
-    Ok(page)
-}
-
-fn decompress_v2(mut page: PageV2, decompressor: &mut dyn Codec) -> Result<PageV2> {
-    let page_header = &page.header;
-    let uncompressed_page_size = &page.uncompressed_page_size;
-
+    buffer: &mut [u8],
+) -> Result<()> {
     // When processing data page v2, depending on enabled compression for the
     // page, we should account for uncompressed data ('offset') of
     // repetition and definition levels.
@@ -41,48 +27,131 @@ fn decompress_v2(mut page: PageV2, decompressor: &mut dyn Codec) -> Result<PageV
     // When is_compressed flag is missing the page is considered compressed
     let can_decompress = page_header.is_compressed.unwrap_or(true);
 
-    let uncompressed_len = uncompressed_page_size - offset;
-
     if can_decompress {
-        let mut decompressed_buffer = Vec::with_capacity(uncompressed_len);
-        let decompressed_size =
-            decompressor.decompress(&page.buffer[offset..], &mut decompressed_buffer)?;
-        if decompressed_size != uncompressed_len {
-            return Err(general_err!(
-                "Actual decompressed size doesn't match the expected one ({} vs {})",
-                decompressed_size,
-                uncompressed_len
-            ));
-        }
-        if offset == 0 {
-            page.buffer = decompressed_buffer;
-        } else {
-            // Prepend saved offsets to the buffer
-            page.buffer.truncate(offset);
-            page.buffer.append(&mut decompressed_buffer);
-        }
-    };
-    Ok(page)
+        buffer.copy_from_slice(&compressed[..offset]);
+
+        decompressor.decompress(&compressed[offset..], &mut buffer[offset..])?;
+    } else {
+        buffer.copy_from_slice(&compressed);
+    }
+    Ok(())
 }
 
-/// decompresses a page in place. This only changes the pages' internal buffer.
-pub fn decompress_page(page: CompressedPage) -> Result<Page> {
-    match page {
-        CompressedPage::V1(page) => {
-            let codec = create_codec(&page.compression)?;
-            if let Some(mut codec) = codec {
-                decompress_v1(page, codec.as_mut()).map(Page::V1)
-            } else {
-                Ok(Page::V1(page))
+/// decompresses a page.
+/// If `page.buffer.len() == 0`, there was no decompression and the buffer was moved.
+/// Else, decompression took place.
+pub fn decompress_buffer(
+    compressed_page: &mut CompressedPage,
+    buffer: &mut Vec<u8>,
+) -> Result<bool> {
+    let codec = create_codec(&compressed_page.compression())?;
+
+    if let Some(mut codec) = codec {
+        // the buffer must be decompressed; do it so now, writing the decompressed data into `buffer`
+        let compressed_buffer = &compressed_page.buffer;
+        buffer.resize(compressed_page.uncompressed_size(), 0);
+        match compressed_page.header() {
+            PageHeader::V1(_) => decompress_v1(compressed_buffer, codec.as_mut(), buffer)?,
+            PageHeader::V2(header) => {
+                decompress_v2(compressed_buffer, header, codec.as_mut(), buffer)?
             }
         }
-        CompressedPage::V2(page) => {
-            let codec = create_codec(&page.compression)?;
-            if let Some(mut codec) = codec {
-                decompress_v2(page, codec.as_mut()).map(Page::V2)
-            } else {
-                Ok(Page::V2(page))
-            }
+        Ok(true)
+    } else {
+        // page.buffer is already decompressed => swap it with `buffer`, making `page.buffer` the
+        // decompression buffer and `buffer` the decompressed buffer
+        std::mem::swap(&mut compressed_page.buffer, buffer);
+        Ok(false)
+    }
+}
+
+/// Decompresses the page, using `buffer` for decompression.
+pub fn decompress(mut compressed_page: CompressedPage, buffer: &mut Vec<u8>) -> Result<Page> {
+    decompress_buffer(&mut compressed_page, buffer)?;
+    Ok(Page::new(
+        compressed_page.header,
+        std::mem::take(buffer),
+        compressed_page.dictionary_page,
+        compressed_page.statistics,
+    ))
+}
+
+fn decompress_reuse<R: std::io::Read>(
+    mut compressed_page: CompressedPage,
+    iterator: &mut PageIterator<R>,
+    buffer: &mut Vec<u8>,
+    decompressions: &mut usize,
+) -> Result<Page> {
+    let was_decompressed = decompress_buffer(&mut compressed_page, buffer)?;
+
+    let new_page = Page::new(
+        compressed_page.header,
+        std::mem::take(buffer),
+        compressed_page.dictionary_page,
+        compressed_page.statistics,
+    );
+
+    if was_decompressed {
+        *decompressions += 1;
+    } else {
+        iterator.reuse_buffer(compressed_page.buffer)
+    }
+    Ok(new_page)
+}
+
+/// Decompressor that allows re-using the page buffer of [`PageIterator`]
+pub struct Decompressor<'a, R: std::io::Read> {
+    iter: PageIterator<'a, R>,
+    buffer: Vec<u8>,
+    current: Option<Result<Page>>,
+    decompressions: usize,
+}
+
+impl<'a, R: std::io::Read> Decompressor<'a, R> {
+    pub fn new(iter: PageIterator<'a, R>, buffer: Vec<u8>) -> Self {
+        Self {
+            iter,
+            buffer,
+            current: None,
+            decompressions: 0,
         }
+    }
+
+    pub fn into_buffers(mut self) -> (Vec<u8>, Vec<u8>) {
+        let mut a = self
+            .current
+            .map(|x| x.map(|x| x.buffer).unwrap_or_else(|_| Vec::new()))
+            .unwrap_or(self.iter.buffer);
+
+        if self.decompressions % 2 == 0 {
+            std::mem::swap(&mut a, &mut self.buffer)
+        };
+        (a, self.buffer)
+    }
+}
+
+impl<'a, R: std::io::Read> StreamingIterator for Decompressor<'a, R> {
+    type Item = Result<Page>;
+
+    fn advance(&mut self) {
+        if let Some(Ok(page)) = self.current.as_mut() {
+            self.buffer = std::mem::take(&mut page.buffer);
+        }
+
+        let next = self.iter.next().map(|x| {
+            x.and_then(|x| {
+                decompress_reuse(
+                    x,
+                    &mut self.iter,
+                    &mut self.buffer,
+                    &mut self.decompressions,
+                )
+            })
+        });
+        self.current = next;
+    }
+
+    fn get(&self) -> Option<&Self::Item> {
+        self.current.as_ref()
     }
 }

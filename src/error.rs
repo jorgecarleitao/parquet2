@@ -1,11 +1,13 @@
-#[derive(Debug)]
+use std::sync::Arc;
+
+#[derive(Debug, Clone)]
 pub enum ParquetError {
     /// General Parquet error.
     General(String),
     /// When the parquet file is known to be out of spec.
     OutOfSpec(String),
     // An error originating from a consumer or dependency
-    External(String, Box<dyn std::error::Error + Send + Sync>),
+    External(String, Arc<dyn std::error::Error + Send + Sync>),
 }
 
 impl std::error::Error for ParquetError {}
@@ -29,7 +31,7 @@ impl std::fmt::Display for ParquetError {
 impl ParquetError {
     /// Wraps an external error in an `ParquetError`.
     pub fn from_external_error(error: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::External("".to_string(), Box::new(error))
+        Self::External("".to_string(), Arc::new(error))
     }
 }
 

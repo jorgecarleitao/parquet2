@@ -7,6 +7,7 @@ use super::utils::ValuesDef;
 use crate::encoding::{bitpacking, uleb128};
 use crate::error::{ParquetError, Result};
 use crate::metadata::ColumnDescriptor;
+use crate::read::PageHeader;
 use crate::{
     read::{Page, PrimitivePageDict},
     types::NativeType,
@@ -69,14 +70,14 @@ pub fn page_dict_to_vec<T: NativeType>(
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<T>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
-    match page {
-        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+    match page.header() {
+        PageHeader::V1(header) => match (page.encoding(), page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer::<T>(
-                &page.buffer,
-                page.header.num_values as u32,
+                page.buffer(),
+                page.num_values() as u32,
                 dict.as_any().downcast_ref().unwrap(),
                 (
-                    &page.header.definition_level_encoding,
+                    &header.definition_level_encoding,
                     descriptor.max_def_level(),
                 ),
             )),
@@ -85,7 +86,7 @@ pub fn page_dict_to_vec<T: NativeType>(
             )),
             _ => todo!(),
         },
-        Page::V2(_) => todo!(),
+        PageHeader::V2(_) => todo!(),
     }
 }
 
@@ -94,18 +95,18 @@ pub fn page_to_vec<T: NativeType>(
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<T>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
-    match page {
-        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+    match page.header() {
+        PageHeader::V1(header) => match (&header.encoding, &page.dictionary_page()) {
             (Encoding::Plain, None) => Ok(read_buffer::<T>(
-                &page.buffer,
-                page.header.num_values as u32,
+                page.buffer(),
+                page.num_values() as u32,
                 (
-                    &page.header.definition_level_encoding,
+                    &header.definition_level_encoding,
                     descriptor.max_def_level(),
                 ),
             )),
             _ => todo!(),
         },
-        Page::V2(_) => todo!(),
+        PageHeader::V2(_) => todo!(),
     }
 }

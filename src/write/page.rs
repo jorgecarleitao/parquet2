@@ -1,15 +1,16 @@
 use std::io::{Seek, SeekFrom, Write};
 
-use parquet_format::{PageHeader, PageType};
+use parquet_format::{PageHeader as ParquetPageHeader, PageType};
 use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
 
 use crate::error::Result;
 use crate::read::CompressedPage;
+use crate::read::PageHeader;
 
 /// Contains page write metrics.
 pub struct PageWriteSpec {
-    pub header: PageHeader,
+    pub header: ParquetPageHeader,
     pub header_size: usize,
     pub offset: u64,
     pub bytes_written: u64,
@@ -25,10 +26,8 @@ pub fn write_page<W: Write + Seek>(
 
     let header_size = write_page_header(writer, &header)?;
 
-    match compressed_page {
-        CompressedPage::V1(page) => writer.write_all(&page.buffer),
-        CompressedPage::V2(page) => writer.write_all(&page.buffer),
-    }?;
+    writer.write_all(&compressed_page.buffer)?;
+
     let end_pos = writer.seek(SeekFrom::Current(0))?;
 
     Ok(PageWriteSpec {
@@ -39,11 +38,11 @@ pub fn write_page<W: Write + Seek>(
     })
 }
 
-fn assemble_page_header(compressed_page: &CompressedPage) -> PageHeader {
-    let mut page_header = PageHeader {
-        type_: match compressed_page {
-            CompressedPage::V1(_) => PageType::DataPage,
-            CompressedPage::V2(_) => PageType::DataPageV2,
+fn assemble_page_header(compressed_page: &CompressedPage) -> ParquetPageHeader {
+    let mut page_header = ParquetPageHeader {
+        type_: match compressed_page.header() {
+            PageHeader::V1(_) => PageType::DataPage,
+            PageHeader::V2(_) => PageType::DataPageV2,
         },
         uncompressed_page_size: compressed_page.uncompressed_size() as i32,
         compressed_page_size: compressed_page.compressed_size() as i32,
@@ -54,19 +53,22 @@ fn assemble_page_header(compressed_page: &CompressedPage) -> PageHeader {
         data_page_header_v2: None,
     };
 
-    match compressed_page {
-        CompressedPage::V1(page) => {
-            page_header.data_page_header = Some(page.header.clone());
+    match compressed_page.header() {
+        PageHeader::V1(header) => {
+            page_header.data_page_header = Some(header.clone());
         }
-        CompressedPage::V2(page) => {
-            page_header.data_page_header_v2 = Some(page.header.clone());
+        PageHeader::V2(header) => {
+            page_header.data_page_header_v2 = Some(header.clone());
         }
     }
     page_header
 }
 
 /// writes the page header into `writer`, returning the number of bytes used in the process.
-fn write_page_header<W: Write + Seek>(mut writer: &mut W, header: &PageHeader) -> Result<usize> {
+fn write_page_header<W: Write + Seek>(
+    mut writer: &mut W,
+    header: &ParquetPageHeader,
+) -> Result<usize> {
     let start_pos = writer.seek(SeekFrom::Current(0))?;
     {
         let mut protocol = TCompactOutputProtocol::new(&mut writer);

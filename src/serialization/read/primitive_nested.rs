@@ -5,6 +5,7 @@ use parquet_format::Encoding;
 use super::{levels, Array};
 use crate::encoding::{bitpacking, uleb128};
 use crate::metadata::ColumnDescriptor;
+use crate::read::PageHeader;
 use crate::{
     error::{ParquetError, Result},
     read::PrimitivePageDict,
@@ -85,23 +86,23 @@ fn read_array<'a, T: NativeType>(
 }
 
 pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) -> Result<Array> {
-    match page {
-        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+    match page.header() {
+        PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::Plain, None) => Ok(read_array::<T>(
-                &page.buffer,
-                page.header.num_values as u32,
+                page.buffer(),
+                page.num_values() as u32,
                 (
-                    &page.header.repetition_level_encoding,
+                    &header.repetition_level_encoding,
                     descriptor.max_rep_level(),
                 ),
                 (
-                    &page.header.definition_level_encoding,
+                    &header.definition_level_encoding,
                     descriptor.max_def_level(),
                 ),
             )),
             _ => todo!(),
         },
-        Page::V2(_) => todo!(),
+        PageHeader::V2(_) => todo!(),
     }
 }
 
@@ -141,18 +142,18 @@ pub fn page_dict_to_array<T: NativeType>(
     descriptor: &ColumnDescriptor,
 ) -> Result<Array> {
     assert_eq!(descriptor.max_rep_level(), 1);
-    match page {
-        Page::V1(page) => match (&page.header.encoding, &page.dictionary_page) {
+    match page.header() {
+        PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_array(
-                &page.buffer,
-                page.header.num_values as u32,
+                &page.buffer(),
+                page.num_values() as u32,
                 dict.as_any().downcast_ref().unwrap(),
                 (
-                    &page.header.repetition_level_encoding,
+                    &header.repetition_level_encoding,
                     descriptor.max_rep_level(),
                 ),
                 (
-                    &page.header.definition_level_encoding,
+                    &header.definition_level_encoding,
                     descriptor.max_def_level(),
                 ),
             )),
@@ -161,6 +162,6 @@ pub fn page_dict_to_array<T: NativeType>(
             )),
             _ => todo!(),
         },
-        Page::V2(_) => todo!(),
+        PageHeader::V2(_) => todo!(),
     }
 }

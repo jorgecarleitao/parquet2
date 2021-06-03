@@ -10,12 +10,10 @@ mod utils;
 pub mod levels;
 
 use crate::error::{ParquetError, Result};
+use crate::metadata::ColumnDescriptor;
+use crate::read::Page;
 use crate::schema::types::ParquetType;
 use crate::schema::types::PhysicalType;
-use crate::{
-    metadata::ColumnDescriptor,
-    read::{decompress_page, CompressedPage},
-};
 
 // The dynamic representation of values in native Rust. This is not exaustive.
 // todo: maybe refactor this into serde/json?
@@ -49,9 +47,7 @@ pub enum Value {
 
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
-pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Result<Array> {
-    let page = decompress_page(page)?;
-
+pub fn page_to_array(page: &Page, descriptor: &ColumnDescriptor) -> Result<Array> {
     match (descriptor.type_(), descriptor.max_rep_level()) {
         (ParquetType::PrimitiveType { physical_type, .. }, 0) => match page.dictionary_page() {
             Some(_) => match physical_type {
@@ -115,49 +111,50 @@ pub fn page_to_array(page: CompressedPage, descriptor: &ColumnDescriptor) -> Res
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use std::fs::File;
+    use streaming_iterator::StreamingIterator;
 
     use crate::read::{
-        get_page_iterator, read_metadata, BinaryStatistics, PrimitiveStatistics, Statistics,
+        get_page_iterator, read_metadata, BinaryStatistics, Decompressor, PrimitiveStatistics,
+        Statistics,
     };
     use crate::tests::*;
     use crate::types::int96_to_i64_ns;
 
     use super::*;
-    use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage};
+    use crate::error::Result;
 
-    fn prepare(
-        path: &str,
+    pub fn read_column<R: std::io::Read + std::io::Seek>(
+        reader: &mut R,
         row_group: usize,
         column: usize,
-    ) -> Result<(ColumnDescriptor, Vec<CompressedPage>)> {
-        let mut file = File::open(path).unwrap();
-
-        let metadata = read_metadata(&mut file)?;
+    ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
+        let metadata = read_metadata(reader)?;
         let descriptor = metadata.row_groups[row_group]
             .column(column)
             .descriptor()
             .clone();
-        Ok((
-            descriptor,
-            get_page_iterator(&metadata, row_group, column, &mut file)?
-                .collect::<Result<Vec<_>>>()?,
-        ))
+
+        let iterator = get_page_iterator(&metadata, row_group, column, reader, vec![])?;
+
+        let buffer = vec![];
+        let mut iterator = Decompressor::new(iterator, buffer);
+
+        let decompressed_page = iterator.next().unwrap().as_ref().unwrap();
+
+        let statistics = decompressed_page.statistics().cloned();
+        let array = page_to_array(decompressed_page, &descriptor)?;
+
+        Ok((array, statistics))
     }
 
     fn get_column(
         path: &str,
         column: usize,
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
-        let (descriptor, mut pages) = prepare(path, 0, column)?;
-        assert_eq!(pages.len(), 1);
-
-        let page = pages.pop().unwrap();
-
-        let statistics = page.statistics().cloned();
-
-        Ok((page_to_array(page, &descriptor)?, statistics))
+        let mut file = File::open(path).unwrap();
+        read_column(&mut file, 0, column)
     }
 
     fn test_column(column: usize) -> Result<()> {

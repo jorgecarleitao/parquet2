@@ -23,39 +23,17 @@ pub fn array_to_page(array: &Array) -> Result<CompressedPage> {
 mod tests {
     use std::io::{Cursor, Read, Seek};
 
-    use crate::read::{get_page_iterator, read_metadata};
     use crate::tests::alltypes_plain;
     use crate::write::write_file;
 
     use crate::metadata::SchemaDescriptor;
-    use crate::serialization::read::page_to_array;
 
     use super::*;
-    use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage};
-
-    fn get_pages<R: Read + Seek>(
-        reader: &mut R,
-        row_group: usize,
-        column: usize,
-    ) -> Result<(ColumnDescriptor, Vec<CompressedPage>)> {
-        let metadata = read_metadata(reader)?;
-        let descriptor = metadata.row_groups[row_group]
-            .column(column)
-            .descriptor()
-            .clone();
-        Ok((
-            descriptor,
-            get_page_iterator(&metadata, row_group, column, reader)?.collect::<Result<Vec<_>>>()?,
-        ))
-    }
+    use crate::error::Result;
 
     fn read_column<R: Read + Seek>(reader: &mut R) -> Result<Array> {
-        let (descriptor, mut pages) = get_pages(reader, 0, 0)?;
-        assert_eq!(pages.len(), 1);
-
-        let page = pages.pop().unwrap();
-
-        page_to_array(page, &descriptor)
+        let (a, _) = super::super::read::tests::read_column(reader, 0, 0)?;
+        Ok(a)
     }
 
     fn test_column(column: usize) -> Result<()> {

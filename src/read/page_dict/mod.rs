@@ -14,8 +14,6 @@ use crate::compression::create_codec;
 use crate::error::{ParquetError, Result};
 use crate::schema::types::PhysicalType;
 
-use super::compression::decompress;
-
 /// A dynamic trait describing a decompressed and decoded Dictionary Page.
 pub trait PageDict: std::fmt::Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
@@ -24,19 +22,28 @@ pub trait PageDict: std::fmt::Debug + Send + Sync {
 }
 
 pub fn read_page_dict(
-    buf: Vec<u8>,
+    buf: &[u8],
     num_values: u32,
     compression: (CompressionCodec, usize),
     is_sorted: bool,
     physical_type: PhysicalType,
 ) -> Result<Arc<dyn PageDict>> {
     let decompressor = create_codec(&compression.0)?;
-    let buf = if let Some(mut decompressor) = decompressor {
-        decompress(&buf, compression.1, decompressor.as_mut())?
+    if let Some(mut decompressor) = decompressor {
+        let mut decompressed = vec![0; compression.1];
+        decompressor.decompress(buf, &mut decompressed)?;
+        deserialize(&decompressed, num_values, is_sorted, physical_type)
     } else {
-        buf
-    };
+        deserialize(buf, num_values, is_sorted, physical_type)
+    }
+}
 
+fn deserialize(
+    buf: &[u8],
+    num_values: u32,
+    is_sorted: bool,
+    physical_type: PhysicalType,
+) -> Result<Arc<dyn PageDict>> {
     match physical_type {
         PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
             "Boolean physical type cannot be dictionary-encoded".to_string(),

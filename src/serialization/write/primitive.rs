@@ -1,6 +1,7 @@
 use parquet_format::{CompressionCodec, DataPageHeader, Encoding};
 
-use crate::{compression::create_codec, encoding::hybrid_rle::encode, error::Result, read::PageV1};
+use crate::read::PageHeader;
+use crate::{compression::create_codec, encoding::hybrid_rle::encode, error::Result};
 use crate::{read::CompressedPage, types::NativeType};
 
 fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)> {
@@ -63,12 +64,12 @@ pub fn array_to_page_v1<T: NativeType>(
         statistics: None,
     };
 
-    Ok(CompressedPage::V1(PageV1 {
+    Ok(CompressedPage::new(
+        PageHeader::V1(header),
         buffer,
-        header,
         compression,
         uncompressed_page_size,
-        dictionary_page: None,
-        statistics: None,
-    }))
+        None,
+        None,
+    ))
 }
