@@ -352,20 +352,8 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[ignore = "optional strings are not yet supported, see https://github.com/jorgecarleitao/parquet2/pull/7"]
     fn pyarrow_v1_dict_string_optional() -> Result<()> {
         test_pyarrow_integration("basic", 2, 1, false)
-    }
-
-    #[test]
-    fn pyarrow_v1_non_dict_string_required() -> Result<()> {
-        test_pyarrow_integration("basic", 6, 1, true)
-    }
-
-    #[test]
-    #[ignore = "optional non dictionary encoded strings seem to be written incorrectly by pyarrow, neither pyarrow itself nor rust parquet1 can read the generated file"]
-    fn pyarrow_v1_non_dict_string_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 6, 1, false)
     }
 
     #[test]
