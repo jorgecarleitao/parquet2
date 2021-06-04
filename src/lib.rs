@@ -8,6 +8,7 @@ pub mod metadata;
 pub mod read;
 pub mod schema;
 pub mod serialization;
+pub mod statistics;
 pub mod types;
 pub mod write;
 
@@ -20,8 +21,12 @@ const DEFAULT_FOOTER_READ_SIZE: u64 = 64 * 1024;
 #[cfg(test)]
 mod tests {
     use std::path::PathBuf;
+    use std::sync::Arc;
 
-    use crate::serialization::read::{Array, Value};
+    use crate::{
+        serialization::read::{Array, Value},
+        statistics::*,
+    };
 
     pub fn get_path() -> PathBuf {
         let dir = env!("CARGO_MANIFEST_DIR");
@@ -109,6 +114,64 @@ mod tests {
                 let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
                 Array::Binary(expected)
             }
+            10 => {
+                // timestamp_col
+                todo!()
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
+        match column {
+            0 => Arc::new(PrimitiveStatistics::<i32> {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(0),
+                max_value: Some(7),
+            }),
+            1 => Arc::new(BooleanStatistics {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(false),
+                max_value: Some(true),
+            }),
+            2 | 3 | 4 => Arc::new(PrimitiveStatistics::<i32> {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(0),
+                max_value: Some(1),
+            }),
+            5 => Arc::new(PrimitiveStatistics::<i64> {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(0),
+                max_value: Some(10),
+            }),
+            6 => Arc::new(PrimitiveStatistics::<f32> {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(0.0),
+                max_value: Some(1.1),
+            }),
+            7 => Arc::new(PrimitiveStatistics::<f64> {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(0.0),
+                max_value: Some(10.1),
+            }),
+            8 => Arc::new(BinaryStatistics {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![48, 49, 47, 48, 49, 47, 48, 57]),
+                max_value: Some(vec![48, 52, 47, 48, 49, 47, 48, 57]),
+            }),
+            9 => Arc::new(BinaryStatistics {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![48]),
+                max_value: Some(vec![49]),
+            }),
             10 => {
                 // timestamp_col
                 todo!()

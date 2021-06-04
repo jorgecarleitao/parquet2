@@ -3,7 +3,6 @@ mod metadata;
 mod page;
 mod page_dict;
 mod page_iterator;
-mod statistics;
 
 pub use streaming_iterator;
 pub use streaming_iterator::StreamingIterator;
@@ -20,7 +19,6 @@ use crate::{error::Result, metadata::FileMetaData};
 pub use page::{CompressedPage, Page, PageHeader};
 pub use page_dict::{BinaryPageDict, FixedLenByteArrayPageDict, PageDict, PrimitivePageDict};
 pub use page_iterator::PageIterator;
-pub use statistics::*;
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true

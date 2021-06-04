@@ -5,7 +5,7 @@ use parquet_format::Statistics as ParquetStatistics;
 use super::Statistics;
 use crate::{error::Result, schema::types::PhysicalType};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct BinaryStatistics {
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
@@ -24,11 +24,21 @@ impl Statistics for BinaryStatistics {
 }
 
 pub fn read(v: &ParquetStatistics) -> Result<Arc<dyn Statistics>> {
-    //
     Ok(Arc::new(BinaryStatistics {
         null_count: v.null_count,
         distinct_count: v.distinct_count,
         max_value: v.max_value.clone(),
         min_value: v.min_value.clone(),
     }))
+}
+
+pub fn write(v: &BinaryStatistics) -> ParquetStatistics {
+    ParquetStatistics {
+        null_count: v.null_count,
+        distinct_count: v.distinct_count,
+        max_value: v.max_value.clone(),
+        min_value: v.min_value.clone(),
+        min: None,
+        max: None,
+    }
 }

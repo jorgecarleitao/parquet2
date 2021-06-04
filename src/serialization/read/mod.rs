@@ -115,10 +115,8 @@ pub(crate) mod tests {
     use std::fs::File;
     use streaming_iterator::StreamingIterator;
 
-    use crate::read::{
-        get_page_iterator, read_metadata, BinaryStatistics, Decompressor, PrimitiveStatistics,
-        Statistics,
-    };
+    use crate::read::{get_page_iterator, read_metadata, Decompressor};
+    use crate::statistics::{BinaryStatistics, PrimitiveStatistics, Statistics};
     use crate::tests::*;
     use crate::types::int96_to_i64_ns;
 

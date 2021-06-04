@@ -3,6 +3,7 @@ mod column_chunk;
 mod file;
 mod page;
 mod row_group;
+pub(self) mod statistics;
 
 pub use file::write_file;
 

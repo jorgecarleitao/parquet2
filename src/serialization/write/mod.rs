@@ -22,22 +22,25 @@ pub fn array_to_page(array: &Array, descriptor: &ColumnDescriptor) -> Result<Com
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Read, Seek};
+    use std::sync::Arc;
 
-    use crate::tests::alltypes_plain;
+    use crate::tests::{alltypes_plain, alltypes_statistics};
     use crate::write::write_file;
 
     use crate::metadata::SchemaDescriptor;
+    use crate::statistics::Statistics;
 
     use super::*;
     use crate::error::Result;
 
-    fn read_column<R: Read + Seek>(reader: &mut R) -> Result<Array> {
-        let (a, _) = super::super::read::tests::read_column(reader, 0, 0)?;
-        Ok(a)
+    fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn Statistics>>)> {
+        let (a, statistics) = super::super::read::tests::read_column(reader, 0, 0)?;
+        Ok((a, statistics))
     }
 
     fn test_column(column: usize) -> Result<()> {
         let array = alltypes_plain(column);
+        let stats = alltypes_statistics(column);
 
         // prepare schema
         let a = match array {
@@ -71,8 +74,12 @@ mod tests {
 
         let data = writer.into_inner();
 
-        let result = read_column(&mut Cursor::new(data))?;
+        let (result, statistics) = read_column(&mut Cursor::new(data))?;
         assert_eq!(array, result);
+        assert_eq!(
+            statistics.as_ref().map(|x| x.as_ref()),
+            Some(stats).as_ref().map(|x| x.as_ref())
+        );
         Ok(())
     }
 

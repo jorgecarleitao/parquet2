@@ -6,9 +6,8 @@ use parquet_format::{CompressionCodec, DataPageHeader, DataPageHeaderV2};
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
-use super::deserialize_statistics;
 use super::page_dict::PageDict;
-use super::Statistics;
+use crate::statistics::{deserialize_statistics, Statistics};
 
 /// A [`CompressedPage`] is compressed, encoded representation of a Parquet page. It holds actual data
 /// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it

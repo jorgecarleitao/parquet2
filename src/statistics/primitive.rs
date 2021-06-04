@@ -9,7 +9,7 @@ use crate::{
     schema::types::PhysicalType,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PrimitiveStatistics<T: types::NativeType> {
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
@@ -49,4 +49,15 @@ pub fn read<T: types::NativeType>(v: &ParquetStatistics) -> Result<Arc<dyn Stati
         max_value: v.max_value.as_ref().map(|x| types::decode(&x)),
         min_value: v.min_value.as_ref().map(|x| types::decode(&x)),
     }))
+}
+
+pub fn write<T: types::NativeType>(v: &PrimitiveStatistics<T>) -> ParquetStatistics {
+    ParquetStatistics {
+        null_count: v.null_count,
+        distinct_count: v.distinct_count,
+        max_value: v.max_value.map(|x| x.to_le_bytes().as_ref().to_vec()),
+        min_value: v.min_value.map(|x| x.to_le_bytes().as_ref().to_vec()),
+        min: None,
+        max: None,
+    }
 }
