@@ -124,7 +124,6 @@ fn build_tree<'a>(
                 max_def_level,
                 max_rep_level,
                 path_in_schema,
-                base_tp.clone(),
             ));
         }
         ParquetType::GroupType { ref fields, .. } => {
