@@ -1,20 +1,21 @@
 pub(crate) mod primitive;
 
-use parquet_format::CompressionCodec;
-
-use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage};
+use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions};
 
 use super::read::Array;
 
-pub fn array_to_page(array: &Array, descriptor: &ColumnDescriptor) -> Result<CompressedPage> {
+pub fn array_to_page(
+    array: &Array,
+    options: &WriteOptions,
+    descriptor: &ColumnDescriptor,
+) -> Result<CompressedPage> {
     // using plain encoding format
-    let compression = CompressionCodec::Uncompressed;
     match array {
-        Array::Int32(array) => primitive::array_to_page_v1(&array, compression, descriptor),
-        Array::Int64(array) => primitive::array_to_page_v1(&array, compression, descriptor),
-        Array::Int96(array) => primitive::array_to_page_v1(&array, compression, descriptor),
-        Array::Float32(array) => primitive::array_to_page_v1(&array, compression, descriptor),
-        Array::Float64(array) => primitive::array_to_page_v1(&array, compression, descriptor),
+        Array::Int32(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Int64(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Int96(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Float32(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Float64(array) => primitive::array_to_page_v1(&array, options, descriptor),
         _ => todo!(),
     }
 }
@@ -27,6 +28,7 @@ mod tests {
     use crate::tests::{alltypes_plain, alltypes_statistics};
     use crate::write::write_file;
 
+    use crate::compression::CompressionCodec;
     use crate::metadata::SchemaDescriptor;
     use crate::statistics::Statistics;
 
@@ -41,6 +43,11 @@ mod tests {
     fn test_column(column: usize) -> Result<()> {
         let array = alltypes_plain(column);
         let stats = alltypes_statistics(column);
+
+        let options = WriteOptions {
+            write_statistics: true,
+            compression: CompressionCodec::Uncompressed,
+        };
 
         // prepare schema
         let a = match array {
@@ -59,18 +66,11 @@ mod tests {
         let a = schema.columns();
 
         let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(array_to_page(
-            &array, &a[0],
+            &array, &options, &a[0],
         ))))));
 
         let mut writer = Cursor::new(vec![]);
-        write_file(
-            &mut writer,
-            row_groups,
-            schema,
-            CompressionCodec::Uncompressed,
-            None,
-            None,
-        )?;
+        write_file(&mut writer, row_groups, schema, options, None, None)?;
 
         let data = writer.into_inner();
 
