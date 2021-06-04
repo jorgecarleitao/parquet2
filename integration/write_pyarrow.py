@@ -81,10 +81,13 @@ def case_nested(size):
     )
 
 
-def write_pyarrow(case, size=1, page_version=1):
+def write_pyarrow(case, size=1, page_version=1, use_dictionary=False):
     data, schema, path = case(size)
 
-    base_path = f"{PYARROW_PATH}/v{page_version}"
+    if use_dictionary:
+        base_path = f"{PYARROW_PATH}/v{page_version}/dict"
+    else:
+        base_path = f"{PYARROW_PATH}/v{page_version}/non_dict"
 
     t = pa.table(data, schema=schema)
     os.makedirs(base_path, exist_ok=True)
@@ -92,6 +95,7 @@ def write_pyarrow(case, size=1, page_version=1):
         t,
         f"{base_path}/{path}",
         data_page_version=f"{page_version}.0",
+        use_dictionary=use_dictionary,
     )
 
 
@@ -102,3 +106,10 @@ write_pyarrow(case_basic_required, 1, 1)  # V1
 write_pyarrow(case_basic_required, 1, 2)  # V2
 
 write_pyarrow(case_nested, 1, 1)
+
+write_pyarrow(case_basic_nullable, 1, 1, True)  # V1
+write_pyarrow(case_basic_nullable, 1, 2, True)  # V2
+write_pyarrow(case_basic_required, 1, 1, True)  # V1
+write_pyarrow(case_basic_required, 1, 2, True)  # V2
+
+write_pyarrow(case_nested, 1, 1, True)
