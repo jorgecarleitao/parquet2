@@ -295,21 +295,19 @@ mod tests {
         column: usize,
         version: usize,
         required: bool,
+        use_dictionary: bool,
     ) -> Result<()> {
         if std::env::var("PARQUET2_IGNORE_PYARROW_TESTS").is_ok() {
             return Ok(());
         }
-        let path = if required {
-            format!(
-                "fixtures/pyarrow3/v{}/{}_{}_10.parquet",
-                version, file, "required"
-            )
-        } else {
-            format!(
-                "fixtures/pyarrow3/v{}/{}_{}_10.parquet",
-                version, file, "nullable"
-            )
-        };
+        let required_s = if required { "required" } else { "nullable" };
+        let use_dictionary_s = if use_dictionary { "dict" } else { "non_dict" };
+
+        let path = format!(
+            "fixtures/pyarrow3/v{}/{}/{}_{}_10.parquet",
+            version, use_dictionary_s, file, required_s
+        );
+
         let (array, statistics) = get_column(&path, column)?;
 
         let expected = if file == "basic" {
@@ -340,27 +338,52 @@ mod tests {
     }
 
     #[test]
-    fn pyarrow_v1_int32_required() -> Result<()> {
-        test_pyarrow_integration("basic", 0, 1, true)
+    fn pyarrow_v1_dict_int32_required() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, true, true)
     }
 
     #[test]
-    fn pyarrow_v1_int32_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 0, 1, false)
+    fn pyarrow_v1_dict_int32_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, false, true)
+    }
+
+    #[test]
+    fn pyarrow_v1_non_dict_int32_required() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, true, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_non_dict_int32_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, false, false)
     }
 
     #[test]
     fn pyarrow_v1_dict_string_required() -> Result<()> {
-        test_pyarrow_integration("basic", 2, 1, true)
+        test_pyarrow_integration("basic", 2, 1, true, true)
     }
 
     #[test]
     fn pyarrow_v1_dict_string_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 2, 1, false)
+        test_pyarrow_integration("basic", 2, 1, false, true)
     }
 
     #[test]
-    fn pyarrow_v1_list_nullable() -> Result<()> {
-        test_pyarrow_integration("nested", 0, 1, false)
+    fn pyarrow_v1_non_dict_string_required() -> Result<()> {
+        test_pyarrow_integration("basic", 2, 1, true, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_non_dict_string_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 2, 1, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_dict_list_optional() -> Result<()> {
+        test_pyarrow_integration("nested", 0, 1, false, true)
+    }
+
+    #[test]
+    fn pyarrow_v1_non_dict_list_optional() -> Result<()> {
+        test_pyarrow_integration("nested", 0, 1, false, false)
     }
 }
