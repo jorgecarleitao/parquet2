@@ -8,6 +8,7 @@ pub(self) mod statistics;
 pub use file::write_file;
 use parquet_format::CompressionCodec;
 
+#[derive(Debug, Copy, Clone)]
 pub struct WriteOptions {
     pub write_statistics: bool,
     pub compression: CompressionCodec,

@@ -72,7 +72,7 @@ where
         .map(|row_group| {
             write_row_group(
                 writer,
-                &schema,
+                schema.columns(),
                 options.compression,
                 row_group.map_err(ParquetError::from_external_error)?,
             )

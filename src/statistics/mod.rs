@@ -5,13 +5,10 @@ mod primitive;
 
 use std::{any::Any, sync::Arc};
 
-use parquet_format::Statistics as ParquetStatistics;
+pub use parquet_format::Statistics as ParquetStatistics;
 
-use crate::{error::Result, metadata::FileMetaData};
-use crate::{
-    metadata::ColumnChunkMetaData,
-    schema::types::{ParquetType, PhysicalType},
-};
+use crate::error::Result;
+use crate::schema::types::PhysicalType;
 
 pub use binary::BinaryStatistics;
 pub use boolean::BooleanStatistics;
@@ -110,45 +107,6 @@ pub fn deserialize_statistics(
         PhysicalType::ByteArray => binary::read(statistics),
         PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(statistics, *size),
     }
-}
-
-/// Deserializes statistics in a column chunk.
-/// # Error
-/// Errors when the statistics cannot be deserialized. `None` when the statistics
-/// is not available.
-pub fn deserialize_column_statistics(
-    column: &ColumnChunkMetaData,
-) -> Result<Option<Arc<dyn Statistics>>> {
-    let physical_type = match column.descriptor().type_() {
-        ParquetType::PrimitiveType { physical_type, .. } => physical_type,
-        _ => unreachable!(),
-    };
-    column
-        .statistics()
-        .as_ref()
-        .map(|statistics| deserialize_statistics(&statistics, physical_type))
-        .transpose()
-}
-
-/// Deserializes all row groups' statistics, converting them into [`Statistics`].
-/// The first `Vec` corresponds to row groups, the second to columns.
-/// Errors emerge when the statistics cannot be deserialized. Options emerge when the statistics
-/// are not available.
-/// # Implementation
-/// This operation has no IO and amounts to deserializing all statistics.
-#[allow(clippy::type_complexity)]
-pub fn read_statistics(metadata: &FileMetaData) -> Vec<Vec<Result<Option<Arc<dyn Statistics>>>>> {
-    metadata
-        .row_groups
-        .iter()
-        .map(|row_group| {
-            row_group
-                .columns()
-                .iter()
-                .map(deserialize_column_statistics)
-                .collect::<Vec<_>>()
-        })
-        .collect()
 }
 
 /// Serializes [`Statistics`] into a raw parquet statistics.
