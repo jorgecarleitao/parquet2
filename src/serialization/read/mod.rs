@@ -141,10 +141,10 @@ pub(crate) mod tests {
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
-        let decompressed_page = iterator.next().unwrap().as_ref().unwrap();
+        let page = iterator.next().unwrap().as_ref().unwrap();
 
-        let statistics = decompressed_page.statistics().cloned();
-        let array = page_to_array(decompressed_page, &descriptor)?;
+        let statistics = page.statistics().transpose()?;
+        let array = page_to_array(page, &descriptor)?;
 
         Ok((array, statistics))
     }

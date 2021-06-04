@@ -31,11 +31,11 @@ mod tests {
 
         let compression = parquet_format::CompressionCodec::Uncompressed;
 
-        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(
-            array_to_page_v1(&array, compression),
-        )))));
-
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
+
+        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(
+            array_to_page_v1(&array, compression, &schema.columns()[0]),
+        )))));
 
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, compression, None, None)?;

@@ -3,8 +3,12 @@ use std::sync::Arc;
 use parquet_format::Encoding;
 use parquet_format::{CompressionCodec, DataPageHeader, DataPageHeaderV2};
 
+use crate::error::Result;
+use crate::metadata::ColumnDescriptor;
+
+use super::deserialize_statistics;
 use super::page_dict::PageDict;
-use super::statistics::Statistics;
+use super::Statistics;
 
 /// A [`CompressedPage`] is compressed, encoded representation of a Parquet page. It holds actual data
 /// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
@@ -16,7 +20,7 @@ pub struct CompressedPage {
     compression: CompressionCodec,
     uncompressed_page_size: usize,
     pub(crate) dictionary_page: Option<Arc<dyn PageDict>>,
-    pub(crate) statistics: Option<Arc<dyn Statistics>>,
+    pub(crate) descriptor: ColumnDescriptor,
 }
 
 impl CompressedPage {
@@ -26,7 +30,7 @@ impl CompressedPage {
         compression: CompressionCodec,
         uncompressed_page_size: usize,
         dictionary_page: Option<Arc<dyn PageDict>>,
-        statistics: Option<Arc<dyn Statistics>>,
+        descriptor: ColumnDescriptor,
     ) -> Self {
         Self {
             header,
@@ -34,7 +38,7 @@ impl CompressedPage {
             compression,
             uncompressed_page_size,
             dictionary_page,
-            statistics,
+            descriptor,
         }
     }
 
@@ -44,10 +48,6 @@ impl CompressedPage {
 
     pub fn uncompressed_size(&self) -> usize {
         self.uncompressed_page_size
-    }
-
-    pub fn statistics(&self) -> Option<&Arc<dyn Statistics>> {
-        self.statistics.as_ref()
     }
 
     pub fn compressed_size(&self) -> usize {
@@ -63,6 +63,24 @@ impl CompressedPage {
             PageHeader::V1(d) => d.num_values as usize,
             PageHeader::V2(d) => d.num_values as usize,
         }
+    }
+
+    /// Decodes the raw statistics into a statistics
+    pub fn statistics(&self) -> Option<Result<Arc<dyn Statistics>>> {
+        match &self.header {
+            PageHeader::V1(d) => d
+                .statistics
+                .as_ref()
+                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+            PageHeader::V2(d) => d
+                .statistics
+                .as_ref()
+                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+        }
+    }
+
+    pub fn descriptor(&self) -> &ColumnDescriptor {
+        &self.descriptor
     }
 }
 
@@ -80,7 +98,7 @@ pub struct Page {
     header: PageHeader,
     pub(super) buffer: Vec<u8>,
     dictionary_page: Option<Arc<dyn PageDict>>,
-    statistics: Option<Arc<dyn Statistics>>,
+    descriptor: ColumnDescriptor,
 }
 
 impl Page {
@@ -88,18 +106,14 @@ impl Page {
         header: PageHeader,
         buffer: Vec<u8>,
         dictionary_page: Option<Arc<dyn PageDict>>,
-        statistics: Option<Arc<dyn Statistics>>,
+        descriptor: ColumnDescriptor,
     ) -> Self {
         Self {
             header,
             buffer,
             dictionary_page,
-            statistics,
+            descriptor,
         }
-    }
-
-    pub fn statistics(&self) -> Option<&Arc<dyn Statistics>> {
-        self.statistics.as_ref()
     }
 
     pub fn header(&self) -> &PageHeader {
@@ -126,6 +140,24 @@ impl Page {
             PageHeader::V1(d) => d.encoding,
             PageHeader::V2(d) => d.encoding,
         }
+    }
+
+    /// Decodes the raw statistics into a statistics
+    pub fn statistics(&self) -> Option<Result<Arc<dyn Statistics>>> {
+        match &self.header {
+            PageHeader::V1(d) => d
+                .statistics
+                .as_ref()
+                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+            PageHeader::V2(d) => d
+                .statistics
+                .as_ref()
+                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+        }
+    }
+
+    pub fn descriptor(&self) -> &ColumnDescriptor {
+        &self.descriptor
     }
 }
 

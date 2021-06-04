@@ -72,7 +72,7 @@ pub fn decompress(mut compressed_page: CompressedPage, buffer: &mut Vec<u8>) -> 
         compressed_page.header,
         std::mem::take(buffer),
         compressed_page.dictionary_page,
-        compressed_page.statistics,
+        compressed_page.descriptor,
     ))
 }
 
@@ -88,7 +88,7 @@ fn decompress_reuse<R: std::io::Read>(
         compressed_page.header,
         std::mem::take(buffer),
         compressed_page.dictionary_page,
-        compressed_page.statistics,
+        compressed_page.descriptor,
     );
 
     if was_decompressed {

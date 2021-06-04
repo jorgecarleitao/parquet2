@@ -53,7 +53,7 @@ pub fn get_page_iterator<'a, RR: Read + Seek>(
         reader,
         column_metadata.num_values(),
         *column_metadata.compression(),
-        column_metadata.physical_type(),
+        column_metadata.descriptor().clone(),
         buffer,
     ))
 }

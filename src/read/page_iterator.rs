@@ -4,12 +4,11 @@ use parquet_format::{CompressionCodec, PageHeader as ParquetPageHeader, PageType
 use thrift::protocol::TCompactInputProtocol;
 
 use crate::error::Result;
-use crate::schema::types::PhysicalType;
+use crate::metadata::ColumnDescriptor;
 
 use super::page::CompressedPage;
 use super::page::PageHeader;
 use super::page_dict::{read_page_dict, PageDict};
-use super::statistics::deserialize_statistics;
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -29,7 +28,7 @@ pub struct PageIterator<'a, R: Read> {
     // Arc: it will be shared between multiple pages and pages should be Send + Sync.
     current_dictionary: Option<Arc<dyn PageDict>>,
 
-    physical_type: PhysicalType,
+    descriptor: ColumnDescriptor,
 
     // The currently allocated buffer.
     pub(crate) buffer: Vec<u8>,
@@ -40,7 +39,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
         reader: &'a mut R,
         total_num_values: i64,
         compression: CompressionCodec,
-        physical_type: PhysicalType,
+        descriptor: ColumnDescriptor,
         buffer: Vec<u8>,
     ) -> Self {
         Self {
@@ -49,7 +48,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
             compression,
             seen_num_values: 0,
             current_dictionary: None,
-            physical_type,
+            descriptor,
             buffer,
         }
     }
@@ -127,7 +126,7 @@ fn build_page<R: Read>(
                     page_header.uncompressed_page_size as usize,
                 ),
                 is_sorted,
-                reader.physical_type,
+                reader.descriptor.physical_type(),
             )?;
 
             reader.current_dictionary = Some(page);
@@ -137,30 +136,18 @@ fn build_page<R: Read>(
             let header = page_header.data_page_header.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
-            let statistics = header
-                .statistics
-                .as_ref()
-                .map(|s| deserialize_statistics(s, &reader.physical_type))
-                .transpose()?;
-
             Ok(Some(CompressedPage::new(
                 PageHeader::V1(header),
                 std::mem::take(buffer),
                 reader.compression,
                 page_header.uncompressed_page_size as usize,
                 reader.current_dictionary.clone(),
-                statistics,
+                reader.descriptor.clone(),
             )))
         }
         PageType::DataPageV2 => {
             let header = page_header.data_page_header_v2.unwrap();
             reader.seen_num_values += header.num_values as i64;
-
-            let statistics = header
-                .statistics
-                .as_ref()
-                .map(|s| deserialize_statistics(s, &reader.physical_type))
-                .transpose()?;
 
             Ok(Some(CompressedPage::new(
                 PageHeader::V2(header),
@@ -168,7 +155,7 @@ fn build_page<R: Read>(
                 reader.compression,
                 page_header.uncompressed_page_size as usize,
                 reader.current_dictionary.clone(),
-                statistics,
+                reader.descriptor.clone(),
             )))
         }
         PageType::IndexPage => Ok(None),

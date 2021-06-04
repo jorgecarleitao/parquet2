@@ -1,5 +1,6 @@
 use parquet_format::{CompressionCodec, DataPageHeader, Encoding};
 
+use crate::metadata::ColumnDescriptor;
 use crate::read::PageHeader;
 use crate::{compression::create_codec, encoding::hybrid_rle::encode, error::Result};
 use crate::{read::CompressedPage, types::NativeType};
@@ -39,6 +40,7 @@ fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)
 pub fn array_to_page_v1<T: NativeType>(
     array: &[Option<T>],
     compression: CompressionCodec,
+    descriptor: &ColumnDescriptor,
 ) -> Result<CompressedPage> {
     let (values, mut buffer) = unzip_option(array)?;
 
@@ -70,6 +72,6 @@ pub fn array_to_page_v1<T: NativeType>(
         compression,
         uncompressed_page_size,
         None,
-        None,
+        descriptor.clone(),
     ))
 }

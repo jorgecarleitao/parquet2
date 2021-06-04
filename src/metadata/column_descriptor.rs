@@ -1,4 +1,4 @@
-use crate::schema::types::ParquetType;
+use crate::schema::types::{ParquetType, PhysicalType};
 
 /// A descriptor for leaf-level primitive columns.
 /// This encapsulates information such as definition and repetition levels and is used to
@@ -48,9 +48,19 @@ impl ColumnDescriptor {
         &self.path_in_schema
     }
 
-    /// Returns self type [`ParquetType`](crate::schema::types::ParquetType) for this leaf column.
+    /// Returns self type [`ParquetType`] for this leaf column.
     pub fn type_(&self) -> &ParquetType {
         &self.primitive_type
+    }
+
+    /// Returns self type [`PhysicalType`] for this leaf column.
+    /// # Panic
+    /// This function panics if the corresponding [`ParquetType`] is not a primitive type
+    pub fn physical_type(&self) -> &PhysicalType {
+        match &self.primitive_type {
+            ParquetType::PrimitiveType { physical_type, .. } => physical_type,
+            _ => unreachable!(""),
+        }
     }
 
     /// Returns column name.
