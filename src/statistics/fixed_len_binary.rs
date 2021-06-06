@@ -8,7 +8,7 @@ use crate::{
     schema::types::PhysicalType,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct FixedLenStatistics {
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
@@ -56,4 +56,15 @@ pub fn read(v: &ParquetStatistics, size: i32) -> Result<Arc<dyn Statistics>> {
         }),
         physical_type: PhysicalType::FixedLenByteArray(size),
     }))
+}
+
+pub fn write(v: &FixedLenStatistics) -> ParquetStatistics {
+    ParquetStatistics {
+        null_count: v.null_count,
+        distinct_count: v.distinct_count,
+        max_value: v.max_value.clone(),
+        min_value: v.min_value.clone(),
+        min: None,
+        max: None,
+    }
 }

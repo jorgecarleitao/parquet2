@@ -1,4 +1,4 @@
-use crate::schema::types::ParquetType;
+use crate::schema::types::{ParquetType, PhysicalType};
 
 /// A descriptor for leaf-level primitive columns.
 /// This encapsulates information such as definition and repetition levels and is used to
@@ -16,9 +16,6 @@ pub struct ColumnDescriptor {
 
     // The path of this column. For instance, "a.b.c.d".
     path_in_schema: Vec<String>,
-
-    // The parent of this
-    root: ParquetType,
 }
 
 impl ColumnDescriptor {
@@ -28,14 +25,12 @@ impl ColumnDescriptor {
         max_def_level: i16,
         max_rep_level: i16,
         path_in_schema: Vec<String>,
-        root: ParquetType,
     ) -> Self {
         Self {
             primitive_type,
             max_def_level,
             max_rep_level,
             path_in_schema,
-            root,
         }
     }
 
@@ -53,9 +48,19 @@ impl ColumnDescriptor {
         &self.path_in_schema
     }
 
-    /// Returns self type [`ParquetType`](crate::schema::types::ParquetType) for this leaf column.
+    /// Returns self type [`ParquetType`] for this leaf column.
     pub fn type_(&self) -> &ParquetType {
         &self.primitive_type
+    }
+
+    /// Returns self type [`PhysicalType`] for this leaf column.
+    /// # Panic
+    /// This function panics if the corresponding [`ParquetType`] is not a primitive type
+    pub fn physical_type(&self) -> &PhysicalType {
+        match &self.primitive_type {
+            ParquetType::PrimitiveType { physical_type, .. } => physical_type,
+            _ => unreachable!(""),
+        }
     }
 
     /// Returns column name.

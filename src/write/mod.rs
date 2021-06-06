@@ -3,8 +3,16 @@ mod column_chunk;
 mod file;
 mod page;
 mod row_group;
+pub(self) mod statistics;
 
 pub use file::write_file;
+use parquet_format::CompressionCodec;
+
+#[derive(Debug, Copy, Clone)]
+pub struct WriteOptions {
+    pub write_statistics: bool,
+    pub compression: CompressionCodec,
+}
 
 #[cfg(test)]
 mod tests {
@@ -29,16 +37,19 @@ mod tests {
             Some(6),
         ];
 
-        let compression = parquet_format::CompressionCodec::Uncompressed;
-
-        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(
-            array_to_page_v1(&array, compression),
-        )))));
+        let options = WriteOptions {
+            write_statistics: false,
+            compression: CompressionCodec::Uncompressed,
+        };
 
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
 
+        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(
+            array_to_page_v1(&array, &options, &schema.columns()[0]),
+        )))));
+
         let mut writer = Cursor::new(vec![]);
-        write_file(&mut writer, row_groups, schema, compression, None, None)?;
+        write_file(&mut writer, row_groups, schema, options, None, None)?;
 
         let data = writer.into_inner();
         let mut reader = Cursor::new(data);

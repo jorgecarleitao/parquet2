@@ -1,8 +1,11 @@
-use parquet_format::{ColumnChunk, ColumnMetaData, Encoding, Statistics};
+use std::sync::Arc;
+
+use parquet_format::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::error::Result;
 use crate::schema::types::{ParquetType, PhysicalType};
+use crate::statistics::{deserialize_statistics, Statistics};
 use crate::{compression::CompressionCodec, schema::types::Type};
 
 /// Metadata for a column chunk.
@@ -53,9 +56,12 @@ impl ColumnChunkMetaData {
         }
     }
 
-    /// Descriptor for this column.
-    pub(crate) fn statistics(&self) -> &Option<Statistics> {
-        &self.column_metadata().statistics
+    /// Decodes the raw statistics into a statistics
+    pub fn statistics(&self) -> Option<Result<Arc<dyn Statistics>>> {
+        self.column_metadata()
+            .statistics
+            .as_ref()
+            .map(|x| deserialize_statistics(x, self.descriptor().physical_type()))
     }
 
     /// Total number of values in this column chunk.
@@ -101,11 +107,6 @@ impl ColumnChunkMetaData {
     /// Returns the encoding for this column
     pub fn column_encoding(&self) -> &Vec<Encoding> {
         &self.column_metadata().encodings
-    }
-
-    /// Returns statistics from this column
-    pub fn column_statistics(&self) -> &Option<Statistics> {
-        &self.column_metadata().statistics
     }
 
     /// Returns the offset and length in bytes of the column chunk within the file

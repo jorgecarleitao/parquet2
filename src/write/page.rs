@@ -1,4 +1,5 @@
 use std::io::{Seek, SeekFrom, Write};
+use std::sync::Arc;
 
 use parquet_format::{PageHeader as ParquetPageHeader, PageType};
 use thrift::protocol::TCompactOutputProtocol;
@@ -7,6 +8,7 @@ use thrift::protocol::TOutputProtocol;
 use crate::error::Result;
 use crate::read::CompressedPage;
 use crate::read::PageHeader;
+use crate::statistics::Statistics;
 
 /// Contains page write metrics.
 pub struct PageWriteSpec {
@@ -14,6 +16,7 @@ pub struct PageWriteSpec {
     pub header_size: usize,
     pub offset: u64,
     pub bytes_written: u64,
+    pub statistics: Option<Arc<dyn Statistics>>,
 }
 
 pub fn write_page<W: Write + Seek>(
@@ -35,6 +38,7 @@ pub fn write_page<W: Write + Seek>(
         header_size,
         offset: start_pos,
         bytes_written: end_pos - start_pos,
+        statistics: compressed_page.statistics().transpose()?,
     })
 }
 

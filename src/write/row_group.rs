@@ -7,7 +7,7 @@ use parquet_format::{CompressionCodec, RowGroup};
 
 use crate::{
     error::{ParquetError, Result},
-    metadata::SchemaDescriptor,
+    metadata::ColumnDescriptor,
     read::CompressedPage,
 };
 
@@ -32,7 +32,7 @@ pub fn write_row_group<
     E,  // external error any of the iterators may emit
 >(
     writer: &mut W,
-    schema: &SchemaDescriptor,
+    descriptors: &[ColumnDescriptor],
     codec: CompressionCodec,
     columns: II,
 ) -> Result<RowGroup>
@@ -42,7 +42,6 @@ where
     II: Iterator<Item = std::result::Result<I, E>>,
     E: Error + Send + Sync + 'static,
 {
-    let descriptors = schema.columns();
     let column_iter = descriptors.iter().zip(columns);
 
     let columns = column_iter

@@ -10,6 +10,8 @@ pub trait NativeType: Sized + Copy + std::fmt::Debug + Send + Sync + 'static {
 
     fn from_le_bytes(bytes: Self::Bytes) -> Self;
 
+    fn ord(&self, other: &Self) -> std::cmp::Ordering;
+
     const TYPE: PhysicalType;
 }
 
@@ -25,6 +27,11 @@ macro_rules! native {
             #[inline]
             fn from_le_bytes(bytes: Self::Bytes) -> Self {
                 Self::from_le_bytes(bytes)
+            }
+
+            #[inline]
+            fn ord(&self, other: &Self) -> std::cmp::Ordering {
+                self.partial_cmp(other).unwrap_or(std::cmp::Ordering::Equal)
             }
 
             const TYPE: PhysicalType = $physical_type;
@@ -84,6 +91,11 @@ impl NativeType for [u32; 3] {
             u32::from_le_bytes(second),
             u32::from_le_bytes(third),
         ]
+    }
+
+    #[inline]
+    fn ord(&self, other: &Self) -> std::cmp::Ordering {
+        int96_to_i64_ns(*self).ord(&int96_to_i64_ns(*other))
     }
 }
 

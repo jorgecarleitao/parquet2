@@ -5,6 +5,7 @@ use parquet_format::{ColumnChunk, ColumnMetaData, CompressionCodec, Encoding, Pa
 use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
 
+use crate::statistics::serialize_statistics;
 use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
@@ -13,6 +14,7 @@ use crate::{
 };
 
 use super::page::write_page;
+use super::statistics::reduce;
 
 pub fn write_column_chunk<
     W: Write + Seek,
@@ -78,6 +80,10 @@ pub fn write_column_chunk<
         .into_iter() // to vec
         .collect();
 
+    let statistics = specs.iter().map(|x| &x.statistics).collect::<Vec<_>>();
+    let statistics = reduce(&statistics)?;
+    let statistics = statistics.map(|x| serialize_statistics(x.as_ref()));
+
     let type_ = match descriptor.type_() {
         ParquetType::PrimitiveType { physical_type, .. } => physical_type_to_type(physical_type).0,
         _ => {
@@ -99,7 +105,7 @@ pub fn write_column_chunk<
         data_page_offset,
         index_page_offset: None,
         dictionary_page_offset: None,
-        statistics: None,
+        statistics,
         encoding_stats: None,
     };
 

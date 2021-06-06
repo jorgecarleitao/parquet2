@@ -3,7 +3,7 @@ use std::{
     io::{Seek, SeekFrom, Write},
 };
 
-use parquet_format::{CompressionCodec, FileMetaData};
+use parquet_format::FileMetaData;
 
 use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
@@ -16,7 +16,7 @@ use crate::{
     FOOTER_SIZE, PARQUET_MAGIC,
 };
 
-use super::row_group::write_row_group;
+use super::{row_group::write_row_group, WriteOptions};
 
 fn start_file<W: Write>(writer: &mut W) -> Result<()> {
     Ok(writer.write_all(&PARQUET_MAGIC)?)
@@ -55,7 +55,7 @@ pub fn write_file<
     writer: &mut W,
     row_groups: III,
     schema: SchemaDescriptor,
-    codec: CompressionCodec,
+    options: WriteOptions,
     created_by: Option<String>,
     key_value_metadata: Option<Vec<KeyValue>>,
 ) -> Result<()>
@@ -72,8 +72,8 @@ where
         .map(|row_group| {
             write_row_group(
                 writer,
-                &schema,
-                codec,
+                schema.columns(),
+                options.compression,
                 row_group.map_err(ParquetError::from_external_error)?,
             )
         })

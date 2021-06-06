@@ -1,20 +1,21 @@
 pub(crate) mod primitive;
 
-use parquet_format::CompressionCodec;
-
-use crate::{error::Result, read::CompressedPage};
+use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions};
 
 use super::read::Array;
 
-pub fn array_to_page(array: &Array) -> Result<CompressedPage> {
+pub fn array_to_page(
+    array: &Array,
+    options: &WriteOptions,
+    descriptor: &ColumnDescriptor,
+) -> Result<CompressedPage> {
     // using plain encoding format
-    let compression = CompressionCodec::Uncompressed;
     match array {
-        Array::Int32(array) => primitive::array_to_page_v1(&array, compression),
-        Array::Int64(array) => primitive::array_to_page_v1(&array, compression),
-        Array::Int96(array) => primitive::array_to_page_v1(&array, compression),
-        Array::Float32(array) => primitive::array_to_page_v1(&array, compression),
-        Array::Float64(array) => primitive::array_to_page_v1(&array, compression),
+        Array::Int32(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Int64(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Int96(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Float32(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Float64(array) => primitive::array_to_page_v1(&array, options, descriptor),
         _ => todo!(),
     }
 }
@@ -22,26 +23,31 @@ pub fn array_to_page(array: &Array) -> Result<CompressedPage> {
 #[cfg(test)]
 mod tests {
     use std::io::{Cursor, Read, Seek};
+    use std::sync::Arc;
 
-    use crate::tests::alltypes_plain;
+    use crate::tests::{alltypes_plain, alltypes_statistics};
     use crate::write::write_file;
 
+    use crate::compression::CompressionCodec;
     use crate::metadata::SchemaDescriptor;
+    use crate::statistics::Statistics;
 
     use super::*;
     use crate::error::Result;
 
-    fn read_column<R: Read + Seek>(reader: &mut R) -> Result<Array> {
-        let (a, _) = super::super::read::tests::read_column(reader, 0, 0)?;
-        Ok(a)
+    fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn Statistics>>)> {
+        let (a, statistics) = super::super::read::tests::read_column(reader, 0, 0)?;
+        Ok((a, statistics))
     }
 
     fn test_column(column: usize) -> Result<()> {
         let array = alltypes_plain(column);
+        let stats = alltypes_statistics(column);
 
-        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(array_to_page(
-            &array,
-        ))))));
+        let options = WriteOptions {
+            write_statistics: true,
+            compression: CompressionCodec::Uncompressed,
+        };
 
         // prepare schema
         let a = match array {
@@ -57,20 +63,23 @@ mod tests {
             a
         ))?;
 
+        let a = schema.columns();
+
+        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(array_to_page(
+            &array, &options, &a[0],
+        ))))));
+
         let mut writer = Cursor::new(vec![]);
-        write_file(
-            &mut writer,
-            row_groups,
-            schema,
-            CompressionCodec::Uncompressed,
-            None,
-            None,
-        )?;
+        write_file(&mut writer, row_groups, schema, options, None, None)?;
 
         let data = writer.into_inner();
 
-        let result = read_column(&mut Cursor::new(data))?;
+        let (result, statistics) = read_column(&mut Cursor::new(data))?;
         assert_eq!(array, result);
+        assert_eq!(
+            statistics.as_ref().map(|x| x.as_ref()),
+            Some(stats).as_ref().map(|x| x.as_ref())
+        );
         Ok(())
     }
 

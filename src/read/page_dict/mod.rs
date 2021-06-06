@@ -26,7 +26,7 @@ pub fn read_page_dict(
     num_values: u32,
     compression: (CompressionCodec, usize),
     is_sorted: bool,
-    physical_type: PhysicalType,
+    physical_type: &PhysicalType,
 ) -> Result<Arc<dyn PageDict>> {
     let decompressor = create_codec(&compression.0)?;
     if let Some(mut decompressor) = decompressor {
@@ -42,7 +42,7 @@ fn deserialize(
     buf: &[u8],
     num_values: u32,
     is_sorted: bool,
-    physical_type: PhysicalType,
+    physical_type: &PhysicalType,
 ) -> Result<Arc<dyn PageDict>> {
     match physical_type {
         PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
@@ -54,6 +54,6 @@ fn deserialize(
         PhysicalType::Float => primitive::read::<f32>(&buf, num_values, is_sorted),
         PhysicalType::Double => primitive::read::<f64>(&buf, num_values, is_sorted),
         PhysicalType::ByteArray => binary::read(&buf, num_values),
-        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(&buf, size, num_values),
+        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(&buf, *size, num_values),
     }
 }
