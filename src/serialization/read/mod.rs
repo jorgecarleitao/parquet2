@@ -159,7 +159,9 @@ pub(crate) mod tests {
         let mut path = get_path();
         path.push("alltypes_plain.parquet");
         let path = path.to_str().unwrap();
-        let (result, _) = get_column(path, column)?;
+        let (result, statistics) = get_column(path, column)?;
+        // the file does not have statistics
+        assert_eq!(statistics.as_ref().map(|x| x.as_ref()), None);
         assert_eq!(result, alltypes_plain(column));
         Ok(())
     }

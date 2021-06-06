@@ -23,6 +23,9 @@ mod tests {
     use std::path::PathBuf;
     use std::sync::Arc;
 
+    use crate::metadata::ColumnDescriptor;
+    use crate::schema::types::ParquetType;
+    use crate::schema::types::PhysicalType;
     use crate::{
         serialization::read::{Array, Value},
         statistics::*,
@@ -123,8 +126,40 @@ mod tests {
     }
 
     pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
+        let descriptor_i32 = ColumnDescriptor::new(
+            ParquetType::from_physical("col".to_string(), PhysicalType::Int32),
+            1,
+            0,
+            vec!["col".to_string()],
+        );
+        let descriptor_i64 = ColumnDescriptor::new(
+            ParquetType::from_physical("col".to_string(), PhysicalType::Int64),
+            1,
+            0,
+            vec!["col".to_string()],
+        );
+        let descriptor_f32 = ColumnDescriptor::new(
+            ParquetType::from_physical("col".to_string(), PhysicalType::Float),
+            1,
+            0,
+            vec!["col".to_string()],
+        );
+        let descriptor_f64 = ColumnDescriptor::new(
+            ParquetType::from_physical("col".to_string(), PhysicalType::Double),
+            1,
+            0,
+            vec!["col".to_string()],
+        );
+        let descriptor_byte = ColumnDescriptor::new(
+            ParquetType::from_physical("col".to_string(), PhysicalType::ByteArray),
+            1,
+            0,
+            vec!["col".to_string()],
+        );
+
         match column {
             0 => Arc::new(PrimitiveStatistics::<i32> {
+                descriptor: descriptor_i32,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(0),
@@ -137,36 +172,42 @@ mod tests {
                 max_value: Some(true),
             }),
             2 | 3 | 4 => Arc::new(PrimitiveStatistics::<i32> {
+                descriptor: descriptor_i32,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(0),
                 max_value: Some(1),
             }),
             5 => Arc::new(PrimitiveStatistics::<i64> {
+                descriptor: descriptor_i64,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(0),
                 max_value: Some(10),
             }),
             6 => Arc::new(PrimitiveStatistics::<f32> {
+                descriptor: descriptor_f32,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(0.0),
                 max_value: Some(1.1),
             }),
             7 => Arc::new(PrimitiveStatistics::<f64> {
+                descriptor: descriptor_f64,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(0.0),
                 max_value: Some(10.1),
             }),
             8 => Arc::new(BinaryStatistics {
+                descriptor: descriptor_byte,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(vec![48, 49, 47, 48, 49, 47, 48, 57]),
                 max_value: Some(vec![48, 52, 47, 48, 49, 47, 48, 57]),
             }),
             9 => Arc::new(BinaryStatistics {
+                descriptor: descriptor_byte,
                 null_count: Some(0),
                 distinct_count: None,
                 min_value: Some(vec![48]),

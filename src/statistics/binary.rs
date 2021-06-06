@@ -3,10 +3,11 @@ use std::sync::Arc;
 use parquet_format::Statistics as ParquetStatistics;
 
 use super::Statistics;
-use crate::{error::Result, schema::types::PhysicalType};
+use crate::{error::Result, metadata::ColumnDescriptor, schema::types::PhysicalType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct BinaryStatistics {
+    pub descriptor: ColumnDescriptor,
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
     pub max_value: Option<Vec<u8>>,
@@ -23,8 +24,9 @@ impl Statistics for BinaryStatistics {
     }
 }
 
-pub fn read(v: &ParquetStatistics) -> Result<Arc<dyn Statistics>> {
+pub fn read(v: &ParquetStatistics, descriptor: ColumnDescriptor) -> Result<Arc<dyn Statistics>> {
     Ok(Arc::new(BinaryStatistics {
+        descriptor,
         null_count: v.null_count,
         distinct_count: v.distinct_count,
         max_value: v.max_value.clone(),

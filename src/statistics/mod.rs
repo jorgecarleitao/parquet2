@@ -8,6 +8,7 @@ use std::{any::Any, sync::Arc};
 pub use parquet_format::Statistics as ParquetStatistics;
 
 use crate::error::Result;
+use crate::metadata::ColumnDescriptor;
 use crate::schema::types::PhysicalType;
 
 pub use binary::BinaryStatistics;
@@ -95,16 +96,16 @@ impl PartialEq for &dyn Statistics {
 /// corresponding `physical_type`.
 pub fn deserialize_statistics(
     statistics: &ParquetStatistics,
-    physical_type: &PhysicalType,
+    descriptor: ColumnDescriptor,
 ) -> Result<Arc<dyn Statistics>> {
-    match physical_type {
+    match descriptor.physical_type() {
         PhysicalType::Boolean => boolean::read(statistics),
-        PhysicalType::Int32 => primitive::read::<i32>(statistics),
-        PhysicalType::Int64 => primitive::read::<i64>(statistics),
-        PhysicalType::Int96 => primitive::read::<[u32; 3]>(statistics),
-        PhysicalType::Float => primitive::read::<f32>(statistics),
-        PhysicalType::Double => primitive::read::<f64>(statistics),
-        PhysicalType::ByteArray => binary::read(statistics),
+        PhysicalType::Int32 => primitive::read::<i32>(statistics, descriptor),
+        PhysicalType::Int64 => primitive::read::<i64>(statistics, descriptor),
+        PhysicalType::Int96 => primitive::read::<[u32; 3]>(statistics, descriptor),
+        PhysicalType::Float => primitive::read::<f32>(statistics, descriptor),
+        PhysicalType::Double => primitive::read::<f64>(statistics, descriptor),
+        PhysicalType::ByteArray => binary::read(statistics, descriptor),
         PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(statistics, *size),
     }
 }

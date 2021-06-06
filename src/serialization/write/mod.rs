@@ -42,7 +42,6 @@ mod tests {
 
     fn test_column(column: usize) -> Result<()> {
         let array = alltypes_plain(column);
-        let stats = alltypes_statistics(column);
 
         let options = WriteOptions {
             write_statistics: true,
@@ -69,6 +68,7 @@ mod tests {
             &array, &options, &a[0],
         ))))));
 
+        println!("{:#?}", a);
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;
 
@@ -76,6 +76,7 @@ mod tests {
 
         let (result, statistics) = read_column(&mut Cursor::new(data))?;
         assert_eq!(array, result);
+        let stats = alltypes_statistics(column);
         assert_eq!(
             statistics.as_ref().map(|x| x.as_ref()),
             Some(stats).as_ref().map(|x| x.as_ref())

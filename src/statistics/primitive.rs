@@ -3,6 +3,7 @@ use std::sync::Arc;
 use parquet_format::Statistics as ParquetStatistics;
 
 use super::Statistics;
+use crate::metadata::ColumnDescriptor;
 use crate::types;
 use crate::{
     error::{ParquetError, Result},
@@ -11,6 +12,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct PrimitiveStatistics<T: types::NativeType> {
+    pub descriptor: ColumnDescriptor,
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
     pub max_value: Option<T>,
@@ -27,7 +29,10 @@ impl<T: types::NativeType> Statistics for PrimitiveStatistics<T> {
     }
 }
 
-pub fn read<T: types::NativeType>(v: &ParquetStatistics) -> Result<Arc<dyn Statistics>> {
+pub fn read<T: types::NativeType>(
+    v: &ParquetStatistics,
+    descriptor: ColumnDescriptor,
+) -> Result<Arc<dyn Statistics>> {
     if let Some(ref v) = v.max_value {
         if v.len() != std::mem::size_of::<T>() {
             return Err(ParquetError::OutOfSpec(
@@ -44,6 +49,7 @@ pub fn read<T: types::NativeType>(v: &ParquetStatistics) -> Result<Arc<dyn Stati
     };
 
     Ok(Arc::new(PrimitiveStatistics::<T> {
+        descriptor,
         null_count: v.null_count,
         distinct_count: v.distinct_count,
         max_value: v.max_value.as_ref().map(|x| types::decode(&x)),

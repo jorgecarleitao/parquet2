@@ -64,6 +64,7 @@ pub fn array_to_page_v1<T: NativeType>(
 
     let statistics = if options.write_statistics {
         let statistics = &PrimitiveStatistics {
+            descriptor: descriptor.clone(),
             null_count: Some((array.len() - array.iter().flatten().count()) as i64),
             distinct_count: None,
             max_value: array.iter().flatten().max_by(|x, y| x.ord(y)).copied(),

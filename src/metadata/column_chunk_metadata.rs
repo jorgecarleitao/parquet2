@@ -61,7 +61,7 @@ impl ColumnChunkMetaData {
         self.column_metadata()
             .statistics
             .as_ref()
-            .map(|x| deserialize_statistics(x, self.descriptor().physical_type()))
+            .map(|x| deserialize_statistics(x, self.descriptor().clone()))
     }
 
     /// Total number of values in this column chunk.

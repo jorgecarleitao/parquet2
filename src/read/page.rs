@@ -70,11 +70,11 @@ impl CompressedPage {
             PageHeader::V1(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
             PageHeader::V2(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
         }
     }
 
@@ -147,11 +147,11 @@ impl Page {
             PageHeader::V1(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
             PageHeader::V2(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().physical_type())),
+                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
         }
     }
 
