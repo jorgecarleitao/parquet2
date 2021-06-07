@@ -1,12 +1,22 @@
 mod column_chunk;
-//mod compression;
 mod file;
 mod page;
 mod row_group;
 pub(self) mod statistics;
 
+#[cfg(feature = "stream")]
+pub mod stream;
+
+mod dyn_iter;
+pub use dyn_iter::DynIter;
+
 pub use file::write_file;
 use parquet_format::CompressionCodec;
+
+use crate::read::CompressedPage;
+
+pub type RowGroupIter<'a, E> =
+    DynIter<'a, std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>>;
 
 #[derive(Debug, Copy, Clone)]
 pub struct WriteOptions {
@@ -44,9 +54,9 @@ mod tests {
 
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
 
-        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(
-            array_to_page_v1(&array, &options, &schema.columns()[0]),
-        )))));
+        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(DynIter::new(
+            std::iter::once(array_to_page_v1(&array, &options, &schema.columns()[0])),
+        ))))));
 
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;

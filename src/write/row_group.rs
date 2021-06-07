@@ -11,7 +11,7 @@ use crate::{
     read::CompressedPage,
 };
 
-use super::column_chunk::write_column_chunk;
+use super::{column_chunk::write_column_chunk, DynIter};
 
 fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
     if arr.is_empty() {
@@ -27,19 +27,15 @@ fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
 
 pub fn write_row_group<
     W,
-    I,  // iterator over pages
-    II, // iterator over columns
-    E,  // external error any of the iterators may emit
+    E, // external error any of the iterators may emit
 >(
     writer: &mut W,
     descriptors: &[ColumnDescriptor],
     codec: CompressionCodec,
-    columns: II,
+    columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>,
 ) -> Result<RowGroup>
 where
     W: Write + Seek,
-    I: Iterator<Item = std::result::Result<CompressedPage, E>>,
-    II: Iterator<Item = std::result::Result<I, E>>,
     E: Error + Send + Sync + 'static,
 {
     let column_iter = descriptors.iter().zip(columns);

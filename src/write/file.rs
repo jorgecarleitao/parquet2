@@ -12,17 +12,16 @@ pub use crate::metadata::KeyValue;
 use crate::{
     error::{ParquetError, Result},
     metadata::SchemaDescriptor,
-    read::CompressedPage,
     FOOTER_SIZE, PARQUET_MAGIC,
 };
 
-use super::{row_group::write_row_group, WriteOptions};
+use super::{row_group::write_row_group, RowGroupIter, WriteOptions};
 
-fn start_file<W: Write>(writer: &mut W) -> Result<()> {
+pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<()> {
     Ok(writer.write_all(&PARQUET_MAGIC)?)
 }
 
-fn end_file<W: Write + Seek>(mut writer: &mut W, metadata: FileMetaData) -> Result<()> {
+pub(super) fn end_file<W: Write + Seek>(mut writer: &mut W, metadata: FileMetaData) -> Result<()> {
     // Write file metadata
     let start_pos = writer.seek(SeekFrom::Current(0))?;
     {
@@ -45,15 +44,9 @@ fn end_file<W: Write + Seek>(mut writer: &mut W, metadata: FileMetaData) -> Resu
     Ok(())
 }
 
-pub fn write_file<
-    W,
-    I,   // iterator over pages
-    II,  // iterator over columns
-    III, // iterator over row groups
-    E,   // external error any of the iterators may emit
->(
+pub fn write_file<'a, W, I, E>(
     writer: &mut W,
-    row_groups: III,
+    row_groups: I,
     schema: SchemaDescriptor,
     options: WriteOptions,
     created_by: Option<String>,
@@ -61,9 +54,7 @@ pub fn write_file<
 ) -> Result<()>
 where
     W: Write + Seek,
-    I: Iterator<Item = std::result::Result<CompressedPage, E>>,
-    II: Iterator<Item = std::result::Result<I, E>>,
-    III: Iterator<Item = std::result::Result<II, E>>,
+    I: Iterator<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
     E: Error + Send + Sync + 'static,
 {
     start_file(writer)?;

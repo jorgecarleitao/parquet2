@@ -26,7 +26,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::tests::{alltypes_plain, alltypes_statistics};
-    use crate::write::write_file;
+    use crate::write::{write_file, DynIter};
 
     use crate::compression::CompressionCodec;
     use crate::metadata::SchemaDescriptor;
@@ -64,11 +64,10 @@ mod tests {
 
         let a = schema.columns();
 
-        let row_groups = std::iter::once(Ok(std::iter::once(Ok(std::iter::once(array_to_page(
-            &array, &options, &a[0],
+        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(DynIter::new(
+            std::iter::once(array_to_page(&array, &options, &a[0])),
         ))))));
 
-        println!("{:#?}", a);
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;
 
