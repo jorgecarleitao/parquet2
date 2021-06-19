@@ -50,11 +50,23 @@ use super::super::*;
 use crate::error::{ParquetError, Result};
 
 fn is_logical_type(s: &str) -> bool {
-    match s {
-        "INTEGER" | "MAP" | "LIST" | "ENUM" | "DECIMAL" | "DATE" | "TIME" | "TIMESTAMP"
-        | "STRING" | "JSON" | "BSON" | "UUID" | "UNKNOWN" | "INTERVAL" => true,
-        _ => false,
-    }
+    matches!(
+        s,
+        "INTEGER"
+            | "MAP"
+            | "LIST"
+            | "ENUM"
+            | "DECIMAL"
+            | "DATE"
+            | "TIME"
+            | "TIMESTAMP"
+            | "STRING"
+            | "JSON"
+            | "BSON"
+            | "UUID"
+            | "UNKNOWN"
+            | "INTERVAL"
+    )
 }
 
 fn is_converted_type(s: &str) -> bool {
@@ -534,7 +546,7 @@ impl<'a> Parser<'a> {
                     self.tokenizer.backtrack();
                     (-1, -1)
                 };
-                LogicalType::DECIMAL(DecimalType { precision, scale })
+                LogicalType::DECIMAL(DecimalType { scale, precision })
             }
             "TIME" => {
                 let (unit, is_adjusted_to_u_t_c) = if let Some("(") = self.tokenizer.next() {
@@ -560,8 +572,8 @@ impl<'a> Parser<'a> {
                     (TimeUnit::MILLIS(MilliSeconds {}), false)
                 };
                 LogicalType::TIME(TimeType {
-                    unit,
                     is_adjusted_to_u_t_c,
+                    unit,
                 })
             }
             "TIMESTAMP" => {
@@ -589,8 +601,8 @@ impl<'a> Parser<'a> {
                     (TimeUnit::MILLIS(MilliSeconds {}), false)
                 };
                 LogicalType::TIMESTAMP(TimestampType {
-                    unit,
                     is_adjusted_to_u_t_c,
+                    unit,
                 })
             }
             "INTEGER" => {

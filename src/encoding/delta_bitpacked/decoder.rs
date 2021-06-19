@@ -131,11 +131,11 @@ impl<'a> Decoder<'a> {
 
         Self {
             block_size,
-            values,
-            total_count,
             num_mini_blocks,
             values_per_mini_block,
+            total_count,
             first_value,
+            values,
             current_block,
             consumed_bytes,
         }
