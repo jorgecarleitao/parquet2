@@ -66,13 +66,15 @@ fn compose_array<I: Iterator<Item = u32>, F: Iterator<Item = u32>, G: Iterator<I
 }
 
 fn read_array<'a, T: NativeType>(
+    rep_levels: &'a [u8],
+    def_levels: &'a [u8],
     values: &'a [u8],
     length: u32,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Array {
-    let (values, rep_levels) = levels::consume_level(values, length, rep_level_encoding);
-    let (values, def_levels) = levels::consume_level(values, length, def_level_encoding);
+    let rep_levels = levels::consume_level(rep_levels, length, rep_level_encoding);
+    let def_levels = levels::consume_level(&def_levels, length, def_level_encoding);
 
     let iter = read_buffer::<i64>(values);
 
@@ -88,18 +90,24 @@ fn read_array<'a, T: NativeType>(
 pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) -> Result<Array> {
     match page.header() {
         PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
-            (Encoding::Plain, None) => Ok(read_array::<T>(
-                page.buffer(),
-                page.num_values() as u32,
-                (
-                    &header.repetition_level_encoding,
-                    descriptor.max_rep_level(),
-                ),
-                (
-                    &header.definition_level_encoding,
-                    descriptor.max_def_level(),
-                ),
-            )),
+            (Encoding::Plain, None) => {
+                let (rep_levels, def_levels, values) =
+                    levels::split_buffer_v1(page.buffer(), true, true);
+                Ok(read_array::<T>(
+                    rep_levels,
+                    def_levels,
+                    values,
+                    page.num_values() as u32,
+                    (
+                        &header.repetition_level_encoding,
+                        descriptor.max_rep_level(),
+                    ),
+                    (
+                        &header.definition_level_encoding,
+                        descriptor.max_def_level(),
+                    ),
+                ))
+            }
             _ => todo!(),
         },
         PageHeader::V2(_) => todo!(),
@@ -107,6 +115,8 @@ pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) 
 }
 
 fn read_dict_array<'a>(
+    rep_levels: &'a [u8],
+    def_levels: &'a [u8],
     values: &'a [u8],
     length: u32,
     dict: &'a PrimitivePageDict<i64>,
@@ -115,8 +125,8 @@ fn read_dict_array<'a>(
 ) -> Array {
     let dict_values = dict.values();
 
-    let (values, rep_levels) = levels::consume_level(values, length, rep_level_encoding);
-    let (values, def_levels) = levels::consume_level(values, length, def_level_encoding);
+    let rep_levels = levels::consume_level(rep_levels, length, rep_level_encoding);
+    let def_levels = levels::consume_level(def_levels, length, def_level_encoding);
 
     let bit_width = values[0];
     let values = &values[1..];
@@ -144,19 +154,25 @@ pub fn page_dict_to_array<T: NativeType>(
     assert_eq!(descriptor.max_rep_level(), 1);
     match page.header() {
         PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
-            (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_array(
-                &page.buffer(),
-                page.num_values() as u32,
-                dict.as_any().downcast_ref().unwrap(),
-                (
-                    &header.repetition_level_encoding,
-                    descriptor.max_rep_level(),
-                ),
-                (
-                    &header.definition_level_encoding,
-                    descriptor.max_def_level(),
-                ),
-            )),
+            (Encoding::PlainDictionary, Some(dict)) => {
+                let (rep_levels, def_levels, values) =
+                    levels::split_buffer_v1(page.buffer(), true, true);
+                Ok(read_dict_array(
+                    rep_levels,
+                    def_levels,
+                    values,
+                    page.num_values() as u32,
+                    dict.as_any().downcast_ref().unwrap(),
+                    (
+                        &header.repetition_level_encoding,
+                        descriptor.max_rep_level(),
+                    ),
+                    (
+                        &header.definition_level_encoding,
+                        descriptor.max_def_level(),
+                    ),
+                ))
+            }
             (_, None) => Err(ParquetError::OutOfSpec(
                 "A dictionary-encoded page MUST be preceeded by a dictionary page".to_string(),
             )),

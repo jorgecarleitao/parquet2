@@ -28,7 +28,7 @@ fn decompress_v2(
     let can_decompress = page_header.is_compressed.unwrap_or(true);
 
     if can_decompress {
-        buffer.copy_from_slice(&compressed[..offset]);
+        (&mut buffer[..offset]).copy_from_slice(&compressed[..offset]);
 
         decompressor.decompress(&compressed[offset..], &mut buffer[offset..])?;
     } else {

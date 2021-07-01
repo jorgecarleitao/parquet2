@@ -139,9 +139,13 @@ pub(crate) mod tests {
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
+        let statistics = metadata.row_groups[row_group]
+            .column(column)
+            .statistics()
+            .transpose()?;
+
         let page = iterator.next().unwrap().as_ref().unwrap();
 
-        let statistics = page.statistics().transpose()?;
         let array = page_to_array(page, &descriptor)?;
 
         Ok((array, statistics))
@@ -293,17 +297,20 @@ pub(crate) mod tests {
         version: usize,
         required: bool,
         use_dictionary: bool,
+        use_compression: bool,
     ) -> Result<()> {
         if std::env::var("PARQUET2_IGNORE_PYARROW_TESTS").is_ok() {
             return Ok(());
         }
         let required_s = if required { "required" } else { "nullable" };
         let use_dictionary_s = if use_dictionary { "dict" } else { "non_dict" };
+        let compression = if use_compression { "/snappy" } else { "" };
 
         let path = format!(
-            "fixtures/pyarrow3/v{}/{}/{}_{}_10.parquet",
-            version, use_dictionary_s, file, required_s
+            "fixtures/pyarrow3/v{}/{}{}/{}_{}_10.parquet",
+            version, use_dictionary_s, compression, file, required_s
         );
+        println!("{:?}", path);
 
         let (array, statistics) = get_column(&path, column)?;
 
@@ -335,52 +342,77 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn pyarrow_v1_dict_int32_required() -> Result<()> {
-        test_pyarrow_integration("basic", 0, 1, true, true)
+    fn pyarrow_v1_dict_int64_required() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, true, true, false)
     }
 
     #[test]
-    fn pyarrow_v1_dict_int32_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 0, 1, false, true)
+    fn pyarrow_v1_dict_int64_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, false, true, false)
     }
 
     #[test]
-    fn pyarrow_v1_non_dict_int32_required() -> Result<()> {
-        test_pyarrow_integration("basic", 0, 1, true, false)
+    fn pyarrow_v1_non_dict_int64_required() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, true, false, false)
     }
 
     #[test]
-    fn pyarrow_v1_non_dict_int32_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 0, 1, false, false)
+    fn pyarrow_v1_non_dict_int64_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_non_dict_int64_optional_compressed() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 1, false, false, true)
+    }
+
+    #[test]
+    fn pyarrow_v2_non_dict_int64_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 2, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v2_non_dict_int64_required() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 2, true, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v2_dict_int64_optional() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 2, false, true, false)
+    }
+
+    #[test]
+    fn pyarrow_v2_non_dict_int64_optional_compressed() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 2, false, false, true)
     }
 
     #[test]
     fn pyarrow_v1_dict_string_required() -> Result<()> {
-        test_pyarrow_integration("basic", 2, 1, true, true)
+        test_pyarrow_integration("basic", 2, 1, true, true, false)
     }
 
     #[test]
     fn pyarrow_v1_dict_string_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 2, 1, false, true)
+        test_pyarrow_integration("basic", 2, 1, false, true, false)
     }
 
     #[test]
     fn pyarrow_v1_non_dict_string_required() -> Result<()> {
-        test_pyarrow_integration("basic", 2, 1, true, false)
+        test_pyarrow_integration("basic", 2, 1, true, false, false)
     }
 
     #[test]
     fn pyarrow_v1_non_dict_string_optional() -> Result<()> {
-        test_pyarrow_integration("basic", 2, 1, false, false)
+        test_pyarrow_integration("basic", 2, 1, false, false, false)
     }
 
     #[test]
     fn pyarrow_v1_dict_list_optional() -> Result<()> {
-        test_pyarrow_integration("nested", 0, 1, false, true)
+        test_pyarrow_integration("nested", 0, 1, false, true, false)
     }
 
     #[test]
     fn pyarrow_v1_non_dict_list_optional() -> Result<()> {
-        test_pyarrow_integration("nested", 0, 1, false, false)
+        test_pyarrow_integration("nested", 0, 1, false, false, false)
     }
 }

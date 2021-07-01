@@ -81,35 +81,33 @@ def case_nested(size):
     )
 
 
-def write_pyarrow(case, size=1, page_version=1, use_dictionary=False):
+def write_pyarrow(
+    case, size=1, page_version=1, use_dictionary=False, use_compression=False
+):
     data, schema, path = case(size)
 
+    compression_path = "/snappy" if use_compression else ""
+
     if use_dictionary:
-        base_path = f"{PYARROW_PATH}/v{page_version}/dict"
+        base_path = f"{PYARROW_PATH}/v{page_version}/dict{compression_path}"
     else:
-        base_path = f"{PYARROW_PATH}/v{page_version}/non_dict"
+        base_path = f"{PYARROW_PATH}/v{page_version}/non_dict{compression_path}"
 
     t = pa.table(data, schema=schema)
     os.makedirs(base_path, exist_ok=True)
     pa.parquet.write_table(
         t,
         f"{base_path}/{path}",
+        version=f"{page_version}.0",
         data_page_version=f"{page_version}.0",
+        write_statistics=True,
+        compression="snappy" if use_compression else None,
         use_dictionary=use_dictionary,
     )
 
 
-write_pyarrow(case_basic_nullable, 1, 1)  # V1
-write_pyarrow(case_basic_nullable, 1, 2)  # V2
-
-write_pyarrow(case_basic_required, 1, 1)  # V1
-write_pyarrow(case_basic_required, 1, 2)  # V2
-
-write_pyarrow(case_nested, 1, 1)
-
-write_pyarrow(case_basic_nullable, 1, 1, True)  # V1
-write_pyarrow(case_basic_nullable, 1, 2, True)  # V2
-write_pyarrow(case_basic_required, 1, 1, True)  # V1
-write_pyarrow(case_basic_required, 1, 2, True)  # V2
-
-write_pyarrow(case_nested, 1, 1, True)
+for case in [case_basic_nullable, case_basic_required, case_nested]:
+    for version in [1, 2]:
+        for use_dict in [False, True]:
+            for compression in [False, True]:
+                write_pyarrow(case, 1, version, use_dict, compression)
