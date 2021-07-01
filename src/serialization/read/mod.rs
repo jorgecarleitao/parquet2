@@ -382,6 +382,11 @@ pub(crate) mod tests {
     }
 
     #[test]
+    fn pyarrow_v2_non_dict_int64_optional_compressed() -> Result<()> {
+        test_pyarrow_integration("basic", 0, 2, false, false, true)
+    }
+
+    #[test]
     fn pyarrow_v1_dict_string_required() -> Result<()> {
         test_pyarrow_integration("basic", 2, 1, true, true, false)
     }
