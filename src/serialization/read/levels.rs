@@ -7,32 +7,13 @@ fn get_bit_width(max_level: i16) -> u32 {
     log2(max_level as u64)
 }
 
-pub fn needed_bytes(values: &[u8], _length: u32, encoding: (&Encoding, i16)) -> usize {
-    match encoding {
-        (_, 0) => 0, // no levels
-        (Encoding::Rle, _) => {
-            let length = get_length(values);
-            // 4 consumed to read `length`
-            4 + length as usize
-        }
-        (Encoding::BitPacked, _) => {
-            todo!()
-        }
-        _ => unreachable!(),
-    }
-}
-
 #[inline]
 pub fn decode(values: &[u8], length: u32, encoding: (&Encoding, i16)) -> Vec<u32> {
     match encoding {
         (_, 0) => vec![0; length as usize], // no levels => required => all zero
         (Encoding::Rle, max_length) => {
             let bit_width = get_bit_width(max_length);
-            rle_decode(
-                &values[4..4 + get_length(values) as usize],
-                bit_width as u32,
-                length,
-            )
+            rle_decode(&values, bit_width as u32, length)
         }
         (Encoding::BitPacked, _) => {
             todo!()
@@ -71,16 +52,36 @@ pub fn rle_decode(values: &[u8], num_bits: u32, length: u32) -> Vec<u32> {
     values
 }
 
-pub fn consume_level<'a>(
-    values: &'a [u8],
-    length: u32,
-    level_encoding: (&Encoding, i16),
-) -> (&'a [u8], Vec<u32>) {
+pub fn consume_level(def_levels: &[u8], length: u32, level_encoding: (&Encoding, i16)) -> Vec<u32> {
     if level_encoding.1 > 0 {
-        let offset = needed_bytes(values, length, level_encoding);
-        let def_levels = decode(values, length, level_encoding);
-        (&values[offset..], def_levels)
+        decode(def_levels, length, level_encoding)
     } else {
-        (values, vec![0; length as usize])
+        vec![0; length as usize]
     }
+}
+
+/// returns slices corresponding to (rep, def, values)
+#[inline]
+pub fn split_buffer_v1(buffer: &[u8], has_rep: bool, has_def: bool) -> (&[u8], &[u8], &[u8]) {
+    let (rep, buffer) = if has_rep {
+        let level_buffer_length = get_length(buffer) as usize;
+        (
+            &buffer[4..4 + level_buffer_length],
+            &buffer[4 + level_buffer_length..],
+        )
+    } else {
+        (&[] as &[u8], buffer)
+    };
+
+    let (def, buffer) = if has_def {
+        let level_buffer_length = get_length(buffer) as usize;
+        (
+            &buffer[4..4 + level_buffer_length],
+            &buffer[4 + level_buffer_length..],
+        )
+    } else {
+        (&[] as &[u8], buffer)
+    };
+
+    (rep, def, buffer)
 }
