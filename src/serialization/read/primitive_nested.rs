@@ -2,7 +2,8 @@ use std::convert::TryInto;
 
 use parquet_format::Encoding;
 
-use super::{levels, Array};
+use super::levels::{get_bit_width, split_buffer_v1, RLEDecoder};
+use super::Array;
 use crate::encoding::{bitpacking, uleb128};
 use crate::metadata::ColumnDescriptor;
 use crate::read::PageHeader;
@@ -65,25 +66,77 @@ fn compose_array<I: Iterator<Item = u32>, F: Iterator<Item = u32>, G: Iterator<I
     Array::List(outer)
 }
 
-fn read_array<'a, T: NativeType>(
-    rep_levels: &'a [u8],
-    def_levels: &'a [u8],
-    values: &'a [u8],
+fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
+    rep_levels: &[u8],
+    def_levels: &[u8],
+    values: I,
     length: u32,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Array {
-    let rep_levels = levels::consume_level(rep_levels, length, rep_level_encoding);
-    let def_levels = levels::consume_level(&def_levels, length, def_level_encoding);
+    let max_rep_level = rep_level_encoding.1 as u32;
+    let max_def_level = def_level_encoding.1 as u32;
 
-    let iter = read_buffer::<i64>(values);
+    match (
+        (rep_level_encoding.0, max_rep_level == 0),
+        (def_level_encoding.0, max_def_level == 0),
+    ) {
+        ((Encoding::Rle, true), (Encoding::Rle, true)) => compose_array(
+            std::iter::repeat(0).take(length as usize),
+            std::iter::repeat(0).take(length as usize),
+            max_rep_level,
+            max_def_level,
+            values,
+        ),
+        ((Encoding::Rle, false), (Encoding::Rle, true)) => {
+            let num_bits = get_bit_width(rep_level_encoding.1);
+            let rep_levels = RLEDecoder::new(rep_levels, num_bits, length);
+            compose_array(
+                rep_levels,
+                std::iter::repeat(0).take(length as usize),
+                max_rep_level,
+                max_def_level,
+                values,
+            )
+        }
+        ((Encoding::Rle, true), (Encoding::Rle, false)) => {
+            let num_bits = get_bit_width(def_level_encoding.1);
+            let def_levels = RLEDecoder::new(def_levels, num_bits, length);
+            compose_array(
+                std::iter::repeat(0).take(length as usize),
+                def_levels,
+                max_rep_level,
+                max_def_level,
+                values,
+            )
+        }
+        ((Encoding::Rle, false), (Encoding::Rle, false)) => {
+            let rep_levels =
+                RLEDecoder::new(rep_levels, get_bit_width(rep_level_encoding.1), length);
+            let def_levels =
+                RLEDecoder::new(def_levels, get_bit_width(def_level_encoding.1), length);
+            compose_array(rep_levels, def_levels, max_rep_level, max_def_level, values)
+        }
+        _ => todo!(),
+    }
+}
 
-    compose_array(
-        rep_levels.into_iter(),
-        def_levels.into_iter(),
-        rep_level_encoding.1 as u32,
-        def_level_encoding.1 as u32,
-        iter,
+fn read_array<T: NativeType>(
+    rep_levels: &[u8],
+    def_levels: &[u8],
+    values: &[u8],
+    length: u32,
+    rep_level_encoding: (&Encoding, i16),
+    def_level_encoding: (&Encoding, i16),
+) -> Array {
+    let values = read_buffer::<i64>(values);
+    read_array_impl::<T, _>(
+        rep_levels,
+        def_levels,
+        values,
+        length,
+        rep_level_encoding,
+        def_level_encoding,
     )
 }
 
@@ -91,8 +144,7 @@ pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) 
     match page.header() {
         PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::Plain, None) => {
-                let (rep_levels, def_levels, values) =
-                    levels::split_buffer_v1(page.buffer(), true, true);
+                let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
                 Ok(read_array::<T>(
                     rep_levels,
                     def_levels,
@@ -114,19 +166,16 @@ pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) 
     }
 }
 
-fn read_dict_array<'a>(
-    rep_levels: &'a [u8],
-    def_levels: &'a [u8],
-    values: &'a [u8],
+fn read_dict_array<T: NativeType>(
+    rep_levels: &[u8],
+    def_levels: &[u8],
+    values: &[u8],
     length: u32,
-    dict: &'a PrimitivePageDict<i64>,
+    dict: &PrimitivePageDict<i64>,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Array {
     let dict_values = dict.values();
-
-    let rep_levels = levels::consume_level(rep_levels, length, rep_level_encoding);
-    let def_levels = levels::consume_level(def_levels, length, def_level_encoding);
 
     let bit_width = values[0];
     let values = &values[1..];
@@ -138,12 +187,13 @@ fn read_dict_array<'a>(
 
     let values = indices.map(|id| dict_values[id as usize]);
 
-    compose_array(
-        rep_levels.into_iter(),
-        def_levels.into_iter(),
-        rep_level_encoding.1 as u32,
-        def_level_encoding.1 as u32,
+    read_array_impl::<T, _>(
+        rep_levels,
+        def_levels,
         values,
+        length,
+        rep_level_encoding,
+        def_level_encoding,
     )
 }
 
@@ -155,9 +205,8 @@ pub fn page_dict_to_array<T: NativeType>(
     match page.header() {
         PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => {
-                let (rep_levels, def_levels, values) =
-                    levels::split_buffer_v1(page.buffer(), true, true);
-                Ok(read_dict_array(
+                let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
+                Ok(read_dict_array::<T>(
                     rep_levels,
                     def_levels,
                     values,
