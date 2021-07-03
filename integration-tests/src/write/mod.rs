@@ -1,8 +1,10 @@
 pub(crate) mod primitive;
 
-use crate::{error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions};
+use parquet::{
+    error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions,
+};
 
-use super::read::Array;
+use super::Array;
 
 pub fn array_to_page(
     array: &Array,
@@ -26,14 +28,14 @@ mod tests {
     use std::sync::Arc;
 
     use crate::tests::{alltypes_plain, alltypes_statistics};
-    use crate::write::{write_file, DynIter};
 
-    use crate::compression::CompressionCodec;
-    use crate::metadata::SchemaDescriptor;
-    use crate::statistics::Statistics;
+    use parquet::compression::CompressionCodec;
+    use parquet::error::Result;
+    use parquet::metadata::SchemaDescriptor;
+    use parquet::statistics::Statistics;
+    use parquet::write::{write_file, DynIter};
 
     use super::*;
-    use crate::error::Result;
 
     fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn Statistics>>)> {
         let (a, statistics) = super::super::read::tests::read_column(reader, 0, 0)?;
@@ -122,5 +124,62 @@ mod tests {
     #[test]
     fn float64_col() -> Result<()> {
         test_column(7)
+    }
+}
+
+#[cfg(test)]
+mod tests2 {
+    use std::io::Cursor;
+
+    use super::*;
+
+    use crate::write::primitive::array_to_page_v1;
+    use parquet::{
+        compression::CompressionCodec,
+        error::Result,
+        metadata::SchemaDescriptor,
+        read::read_metadata,
+        write::{write_file, DynIter},
+    };
+
+    #[test]
+    fn basic() -> Result<()> {
+        let array = vec![
+            Some(0),
+            Some(1),
+            Some(2),
+            Some(3),
+            Some(4),
+            Some(5),
+            Some(6),
+        ];
+
+        let options = WriteOptions {
+            write_statistics: false,
+            compression: CompressionCodec::Uncompressed,
+        };
+
+        let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
+
+        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(DynIter::new(
+            std::iter::once(array_to_page_v1(&array, &options, &schema.columns()[0])),
+        ))))));
+
+        let mut writer = Cursor::new(vec![]);
+        write_file(&mut writer, row_groups, schema, options, None, None)?;
+
+        let data = writer.into_inner();
+        let mut reader = Cursor::new(data);
+
+        let metadata = read_metadata(&mut reader)?;
+
+        // validated against an equivalent array produced by pyarrow.
+        let expected = 51;
+        assert_eq!(
+            metadata.row_groups[0].columns()[0].uncompressed_size(),
+            expected
+        );
+
+        Ok(())
     }
 }

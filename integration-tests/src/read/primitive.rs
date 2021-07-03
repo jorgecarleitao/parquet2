@@ -1,15 +1,13 @@
 use std::convert::TryInto;
 
-use parquet_format::Encoding;
-
 use super::levels::{get_bit_width, split_buffer_v1, RLEDecoder};
 use super::utils::ValuesDef;
-use crate::encoding::{bitpacking, uleb128};
-use crate::error::{ParquetError, Result};
-use crate::metadata::ColumnDescriptor;
-use crate::read::PageHeader;
-use crate::{
-    read::{Page, PrimitivePageDict},
+
+use parquet::{
+    encoding::{bitpacking, uleb128, Encoding},
+    error::{ParquetError, Result},
+    metadata::ColumnDescriptor,
+    read::{Page, PageHeader, PrimitivePageDict},
     types::NativeType,
 };
 

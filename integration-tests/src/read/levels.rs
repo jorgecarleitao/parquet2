@@ -1,6 +1,4 @@
-use parquet_format::Encoding;
-
-use crate::encoding::{bitpacking, get_length, hybrid_rle, log2};
+use parquet::encoding::{bitpacking, get_length, hybrid_rle, log2, Encoding};
 
 #[inline]
 pub fn get_bit_width(max_level: i16) -> u32 {

@@ -1,13 +1,14 @@
-use parquet_format::{DataPageHeader, Encoding};
-
-use crate::metadata::ColumnDescriptor;
-use crate::read::PageHeader;
-use crate::statistics::serialize_statistics;
-use crate::statistics::PrimitiveStatistics;
-use crate::statistics::Statistics;
-use crate::write::WriteOptions;
-use crate::{compression::create_codec, encoding::hybrid_rle::encode, error::Result};
-use crate::{read::CompressedPage, types::NativeType};
+use parquet::{
+    metadata::ColumnDescriptor,
+    read::PageHeader,
+    schema::{DataPageHeader, Encoding},
+    statistics::serialize_statistics,
+    statistics::PrimitiveStatistics,
+    statistics::Statistics,
+    write::WriteOptions,
+    {compression::create_codec, encoding::hybrid_rle::encode, error::Result},
+    {read::CompressedPage, types::NativeType},
+};
 
 fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)> {
     // leave the first 4 bytes anouncing the length of the def level

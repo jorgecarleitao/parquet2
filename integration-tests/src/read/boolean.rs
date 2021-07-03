@@ -1,9 +1,7 @@
-use parquet_format::Encoding;
-
-use crate::error::Result;
-use crate::metadata::ColumnDescriptor;
-use crate::read::Page;
-use crate::read::PageHeader;
+use parquet::encoding::Encoding;
+use parquet::error::Result;
+use parquet::metadata::ColumnDescriptor;
+use parquet::read::{Page, PageHeader};
 
 const BIT_MASK: [u8; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
 
