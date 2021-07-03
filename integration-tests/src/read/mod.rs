@@ -7,43 +7,13 @@ mod primitive;
 mod primitive_nested;
 mod utils;
 
-pub mod levels;
+use parquet::error::Result;
+use parquet::metadata::ColumnDescriptor;
+use parquet::read::Page;
+use parquet::schema::types::ParquetType;
+use parquet::schema::types::PhysicalType;
 
-use crate::error::{ParquetError, Result};
-use crate::metadata::ColumnDescriptor;
-use crate::read::Page;
-use crate::schema::types::ParquetType;
-use crate::schema::types::PhysicalType;
-
-// The dynamic representation of values in native Rust. This is not exaustive.
-// todo: maybe refactor this into serde/json?
-#[derive(Debug, PartialEq)]
-pub enum Array {
-    UInt32(Vec<Option<u32>>),
-    Int32(Vec<Option<i32>>),
-    Int64(Vec<Option<i64>>),
-    Int96(Vec<Option<[u32; 3]>>),
-    Float32(Vec<Option<f32>>),
-    Float64(Vec<Option<f64>>),
-    Boolean(Vec<Option<bool>>),
-    Binary(Vec<Option<Vec<u8>>>),
-    List(Vec<Option<Array>>),
-}
-
-// The dynamic representation of values in native Rust. This is not exaustive.
-// todo: maybe refactor this into serde/json?
-#[derive(Debug, PartialEq)]
-pub enum Value {
-    UInt32(Option<u32>),
-    Int32(Option<i32>),
-    Int64(Option<i64>),
-    Int96(Option<[u32; 3]>),
-    Float32(Option<f32>),
-    Float64(Option<f64>),
-    Boolean(Option<bool>),
-    Binary(Option<Vec<u8>>),
-    List(Option<Array>),
-}
+use crate::Array;
 
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
@@ -104,24 +74,22 @@ pub fn page_to_array(page: &Page, descriptor: &ColumnDescriptor) -> Result<Array
                 _ => todo!(),
             },
         },
-        _ => Err(general_err!(
-            "Nested types are not supported by this in-memory format"
-        )),
+        _ => todo!("Nested types are not supported by this in-memory format"),
     }
 }
 
 #[cfg(test)]
 pub(crate) mod tests {
     use std::fs::File;
-    use streaming_iterator::StreamingIterator;
 
-    use crate::read::{get_page_iterator, read_metadata, Decompressor};
-    use crate::statistics::{BinaryStatistics, PrimitiveStatistics, Statistics};
-    use crate::tests::*;
-    use crate::types::int96_to_i64_ns;
+    use parquet::error::Result;
+    use parquet::read::{get_page_iterator, read_metadata, Decompressor, StreamingIterator};
+    use parquet::statistics::{BinaryStatistics, PrimitiveStatistics, Statistics};
+    use parquet::types::int96_to_i64_ns;
 
     use super::*;
-    use crate::error::Result;
+    use crate::tests::*;
+    use crate::{Array, Value};
 
     pub fn read_column<R: std::io::Read + std::io::Seek>(
         reader: &mut R,

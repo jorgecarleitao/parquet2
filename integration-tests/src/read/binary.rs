@@ -1,15 +1,12 @@
-use parquet_format::Encoding;
-
-use super::levels::{get_bit_width, RLEDecoder};
-use crate::error::{ParquetError, Result};
-use crate::metadata::ColumnDescriptor;
-use crate::read::{Page, PageHeader};
-use crate::serialization::read::levels;
-use crate::serialization::read::utils::ValuesDef;
-use crate::{
-    encoding::{bitpacking, plain_byte_array, uleb128},
-    read::BinaryPageDict,
+use parquet::{
+    encoding::{bitpacking, plain_byte_array, uleb128, Encoding},
+    error::Result,
+    metadata::ColumnDescriptor,
+    read::{levels, BinaryPageDict, Page, PageHeader},
 };
+
+use super::utils::ValuesDef;
+use levels::{get_bit_width, RLEDecoder};
 
 fn read_dict_buffer_impl<I: Iterator<Item = u32>>(
     def_levels: I,
@@ -88,9 +85,7 @@ pub fn page_dict_to_vec(
                     ),
                 ))
             }
-            (_, None) => Err(general_err!(
-                "Dictionary-encoded page requires a dictionary"
-            )),
+            (_, None) => todo!("Dictionary-encoded page requires a dictionary"),
             _ => todo!(),
         },
         _ => todo!(),

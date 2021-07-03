@@ -2,7 +2,7 @@
 mod bitmap;
 mod decoder;
 mod encoder;
-pub use bitmap::encode as bitpacked_encode;
+pub use bitmap::{encode as bitpacked_encode, BitmapIter};
 pub use decoder::Decoder;
 pub use encoder::encode;
 

@@ -27,22 +27,30 @@ jobs:
           # these represent compiled steps of both dependencies and arrow
           # and thus are specific for a particular OS, arch and rust version.
           key: ${{ runner.os }}-amd64-target-cache-stable
-      - name: Setup parquet files
-        run: |
-          apt update && apt install python3-pip python3-venv -y -q
-          python3 -m venv venv
-          venv/bin/pip install pip --upgrade
-          venv/bin/pip install pyarrow==3
-          venv/bin/python integration/write_pyarrow.py
       - name: Setup toolchain
         run: |
           rustup toolchain install stable
           rustup default stable
           rustup component add rustfmt
-      - name: Run
+      - name: Run unit tests
         run: |
           export CARGO_HOME="/github/home/.cargo"
           export CARGO_TARGET_DIR="/github/home/target"
+          cargo test
+      - name: Setup parquet files
+        run: |
+          apt update && apt install python3-pip python3-venv -y -q
+          cd integration-tests
+          python3 -m venv venv
+          venv/bin/pip install pip --upgrade
+          venv/bin/pip install pyarrow==3
+          venv/bin/python integration/write_pyarrow.py
+          cd ..
+      - name: Run integration tests
+        run: |
+          export CARGO_HOME="/github/home/.cargo"
+          export CARGO_TARGET_DIR="/github/home/target"
+          cd integration-tests
           cargo test
 
   clippy:
@@ -101,10 +109,12 @@ jobs:
       - name: Setup parquet files
         run: |
           apt update && apt install python3-pip python3-venv -y -q
+          cd integration-tests
           python3 -m venv venv
           venv/bin/pip install pip --upgrade
           venv/bin/pip install pyarrow==3
           venv/bin/python integration/write_pyarrow.py
+          cd ..
       - name: Run coverage
         run: |
           export CARGO_HOME="/home/runner/.cargo"
@@ -113,6 +123,8 @@ jobs:
           # 2020-11-15: There is a cargo-tarpaulin regression in 0.17.0
           # see https://github.com/xd009642/tarpaulin/issues/618
           cargo install --version 0.16.0 cargo-tarpaulin
+          cargo tarpaulin --out Xml
+          cd integration-tests
           cargo tarpaulin --out Xml
       - name: Report coverage
         continue-on-error: true

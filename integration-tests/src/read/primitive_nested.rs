@@ -1,17 +1,15 @@
 use std::convert::TryInto;
 
-use parquet_format::Encoding;
-
-use super::levels::{get_bit_width, split_buffer_v1, RLEDecoder};
 use super::Array;
-use crate::encoding::{bitpacking, uleb128};
-use crate::metadata::ColumnDescriptor;
-use crate::read::PageHeader;
-use crate::{
+
+use parquet::{
+    encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
-    read::PrimitivePageDict,
+    metadata::ColumnDescriptor,
+    read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
+    read::{Page, PageHeader, PrimitivePageDict},
+    types::NativeType,
 };
-use crate::{read::Page, types::NativeType};
 
 fn read_buffer<T: NativeType>(values: &[u8]) -> impl Iterator<Item = T> + '_ {
     let chunks = values.chunks_exact(std::mem::size_of::<T>());
