@@ -16,15 +16,15 @@ pub struct RLEDecoder<'a> {
     runner: hybrid_rle::Decoder<'a>,
     state: DecoderState<'a>,
     num_bits: u32,
-    length: u32,
+    length: usize,
     length_so_far: usize,
 }
 
 impl<'a> RLEDecoder<'a> {
     pub fn new(values: &'a [u8], num_bits: u32, length: u32) -> Self {
-        let runner = hybrid_rle::Decoder::new(&values, num_bits);
+        let runner = hybrid_rle::Decoder::new(values, num_bits);
         let mut this = Self {
-            length,
+            length: length as usize,
             num_bits,
             state: DecoderState::Finished,
             runner,
@@ -63,6 +63,7 @@ impl<'a> RLEDecoder<'a> {
                 }
             }
         } else {
+            assert_eq!(self.length_so_far, self.length);
             self.state = DecoderState::Finished;
         }
     }
@@ -71,6 +72,7 @@ impl<'a> RLEDecoder<'a> {
 impl<'a> Iterator for RLEDecoder<'a> {
     type Item = u32;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let next = match &mut self.state {
             DecoderState::Finished => return None,
@@ -91,7 +93,13 @@ impl<'a> Iterator for RLEDecoder<'a> {
         self.length_so_far += 1;
         next
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.length, Some(self.length))
+    }
 }
+
+impl<'a> ExactSizeIterator for RLEDecoder<'a> {}
 
 /// returns slices corresponding to (rep, def, values) for v1 pages
 #[inline]
