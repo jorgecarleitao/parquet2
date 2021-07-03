@@ -7,8 +7,6 @@ mod primitive;
 mod primitive_nested;
 mod utils;
 
-pub mod levels;
-
 use parquet::error::Result;
 use parquet::metadata::ColumnDescriptor;
 use parquet::read::Page;

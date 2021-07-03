@@ -2,12 +2,11 @@ use parquet::{
     encoding::{bitpacking, plain_byte_array, uleb128, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
-    read::{BinaryPageDict, Page, PageHeader},
+    read::{levels, BinaryPageDict, Page, PageHeader},
 };
 
-use super::levels;
-use super::levels::{get_bit_width, RLEDecoder};
 use super::utils::ValuesDef;
+use levels::{get_bit_width, RLEDecoder};
 
 fn read_dict_buffer_impl<I: Iterator<Item = u32>>(
     def_levels: I,

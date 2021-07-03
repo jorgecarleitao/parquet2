@@ -1,12 +1,12 @@
 use std::convert::TryInto;
 
-use super::levels::{get_bit_width, split_buffer_v1, RLEDecoder};
 use super::utils::ValuesDef;
 
 use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
+    read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
     read::{Page, PageHeader, PrimitivePageDict},
     types::NativeType,
 };
