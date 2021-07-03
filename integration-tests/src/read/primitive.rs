@@ -6,7 +6,7 @@ use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
+    read::levels::{get_bit_width, split_buffer_v1, split_buffer_v2, RLEDecoder},
     read::{Page, PageHeader, PrimitivePageDict},
     types::NativeType,
 };
@@ -134,9 +134,11 @@ pub fn page_dict_to_vec<T: NativeType>(
         },
         PageHeader::V2(header) => match (&header.encoding, &page.dictionary_page()) {
             (Encoding::RleDictionary, Some(dict)) | (Encoding::PlainDictionary, Some(dict)) => {
-                let (def_levels, values) = page
-                    .buffer()
-                    .split_at(header.definition_levels_byte_length as usize);
+                let (_, def_levels, values) = split_buffer_v2(
+                    page.buffer(),
+                    header.repetition_levels_byte_length as usize,
+                    header.definition_levels_byte_length as usize,
+                );
                 Ok(read_dict_buffer::<T>(
                     def_levels,
                     values,
@@ -174,9 +176,11 @@ pub fn page_to_vec<T: NativeType>(
         },
         PageHeader::V2(header) => match (&header.encoding, &page.dictionary_page()) {
             (Encoding::Plain, None) => {
-                let (def_levels, values) = page
-                    .buffer()
-                    .split_at(header.definition_levels_byte_length as usize);
+                let (_, def_levels, values) = split_buffer_v2(
+                    page.buffer(),
+                    header.repetition_levels_byte_length as usize,
+                    header.definition_levels_byte_length as usize,
+                );
                 Ok(read_buffer::<T>(
                     def_levels,
                     values,
