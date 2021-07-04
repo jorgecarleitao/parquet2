@@ -1,7 +1,10 @@
 pub(crate) mod primitive;
 
 use parquet::{
-    error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions,
+    error::Result,
+    metadata::ColumnDescriptor,
+    read::CompressedPage,
+    write::{Version, WriteOptions},
 };
 
 use super::Array;
@@ -48,6 +51,7 @@ mod tests {
         let options = WriteOptions {
             write_statistics: true,
             compression: CompressionCodec::Uncompressed,
+            version: Version::V1,
         };
 
         // prepare schema
@@ -157,6 +161,7 @@ mod tests2 {
         let options = WriteOptions {
             write_statistics: false,
             compression: CompressionCodec::Uncompressed,
+            version: Version::V1,
         };
 
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
