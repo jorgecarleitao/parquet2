@@ -18,8 +18,24 @@ use crate::read::CompressedPage;
 pub type RowGroupIter<'a, E> =
     DynIter<'a, std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>>;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct WriteOptions {
     pub write_statistics: bool,
     pub compression: CompressionCodec,
+    pub version: Version,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+pub enum Version {
+    V1,
+    V2,
+}
+
+impl From<Version> for i32 {
+    fn from(version: Version) -> Self {
+        match version {
+            Version::V1 => 1,
+            Version::V2 => 2,
+        }
+    }
 }

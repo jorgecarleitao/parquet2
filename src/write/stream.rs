@@ -49,7 +49,7 @@ where
     let num_rows = row_groups.iter().map(|group| group.num_rows).sum();
 
     let metadata = FileMetaData::new(
-        1,
+        options.version.into(),
         schema.into_thrift()?,
         num_rows,
         row_groups,
