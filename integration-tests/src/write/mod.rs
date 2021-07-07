@@ -1,10 +1,7 @@
 pub(crate) mod primitive;
 
 use parquet::{
-    error::Result,
-    metadata::ColumnDescriptor,
-    read::CompressedPage,
-    write::{Version, WriteOptions},
+    error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions,
 };
 
 use super::Array;
@@ -36,7 +33,7 @@ mod tests {
     use parquet::error::Result;
     use parquet::metadata::SchemaDescriptor;
     use parquet::statistics::Statistics;
-    use parquet::write::{write_file, DynIter};
+    use parquet::write::{write_file, DynIter, Version};
 
     use super::*;
 
@@ -143,7 +140,7 @@ mod tests2 {
         error::Result,
         metadata::SchemaDescriptor,
         read::read_metadata,
-        write::{write_file, DynIter},
+        write::{write_file, DynIter, Version},
     };
 
     #[test]

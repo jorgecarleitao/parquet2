@@ -16,6 +16,8 @@ pub struct ColumnDescriptor {
 
     // The path of this column. For instance, "a.b.c.d".
     path_in_schema: Vec<String>,
+
+    base_type: ParquetType,
 }
 
 impl ColumnDescriptor {
@@ -25,12 +27,14 @@ impl ColumnDescriptor {
         max_def_level: i16,
         max_rep_level: i16,
         path_in_schema: Vec<String>,
+        base_type: ParquetType,
     ) -> Self {
         Self {
             primitive_type,
             max_def_level,
             max_rep_level,
             path_in_schema,
+            base_type,
         }
     }
 
@@ -46,6 +50,10 @@ impl ColumnDescriptor {
 
     pub fn path_in_schema(&self) -> &[String] {
         &self.path_in_schema
+    }
+
+    pub fn base_type(&self) -> &ParquetType {
+        &self.base_type
     }
 
     /// Returns self type [`ParquetType`] for this leaf column.
