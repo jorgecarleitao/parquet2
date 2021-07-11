@@ -146,30 +146,35 @@ mod tests {
             1,
             0,
             vec!["col".to_string()],
+            ParquetType::from_physical("col".to_string(), PhysicalType::Int32),
         );
         let descriptor_i64 = ColumnDescriptor::new(
             ParquetType::from_physical("col".to_string(), PhysicalType::Int64),
             1,
             0,
             vec!["col".to_string()],
+            ParquetType::from_physical("col".to_string(), PhysicalType::Int64),
         );
         let descriptor_f32 = ColumnDescriptor::new(
             ParquetType::from_physical("col".to_string(), PhysicalType::Float),
             1,
             0,
             vec!["col".to_string()],
+            ParquetType::from_physical("col".to_string(), PhysicalType::Float),
         );
         let descriptor_f64 = ColumnDescriptor::new(
             ParquetType::from_physical("col".to_string(), PhysicalType::Double),
             1,
             0,
             vec!["col".to_string()],
+            ParquetType::from_physical("col".to_string(), PhysicalType::Double),
         );
         let descriptor_byte = ColumnDescriptor::new(
             ParquetType::from_physical("col".to_string(), PhysicalType::ByteArray),
             1,
             0,
             vec!["col".to_string()],
+            ParquetType::from_physical("col".to_string(), PhysicalType::ByteArray),
         );
 
         match column {
