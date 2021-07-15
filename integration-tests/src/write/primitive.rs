@@ -6,7 +6,7 @@ use parquet::{
     statistics::PrimitiveStatistics,
     statistics::Statistics,
     write::WriteOptions,
-    {compression::create_codec, encoding::hybrid_rle::encode, error::Result},
+    {compression::create_codec, encoding::hybrid_rle::encode_bool, error::Result},
     {read::CompressedPage, types::NativeType},
 };
 
@@ -27,7 +27,7 @@ fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)
             false
         }
     });
-    encode(&mut validity, iter)?;
+    encode_bool(&mut validity, iter)?;
 
     // write the length, now that it is known
     let mut validity = validity.into_inner();

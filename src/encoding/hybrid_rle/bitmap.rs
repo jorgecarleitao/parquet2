@@ -66,7 +66,7 @@ impl<'a> Iterator for BitmapIter<'a> {
 }
 
 /// Writes an iterator of bools into writer, with LSB first.
-pub fn encode<W: Write, I: Iterator<Item = bool>>(
+pub fn encode_bool<W: Write, I: Iterator<Item = bool>>(
     writer: &mut W,
     mut iterator: I,
 ) -> std::io::Result<()> {
