@@ -71,7 +71,9 @@ impl<'a> Iterator for Block<'a> {
                 .map(|x| x.next().unwrap())
                 .unwrap_or(0) as i64;
         self.current_index += 1;
-        if self.current_index == self.values_per_mini_block {
+        self.remaining -= 1;
+
+        if self.remaining > 0 && self.current_index == self.values_per_mini_block {
             // read first bitwidth
             let num_bits = self.bitwidths[0];
             self.bitwidths = &self.bitwidths[1..];
@@ -87,13 +89,14 @@ impl<'a> Iterator for Block<'a> {
             };
             self.current_index = 0;
         }
-        self.remaining -= 1;
 
         Some(result as u32)
     }
 }
 
-/// An iterator that, given a slice of bytes, returns `HybridEncoded`
+/// Decoder of parquets' `DELTA_BINARY_PACKED`. Implements `Iterator<Item = i32>`.
+/// # Implementation
+/// This struct does not allocate on the heap.
 #[derive(Debug)]
 pub struct Decoder<'a> {
     block_size: u64,
@@ -147,16 +150,16 @@ impl<'a> Decoder<'a> {
 }
 
 impl<'a> Iterator for Decoder<'a> {
-    type Item = u32;
+    type Item = i32;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.total_count == 0 {
             return None;
         }
         self.total_count -= 1;
-        let delta = self.current_block.next().unwrap();
-        let result = Some(self.first_value as u32);
-        self.first_value += delta as i64;
+        let delta = self.current_block.next().map(|x| x as i64).unwrap_or(1);
+        let result = Some(self.first_value as i32);
+        self.first_value += delta;
         result
     }
 
@@ -171,7 +174,7 @@ mod tests {
 
     #[test]
     fn test_from_spec() {
-        let expected = (1u32..=5).collect::<Vec<_>>();
+        let expected = (1i32..=5).collect::<Vec<_>>();
         // VALIDATED FROM SPARK==3.1.1
         // header: [128, 1, 4, 5, 2]
         // block size: 128, 1
@@ -193,7 +196,7 @@ mod tests {
 
     #[test]
     fn case2() {
-        let expected = vec![1u32, 2, 3, 4, 5, 1];
+        let expected = vec![1i32, 2, 3, 4, 5, 1];
         // VALIDATED FROM SPARK==3.1.1
         // header: [128, 1, 4, 6, 2]
         // block size: 128, 1 <=u> 128
