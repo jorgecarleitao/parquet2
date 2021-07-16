@@ -4,6 +4,8 @@ use std::convert::TryInto;
 use bitpacking::BitPacker;
 use bitpacking::BitPacker1x;
 
+use super::ceil8;
+
 pub const BLOCK_LEN: usize = bitpacking::BitPacker1x::BLOCK_LEN;
 
 /// Encodes `u32` values into a buffer using `num_bits`.
@@ -12,18 +14,28 @@ pub fn encode(decompressed: &[u32], num_bits: u8, compressed: &mut [u8]) -> usiz
 
     let remainder = chunks.remainder();
 
-    let mut last_chunk = remainder.to_vec();
-    let trailing = BitPacker1x::BLOCK_LEN - remainder.len();
-    last_chunk.extend(std::iter::repeat(0).take(trailing));
+    let size = ceil8(BitPacker1x::BLOCK_LEN * num_bits as usize);
+    if !remainder.is_empty() {
+        let mut last_chunk = remainder.to_vec();
+        let trailing = BitPacker1x::BLOCK_LEN - remainder.len();
+        last_chunk.extend(std::iter::repeat(0).take(trailing));
 
-    let mut compressed_len = 0;
-    chunks
-        .chain(std::iter::once(last_chunk.as_ref()))
-        .for_each(|chunk| {
-            let chunk_compressed =
-                &mut compressed[compressed_len..compressed_len + BitPacker1x::BLOCK_LEN];
+        let mut compressed_len = 0;
+        chunks
+            .chain(std::iter::once(last_chunk.as_ref()))
+            .for_each(|chunk| {
+                let chunk_compressed = &mut compressed[compressed_len..compressed_len + size];
+                compressed_len +=
+                    encode_pack(chunk.try_into().unwrap(), num_bits, chunk_compressed);
+            });
+    } else {
+        let mut compressed_len = 0;
+        chunks.for_each(|chunk| {
+            let chunk_compressed = &mut compressed[compressed_len..compressed_len + size];
             compressed_len += encode_pack(chunk.try_into().unwrap(), num_bits, chunk_compressed);
         });
+    }
+
     decompressed.len() * num_bits as usize / 8
 }
 

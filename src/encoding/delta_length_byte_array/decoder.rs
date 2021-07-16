@@ -9,7 +9,7 @@ use super::super::delta_bitpacked;
 /// use parquet2::encoding::delta_length_byte_array::Decoder;
 ///
 /// let expected = &["Hello", "World"];
-/// let expected_lengths = expected.iter().map(|x| x.len() as u32).collect::<Vec<_>>();
+/// let expected_lengths = expected.iter().map(|x| x.len() as i32).collect::<Vec<_>>();
 /// let expected_values = expected.join("");
 /// let expected_values = expected_values.as_bytes();
 /// let data = &[
@@ -54,12 +54,12 @@ impl<'a> Decoder<'a> {
 }
 
 impl<'a> Iterator for Decoder<'a> {
-    type Item = u32;
+    type Item = i32;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.lengths.next();
         if let Some(result) = result {
-            self.total_length += result
+            self.total_length += result as u32
         }
         result
     }

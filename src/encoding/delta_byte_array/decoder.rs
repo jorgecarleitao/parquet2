@@ -30,7 +30,7 @@ impl<'a> Iterator for Decoder<'a> {
     type Item = u32;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.prefix_lengths.next()
+        self.prefix_lengths.next().map(|x| x as u32)
     }
 }
 
@@ -50,7 +50,7 @@ mod tests {
         ];
         // result of encoding
         let expected = &["Hello", "World"];
-        let expected_lengths = expected.iter().map(|x| x.len() as u32).collect::<Vec<_>>();
+        let expected_lengths = expected.iter().map(|x| x.len() as i32).collect::<Vec<_>>();
         let expected_prefixes = vec![0, 0];
         let expected_values = expected.join("");
         let expected_values = expected_values.as_bytes();
