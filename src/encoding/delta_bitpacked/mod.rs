@@ -46,4 +46,19 @@ mod tests {
         let result = iter.collect::<Vec<_>>();
         assert_eq!(result, data);
     }
+
+    #[test]
+    fn test_another() {
+        let data = vec![2, 3, 1, 2, 1];
+
+        let mut buffer = vec![];
+        encode(data.clone().into_iter(), &mut buffer);
+        let len = buffer.len();
+        let mut iter = Decoder::new(&buffer);
+
+        let result = iter.by_ref().collect::<Vec<_>>();
+        assert_eq!(result, data);
+
+        assert_eq!(iter.consumed_bytes(), len);
+    }
 }

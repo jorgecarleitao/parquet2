@@ -1,3 +1,5 @@
+use crate::encoding::ceil8;
+
 use super::super::bitpacking;
 use super::super::uleb128;
 use super::super::zigzag_leb128;
@@ -10,15 +12,23 @@ struct Block<'a> {
     values_per_mini_block: usize,
     bitwidths: &'a [u8],
     values: &'a [u8],
-    remaining: usize,
+    remaining: usize,     // number of elements
     current_index: usize, // invariant: < values_per_mini_block
     // None represents a relative delta of zero, in which case there is no miniblock.
     current_miniblock: Option<bitpacking::Decoder<'a>>,
+    // number of bytes consumed.
     consumed_bytes: usize,
 }
 
 impl<'a> Block<'a> {
-    pub fn new(mut values: &'a [u8], num_mini_blocks: usize, values_per_mini_block: usize) -> Self {
+    pub fn new(
+        mut values: &'a [u8],
+        num_mini_blocks: usize,
+        values_per_mini_block: usize,
+        length: usize,
+    ) -> Self {
+        let length = std::cmp::min(length, num_mini_blocks * values_per_mini_block);
+
         let mut consumed_bytes = 0;
         let (min_delta, consumed) = zigzag_leb128::decode(values);
         consumed_bytes += consumed;
@@ -33,12 +43,9 @@ impl<'a> Block<'a> {
         bitwidths = &bitwidths[1..];
 
         let current_miniblock = if num_bits > 0 {
-            consumed_bytes += values_per_mini_block * num_bits as usize / 8;
-            Some(bitpacking::Decoder::new(
-                values,
-                num_bits,
-                values_per_mini_block,
-            ))
+            let length = std::cmp::min(length, values_per_mini_block);
+            consumed_bytes += ceil8(values_per_mini_block * num_bits as usize);
+            Some(bitpacking::Decoder::new(values, num_bits, length))
         } else {
             None
         };
@@ -48,7 +55,7 @@ impl<'a> Block<'a> {
             num_mini_blocks,
             values_per_mini_block,
             bitwidths,
-            remaining: num_mini_blocks * values_per_mini_block,
+            remaining: length,
             values,
             current_index: 0,
             current_miniblock,
@@ -74,16 +81,12 @@ impl<'a> Iterator for Block<'a> {
         self.remaining -= 1;
 
         if self.remaining > 0 && self.current_index == self.values_per_mini_block {
-            // read first bitwidth
             let num_bits = self.bitwidths[0];
             self.bitwidths = &self.bitwidths[1..];
             self.current_miniblock = if num_bits > 0 {
-                self.consumed_bytes += self.values_per_mini_block * num_bits as usize / 8;
-                Some(bitpacking::Decoder::new(
-                    self.values,
-                    num_bits,
-                    self.values_per_mini_block,
-                ))
+                let length = std::cmp::min(self.remaining, self.values_per_mini_block);
+                self.consumed_bytes += ceil8(self.values_per_mini_block * num_bits as usize);
+                Some(bitpacking::Decoder::new(self.values, num_bits, length))
             } else {
                 None
             };
@@ -100,12 +103,13 @@ impl<'a> Iterator for Block<'a> {
 #[derive(Debug)]
 pub struct Decoder<'a> {
     block_size: u64,
-    num_mini_blocks: u64,
+    num_mini_blocks: usize,
     values_per_mini_block: usize,
-    total_count: u64,
-    first_value: i64, // the cumulative
+    total_count: usize, // total number of elements
+    first_value: i64,   // the cumulative
     values: &'a [u8],
     current_block: Block<'a>,
+    // the total number of bytes consumed up to a given point, excluding the bytes on the current_block
     consumed_bytes: usize,
 }
 
@@ -117,21 +121,26 @@ impl<'a> Decoder<'a> {
         assert_eq!(block_size % 128, 0);
         values = &values[consumed..];
         let (num_mini_blocks, consumed) = uleb128::decode(values);
+        let num_mini_blocks = num_mini_blocks as usize;
         consumed_bytes += consumed;
         values = &values[consumed..];
         let (total_count, consumed) = uleb128::decode(values);
+        let total_count = total_count as usize;
         consumed_bytes += consumed;
         values = &values[consumed..];
         let (first_value, consumed) = zigzag_leb128::decode(values);
         consumed_bytes += consumed;
         values = &values[consumed..];
 
-        let values_per_mini_block = (block_size / num_mini_blocks) as usize;
+        let values_per_mini_block = block_size as usize / num_mini_blocks;
         assert_eq!(values_per_mini_block % 8, 0);
 
-        let current_block = Block::new(values, num_mini_blocks as usize, values_per_mini_block);
-        consumed_bytes += current_block.consumed_bytes;
-
+        let current_block = Block::new(
+            values,
+            num_mini_blocks as usize,
+            values_per_mini_block,
+            total_count,
+        );
         Self {
             block_size,
             num_mini_blocks,
@@ -144,8 +153,9 @@ impl<'a> Decoder<'a> {
         }
     }
 
+    /// Returns the total number of bytes consumed up to this point by [`Decoder`].
     pub fn consumed_bytes(&self) -> usize {
-        self.consumed_bytes
+        self.consumed_bytes + self.current_block.consumed_bytes
     }
 }
 
@@ -156,8 +166,23 @@ impl<'a> Iterator for Decoder<'a> {
         if self.total_count == 0 {
             return None;
         }
+        let delta = if let Some(x) = self.current_block.next() {
+            x as i64
+        } else {
+            // load next block
+            self.values = &self.values[self.current_block.consumed_bytes..];
+            self.consumed_bytes += self.current_block.consumed_bytes;
+            self.current_block = Block::new(
+                self.values,
+                self.num_mini_blocks,
+                self.values_per_mini_block,
+                self.total_count,
+            );
+            // block is never empty because `self.total_count > 0` at this point, so this is infalible
+            self.current_block.next().unwrap() as i64
+        };
         self.total_count -= 1;
-        let delta = self.current_block.next().map(|x| x as i64).unwrap_or(1);
+
         let result = Some(self.first_value as i32);
         self.first_value += delta;
         result
@@ -191,7 +216,7 @@ mod tests {
 
         assert_eq!(expected, r);
 
-        assert_eq!(decoder.consumed_bytes, 10);
+        assert_eq!(decoder.consumed_bytes(), 10);
     }
 
     #[test]
@@ -221,6 +246,6 @@ mod tests {
         let r = decoder.by_ref().collect::<Vec<_>>();
 
         assert_eq!(expected, r);
-        assert_eq!(decoder.consumed_bytes, data.len() - 3);
+        assert_eq!(decoder.consumed_bytes(), data.len() - 3);
     }
 }
