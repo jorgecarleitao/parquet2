@@ -64,7 +64,7 @@ pub fn encode<I: Iterator<Item = i32>>(mut iterator: I, buffer: &mut Vec<u8>) {
             buffer.resize(bytes_needed, 0);
             bitpacking::encode(deltas.as_ref(), num_bits, &mut buffer[start..]);
 
-            let bytes_needed = start + ceil8(consumed * num_bits as usize);
+            let bytes_needed = start + ceil8(deltas.len() * num_bits as usize);
             buffer.truncate(bytes_needed);
         }
 
@@ -110,7 +110,8 @@ mod tests {
         //      0b01101101
         //      0b00001011
         // ]
-        let expected = vec![128u8, 1, 1, 6, 2, 7, 3, 0b01101101, 0b00001011];
+        let mut expected = vec![128u8, 1, 1, 6, 2, 7, 3, 0b01101101, 0b00001011];
+        expected.extend(std::iter::repeat(0).take(128 * 3 / 8 - 2)); // 128 values, 3 bits, 2 already used
 
         let mut buffer = vec![];
         encode(data.into_iter(), &mut buffer);
