@@ -55,10 +55,12 @@ with them from spark, thereby hindering robust integration tests.
 
 * `read`: read metadata and pages
 * `write`: write metadata and pages
+* `encoding`: encoders and decoders of the different parquet encodings
 * `metadata`: parquet files metadata (e.g. `FileMetaData`)
 * `schema`: types metadata declaration (e.g. `ConvertedType`)
-* `types`: physical type declaration (i.e. how things are represented in memory). So far unused.
-* `compression`: compression (e.g. Gzip)
+* `types.rs`: physical type declaration (i.e. how things are represented in memory).
+* `statistics`: deserialized representation of a parquet page
+* `compression`: compressors and decompressors compression (e.g. Gzip)
 * `error`: errors declaration
 
 ## Run integration tests
@@ -75,46 +77,20 @@ venv/bin/python integration/write_pyarrow.py
 cargo test
 ```
 
-before. This is only needed once (per change in the `integration/write_pyarrow.py`).
+before. This is only needed once (per change in the `integration-tests/integration/write_pyarrow.py`).
 
-## How to use
+## How to implement page readers
 
-```rust
-use std::fs::File;
+The in-memory format used to consume parquet pages strongly influences how the pages should be deserialized. As such, this crate does not commit to a particular in-memory format. Consumers are responsible for converting pages to their target in-memory format.
 
-use parquet2::read::{Page, read_metadata, get_page_iterator};
-
-let mut file = File::open("testing/parquet-testing/data/alltypes_plain.parquet").unwrap();
-
-/// here we read the metadata.
-let metadata = read_metadata(&mut file)?;
-
-/// Here we get an iterator of pages (each page has its own data)
-/// This can be heavily parallelized; not even the same `file` is needed here...
-/// feel free to wrap `metadata` under an `Arc`
-let row_group = 0;
-let column = 0;
-let mut iter = get_page_iterator(&metadata, row_group, column, &mut file)?;
-
-/// A page. It is just (compressed) bytes at this point.
-let page = iter.next().unwrap().unwrap();
-println!("{:#?}", page);
-```
-
-### How to implement page readers
-
-In general, the in-memory format used to consume parquet pages strongly influences how the pages should be deserialized. As such, this crate does not commit to a particular in-memory format. Consumers are responsible for converting pages to their target in-memory format.
-
-This repository contains a serialization to a simple in-memory format in `array-tests`, that are
+This git repository contains a serialization to a simple in-memory format in `integration`, that is
 used to validate integration with other implementations.
 
-There is also implementation for the arrow format [here](https://github.com/jorgecarleitao/arrow2).
+There is also an implementation for the arrow format [here](https://github.com/jorgecarleitao/arrow2).
 
 ### Higher Parallelism
 
-The function above creates an iterator over a row group, `iter`. In Arrow, this
-corresponds to a `RecordBatch`, divided in Parquet pages. Typically, 
-converting a page into in-memory is expensive and thus consider how to 
+Typically, converting a page into memory is expensive and thus consider how to 
 distribute work across threads. E.g.
 
 ```rust 
