@@ -17,6 +17,9 @@ It is up to the consumers to decide whether they want to take advantage of this
 through parallelism at the expense of memory usage (e.g. decompress and deserialize
 pages in threads) or not.
 
+This crate cannot be used directly to read parquet (except metadata). To read data from parquet,
+checkout [arrow2](https://github.com/jorgecarleitao/arrow2).
+
 ## Functionality implemented
 
 * Read dictionary pages
@@ -50,6 +53,8 @@ with them from spark, thereby hindering robust integration tests.
 
 * [PLAIN](https://github.com/apache/parquet-format/blob/master/Encodings.md#plain-plain--0)
 * [RLE hybrid](https://github.com/apache/parquet-format/blob/master/Encodings.md#run-length-encoding--bit-packing-hybrid-rle--3)
+* [Delta-encoding](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-encoding-delta_binary_packed--5)
+* [Delta length byte array](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-length-byte-array-delta_length_byte_array--6)
 
 ## Organization
 

@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+/// Unofficial implementation of parquet IO in Rust.
 
 #[macro_use]
 pub mod error;
