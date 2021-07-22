@@ -32,7 +32,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
             let (type_, type_length) = physical_type_to_type(physical_type);
             let converted_type = converted_type
                 .as_ref()
-                .map(|x| primitive_converted_to_converted(&x));
+                .map(|x| primitive_converted_to_converted(x));
             let (converted_type, maybe_decimal) = converted_type
                 .map(|x| (Some(x.0), x.1))
                 .unwrap_or((None, None));
@@ -60,7 +60,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
         } => {
             let converted_type = converted_type
                 .as_ref()
-                .map(|x| group_converted_converted_to(&x));
+                .map(|x| group_converted_converted_to(x));
 
             let repetition_type = if basic_info.is_root() {
                 // https://github.com/apache/parquet-format/blob/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46/src/main/thrift/parquet.thrift#L363

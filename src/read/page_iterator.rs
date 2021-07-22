@@ -119,7 +119,7 @@ fn build_page<R: Read>(
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
             let page = read_page_dict(
-                &buffer,
+                buffer,
                 dict_header.num_values as u32,
                 (
                     reader.compression,

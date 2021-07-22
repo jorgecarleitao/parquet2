@@ -48,12 +48,12 @@ fn deserialize(
         PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
             "Boolean physical type cannot be dictionary-encoded".to_string(),
         )),
-        PhysicalType::Int32 => primitive::read::<i32>(&buf, num_values, is_sorted),
-        PhysicalType::Int64 => primitive::read::<i64>(&buf, num_values, is_sorted),
-        PhysicalType::Int96 => primitive::read::<[u32; 3]>(&buf, num_values, is_sorted),
-        PhysicalType::Float => primitive::read::<f32>(&buf, num_values, is_sorted),
-        PhysicalType::Double => primitive::read::<f64>(&buf, num_values, is_sorted),
-        PhysicalType::ByteArray => binary::read(&buf, num_values),
-        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(&buf, *size, num_values),
+        PhysicalType::Int32 => primitive::read::<i32>(buf, num_values, is_sorted),
+        PhysicalType::Int64 => primitive::read::<i64>(buf, num_values, is_sorted),
+        PhysicalType::Int96 => primitive::read::<[u32; 3]>(buf, num_values, is_sorted),
+        PhysicalType::Float => primitive::read::<f32>(buf, num_values, is_sorted),
+        PhysicalType::Double => primitive::read::<f64>(buf, num_values, is_sorted),
+        PhysicalType::ByteArray => binary::read(buf, num_values),
+        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(buf, *size, num_values),
     }
 }

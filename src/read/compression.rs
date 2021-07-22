@@ -32,7 +32,7 @@ fn decompress_v2(
 
         decompressor.decompress(&compressed[offset..], &mut buffer[offset..])?;
     } else {
-        buffer.copy_from_slice(&compressed);
+        buffer.copy_from_slice(compressed);
     }
     Ok(())
 }
