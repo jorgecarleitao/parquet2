@@ -1,7 +1,7 @@
 pub(crate) mod primitive;
 
 use parquet::{
-    error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions,
+    error::Result, metadata::ColumnDescriptor, read::CompressedDataPage, write::WriteOptions,
 };
 
 use super::Array;
@@ -10,7 +10,7 @@ pub fn array_to_page(
     array: &Array,
     options: &WriteOptions,
     descriptor: &ColumnDescriptor,
-) -> Result<CompressedPage> {
+) -> Result<CompressedDataPage> {
     // using plain encoding format
     match array {
         Array::Int32(array) => primitive::array_to_page_v1(&array, options, descriptor),

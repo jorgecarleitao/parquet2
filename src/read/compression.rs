@@ -3,7 +3,7 @@ use parquet_format::DataPageHeaderV2;
 use crate::compression::{create_codec, Codec};
 use crate::error::Result;
 
-use super::page::{CompressedPage, PageHeader};
+use super::page::{CompressedDataPage, PageHeader};
 use super::{Page, PageIterator, StreamingIterator};
 
 fn decompress_v1(compressed: &[u8], decompressor: &mut dyn Codec, buffer: &mut [u8]) -> Result<()> {
@@ -41,7 +41,7 @@ fn decompress_v2(
 /// If `page.buffer.len() == 0`, there was no decompression and the buffer was moved.
 /// Else, decompression took place.
 pub fn decompress_buffer(
-    compressed_page: &mut CompressedPage,
+    compressed_page: &mut CompressedDataPage,
     buffer: &mut Vec<u8>,
 ) -> Result<bool> {
     let codec = create_codec(&compressed_page.compression())?;
@@ -66,7 +66,7 @@ pub fn decompress_buffer(
 }
 
 /// Decompresses the page, using `buffer` for decompression.
-pub fn decompress(mut compressed_page: CompressedPage, buffer: &mut Vec<u8>) -> Result<Page> {
+pub fn decompress(mut compressed_page: CompressedDataPage, buffer: &mut Vec<u8>) -> Result<Page> {
     decompress_buffer(&mut compressed_page, buffer)?;
     Ok(Page::new(
         compressed_page.header,
@@ -77,7 +77,7 @@ pub fn decompress(mut compressed_page: CompressedPage, buffer: &mut Vec<u8>) -> 
 }
 
 fn decompress_reuse<R: std::io::Read>(
-    mut compressed_page: CompressedPage,
+    mut compressed_page: CompressedDataPage,
     iterator: &mut PageIterator<R>,
     buffer: &mut Vec<u8>,
     decompressions: &mut usize,

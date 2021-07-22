@@ -17,7 +17,7 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::metadata::RowGroupMetaData;
 use crate::{error::Result, metadata::FileMetaData};
 
-pub use page::{CompressedPage, Page, PageHeader};
+pub use page::{CompressedDataPage, Page, PageHeader};
 pub use page_dict::{BinaryPageDict, FixedLenByteArrayPageDict, PageDict, PrimitivePageDict};
 pub use page_iterator::PageIterator;
 

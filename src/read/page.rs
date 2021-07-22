@@ -9,11 +9,11 @@ use crate::metadata::ColumnDescriptor;
 use super::page_dict::PageDict;
 use crate::statistics::{deserialize_statistics, Statistics};
 
-/// A [`CompressedPage`] is compressed, encoded representation of a Parquet page. It holds actual data
+/// A [`CompressedDataPage`] is compressed, encoded representation of a Parquet page. It holds actual data
 /// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
 /// as soon as it is not needed, thereby reducing memory usage.
 #[derive(Debug)]
-pub struct CompressedPage {
+pub struct CompressedDataPage {
     pub(crate) header: PageHeader,
     pub(crate) buffer: Vec<u8>,
     compression: CompressionCodec,
@@ -22,7 +22,7 @@ pub struct CompressedPage {
     pub(crate) descriptor: ColumnDescriptor,
 }
 
-impl CompressedPage {
+impl CompressedDataPage {
     pub fn new(
         header: PageHeader,
         buffer: Vec<u8>,
@@ -160,5 +160,5 @@ impl Page {
     }
 }
 
-// read: CompressedPage -> Page
-// write: Page -> CompressedPage
+// read: CompressedDataPage -> Page
+// write: Page -> CompressedDataPage

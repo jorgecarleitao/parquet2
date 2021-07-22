@@ -8,7 +8,7 @@ use parquet_format::{CompressionCodec, RowGroup};
 use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    read::CompressedPage,
+    read::CompressedDataPage,
 };
 
 use super::{column_chunk::write_column_chunk, DynIter};
@@ -32,7 +32,7 @@ pub fn write_row_group<
     writer: &mut W,
     descriptors: &[ColumnDescriptor],
     codec: CompressionCodec,
-    columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>,
+    columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedDataPage, E>>, E>>,
 ) -> Result<RowGroup>
 where
     W: Write + Seek,

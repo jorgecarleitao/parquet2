@@ -6,7 +6,7 @@ use thrift::protocol::TCompactInputProtocol;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
-use super::page::CompressedPage;
+use super::page::CompressedDataPage;
 use super::page::PageHeader;
 use super::page_dict::{read_page_dict, PageDict};
 
@@ -66,7 +66,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
 }
 
 impl<'a, R: Read> Iterator for PageIterator<'a, R> {
-    type Item = Result<CompressedPage>;
+    type Item = Result<CompressedDataPage>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buffer = std::mem::take(&mut self.buffer);
@@ -84,7 +84,7 @@ impl<'a, R: Read> Iterator for PageIterator<'a, R> {
 fn next_page<R: Read>(
     reader: &mut PageIterator<R>,
     buffer: &mut Vec<u8>,
-) -> Result<Option<CompressedPage>> {
+) -> Result<Option<CompressedDataPage>> {
     let total_values = reader.total_num_values;
     let mut seen_values = reader.seen_num_values;
     if seen_values >= total_values {
@@ -104,7 +104,7 @@ fn next_page<R: Read>(
 fn build_page<R: Read>(
     reader: &mut PageIterator<R>,
     buffer: &mut Vec<u8>,
-) -> Result<Option<CompressedPage>> {
+) -> Result<Option<CompressedDataPage>> {
     let page_header = reader.read_page_header()?;
 
     let read_size = page_header.compressed_page_size as usize;
@@ -136,7 +136,7 @@ fn build_page<R: Read>(
             let header = page_header.data_page_header.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
-            Ok(Some(CompressedPage::new(
+            Ok(Some(CompressedDataPage::new(
                 PageHeader::V1(header),
                 std::mem::take(buffer),
                 reader.compression,
@@ -149,7 +149,7 @@ fn build_page<R: Read>(
             let header = page_header.data_page_header_v2.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
-            Ok(Some(CompressedPage::new(
+            Ok(Some(CompressedDataPage::new(
                 PageHeader::V2(header),
                 std::mem::take(buffer),
                 reader.compression,

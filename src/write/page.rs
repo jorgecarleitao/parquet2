@@ -6,7 +6,7 @@ use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
 
 use crate::error::Result;
-use crate::read::CompressedPage;
+use crate::read::CompressedDataPage;
 use crate::read::PageHeader;
 use crate::statistics::Statistics;
 
@@ -21,7 +21,7 @@ pub struct PageWriteSpec {
 
 pub fn write_page<W: Write + Seek>(
     writer: &mut W,
-    compressed_page: CompressedPage,
+    compressed_page: CompressedDataPage,
 ) -> Result<PageWriteSpec> {
     let header = assemble_page_header(&compressed_page);
 
@@ -42,7 +42,7 @@ pub fn write_page<W: Write + Seek>(
     })
 }
 
-fn assemble_page_header(compressed_page: &CompressedPage) -> ParquetPageHeader {
+fn assemble_page_header(compressed_page: &CompressedDataPage) -> ParquetPageHeader {
     let mut page_header = ParquetPageHeader {
         type_: match compressed_page.header() {
             PageHeader::V1(_) => PageType::DataPage,

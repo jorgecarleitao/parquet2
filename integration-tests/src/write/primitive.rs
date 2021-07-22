@@ -7,7 +7,7 @@ use parquet::{
     statistics::Statistics,
     write::WriteOptions,
     {compression::create_codec, encoding::hybrid_rle::encode_bool, error::Result},
-    {read::CompressedPage, types::NativeType},
+    {read::CompressedDataPage, types::NativeType},
 };
 
 fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)> {
@@ -46,7 +46,7 @@ pub fn array_to_page_v1<T: NativeType>(
     array: &[Option<T>],
     options: &WriteOptions,
     descriptor: &ColumnDescriptor,
-) -> Result<CompressedPage> {
+) -> Result<CompressedDataPage> {
     let (values, mut buffer) = unzip_option(array)?;
 
     buffer.extend_from_slice(&values);
@@ -84,7 +84,7 @@ pub fn array_to_page_v1<T: NativeType>(
         statistics,
     };
 
-    Ok(CompressedPage::new(
+    Ok(CompressedDataPage::new(
         PageHeader::V1(header),
         buffer,
         options.compression,

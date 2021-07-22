@@ -1,7 +1,7 @@
 //! Subcommand `dump`. This subcommand shows the parquet metadata information
 use parquet2::{
     read::{
-        get_page_iterator, read_metadata, BinaryPageDict, CompressedPage,
+        get_page_iterator, read_metadata, BinaryPageDict, CompressedDataPage,
         FixedLenByteArrayPageDict, PageDict, PrimitivePageDict,
     },
     schema::types::PhysicalType,
@@ -58,14 +58,14 @@ where
                     page.uncompressed_size()
                 )?;
                 let (dict, msg_type) = match page {
-                    CompressedPage::V1(page_v1) => {
+                    CompressedDataPage::V1(page_v1) => {
                         if let Some(dict) = page_v1.dictionary_page {
                             (dict, "PageV1")
                         } else {
                             continue;
                         }
                     }
-                    CompressedPage::V2(page_v2) => {
+                    CompressedDataPage::V2(page_v2) => {
                         if let Some(dict) = page_v2.dictionary_page {
                             (dict, "PageV2")
                         } else {
