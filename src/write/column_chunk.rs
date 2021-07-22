@@ -9,7 +9,7 @@ use crate::statistics::serialize_statistics;
 use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::CompressedDataPage,
+    page::CompressedPage,
     schema::types::{physical_type_to_type, ParquetType},
 };
 
@@ -18,7 +18,7 @@ use super::statistics::reduce;
 
 pub fn write_column_chunk<
     W: Write + Seek,
-    I: Iterator<Item = std::result::Result<CompressedDataPage, E>>,
+    I: Iterator<Item = std::result::Result<CompressedPage, E>>,
     E: Error + Send + Sync + 'static,
 >(
     mut writer: &mut W,

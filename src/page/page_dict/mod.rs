@@ -21,6 +21,19 @@ pub trait DictPage: std::fmt::Debug + Send + Sync {
     fn physical_type(&self) -> &PhysicalType;
 }
 
+/// A compressed dictionary page.
+#[derive(Debug)]
+pub struct CompressedDictPage {
+    pub(crate) buffer: Vec<u8>,
+    pub(crate) num_values: usize,
+}
+
+impl CompressedDictPage {
+    pub fn new(buffer: Vec<u8>, num_values: usize) -> Self {
+        Self { buffer, num_values }
+    }
+}
+
 pub fn read_dict_page(
     buf: &[u8],
     num_values: u32,

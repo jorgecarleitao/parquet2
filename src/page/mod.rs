@@ -14,9 +14,8 @@ use crate::metadata::ColumnDescriptor;
 
 use crate::statistics::{deserialize_statistics, Statistics};
 
-/// A [`CompressedDataPage`] is compressed, encoded representation of a Parquet data page. It holds actual data
-/// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
-/// as soon as it is not needed, thereby reducing memory usage.
+/// A [`CompressedDataPage`] is compressed, encoded representation of a Parquet data page.
+/// It holds actual data and thus cloning it is expensive.
 #[derive(Debug)]
 pub struct CompressedDataPage {
     pub(crate) header: DataPageHeader,
@@ -94,9 +93,8 @@ pub enum DataPageHeader {
     V2(DataPageHeaderV2),
 }
 
-/// A [`Page`] is an uncompressed, encoded representation of a Parquet data page. It holds actual data
-/// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
-/// as soon as it is not needed, thereby reducing memory usage.
+/// A [`DataPage`] is an uncompressed, encoded representation of a Parquet data page. It holds actual data
+/// and thus cloning it is expensive.
 #[derive(Debug, Clone)]
 pub struct DataPage {
     header: DataPageHeader,
@@ -165,5 +163,21 @@ impl DataPage {
     }
 }
 
-// read: CompressedDataPage -> DataPage
-// write: DataPage -> CompressedDataPage
+/// A [`Page`] is an uncompressed, encoded representation of a Parquet page. It may hold actual data
+/// and thus cloning it may be expensive.
+#[derive(Debug)]
+pub enum Page {
+    Data(DataPage),
+    Dict(Arc<dyn DictPage>),
+}
+
+/// A [`CompressedPage`] is a compressed, encoded representation of a Parquet page. It holds actual data
+/// and thus cloning it is expensive.
+#[derive(Debug)]
+pub enum CompressedPage {
+    Data(CompressedDataPage),
+    Dict(CompressedDictPage),
+}
+
+// read: CompressedPage -> Page
+// write: Page -> CompressedPage

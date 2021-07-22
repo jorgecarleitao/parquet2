@@ -1,7 +1,7 @@
 use parquet::{
     encoding::Encoding,
     metadata::ColumnDescriptor,
-    page::{CompressedDataPage, DataPageHeader, DataPageHeaderV1},
+    page::{CompressedDataPage, CompressedPage, DataPageHeader, DataPageHeaderV1},
     statistics::{serialize_statistics, PrimitiveStatistics, Statistics},
     types::NativeType,
     write::WriteOptions,
@@ -44,7 +44,7 @@ pub fn array_to_page_v1<T: NativeType>(
     array: &[Option<T>],
     options: &WriteOptions,
     descriptor: &ColumnDescriptor,
-) -> Result<CompressedDataPage> {
+) -> Result<CompressedPage> {
     let (values, mut buffer) = unzip_option(array)?;
 
     buffer.extend_from_slice(&values);
@@ -82,12 +82,12 @@ pub fn array_to_page_v1<T: NativeType>(
         statistics,
     };
 
-    Ok(CompressedDataPage::new(
+    Ok(CompressedPage::Data(CompressedDataPage::new(
         DataPageHeader::V1(header),
         buffer,
         options.compression,
         uncompressed_page_size,
         None,
         descriptor.clone(),
-    ))
+    )))
 }
