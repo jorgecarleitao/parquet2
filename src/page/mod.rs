@@ -23,7 +23,7 @@ pub struct CompressedDataPage {
     pub(crate) buffer: Vec<u8>,
     compression: CompressionCodec,
     uncompressed_page_size: usize,
-    pub(crate) dictionary_page: Option<Arc<dyn PageDict>>,
+    pub(crate) dictionary_page: Option<Arc<dyn DictPage>>,
     pub(crate) descriptor: ColumnDescriptor,
 }
 
@@ -33,7 +33,7 @@ impl CompressedDataPage {
         buffer: Vec<u8>,
         compression: CompressionCodec,
         uncompressed_page_size: usize,
-        dictionary_page: Option<Arc<dyn PageDict>>,
+        dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: ColumnDescriptor,
     ) -> Self {
         Self {
@@ -101,7 +101,7 @@ pub enum DataPageHeader {
 pub struct DataPage {
     header: DataPageHeader,
     pub(super) buffer: Vec<u8>,
-    dictionary_page: Option<Arc<dyn PageDict>>,
+    dictionary_page: Option<Arc<dyn DictPage>>,
     descriptor: ColumnDescriptor,
 }
 
@@ -109,7 +109,7 @@ impl DataPage {
     pub fn new(
         header: DataPageHeader,
         buffer: Vec<u8>,
-        dictionary_page: Option<Arc<dyn PageDict>>,
+        dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: ColumnDescriptor,
     ) -> Self {
         Self {
@@ -124,7 +124,7 @@ impl DataPage {
         &self.header
     }
 
-    pub fn dictionary_page(&self) -> Option<&Arc<dyn PageDict>> {
+    pub fn dictionary_page(&self) -> Option<&Arc<dyn DictPage>> {
         self.dictionary_page.as_ref()
     }
 

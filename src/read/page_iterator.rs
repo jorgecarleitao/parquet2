@@ -7,7 +7,7 @@ use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
 use crate::page::{
-    read_page_dict, CompressedDataPage, DataPageHeader, PageDict, ParquetPageHeader,
+    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, ParquetPageHeader,
 };
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
@@ -26,7 +26,7 @@ pub struct PageIterator<'a, R: Read> {
     total_num_values: i64,
 
     // Arc: it will be shared between multiple pages and pages should be Send + Sync.
-    current_dictionary: Option<Arc<dyn PageDict>>,
+    current_dictionary: Option<Arc<dyn DictPage>>,
 
     descriptor: ColumnDescriptor,
 
@@ -118,7 +118,7 @@ fn build_page<R: Read>(
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
-            let page = read_page_dict(
+            let page = read_dict_page(
                 buffer,
                 dict_header.num_values as u32,
                 (
