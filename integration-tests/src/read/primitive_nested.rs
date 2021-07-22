@@ -6,8 +6,8 @@ use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
+    page::{DataPage, DataPageHeader, PrimitivePageDict},
     read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
-    read::{Page, PageHeader, PrimitivePageDict},
     types::NativeType,
 };
 
@@ -138,9 +138,12 @@ fn read_array<T: NativeType>(
     )
 }
 
-pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) -> Result<Array> {
+pub fn page_to_array<T: NativeType>(
+    page: &DataPage,
+    descriptor: &ColumnDescriptor,
+) -> Result<Array> {
     match page.header() {
-        PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
+        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::Plain, None) => {
                 let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
                 Ok(read_array::<T>(
@@ -160,7 +163,7 @@ pub fn page_to_array<T: NativeType>(page: &Page, descriptor: &ColumnDescriptor) 
             }
             _ => todo!(),
         },
-        PageHeader::V2(_) => todo!(),
+        DataPageHeader::V2(_) => todo!(),
     }
 }
 
@@ -196,12 +199,12 @@ fn read_dict_array<T: NativeType>(
 }
 
 pub fn page_dict_to_array<T: NativeType>(
-    page: &Page,
+    page: &DataPage,
     descriptor: &ColumnDescriptor,
 ) -> Result<Array> {
     assert_eq!(descriptor.max_rep_level(), 1);
     match page.header() {
-        PageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
+        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => {
                 let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
                 Ok(read_dict_array::<T>(
@@ -225,6 +228,6 @@ pub fn page_dict_to_array<T: NativeType>(
             )),
             _ => todo!(),
         },
-        PageHeader::V2(_) => todo!(),
+        DataPageHeader::V2(_) => todo!(),
     }
 }

@@ -1,12 +1,14 @@
 use std::{io::Read, sync::Arc};
 
-use parquet_format::{CompressionCodec, PageHeader as ParquetPageHeader, PageType};
+use parquet_format::{CompressionCodec, PageType};
 use thrift::protocol::TCompactInputProtocol;
 
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
-use crate::page::{read_page_dict, CompressedDataPage, PageDict, PageHeader};
+use crate::page::{
+    read_page_dict, CompressedDataPage, DataPageHeader, PageDict, ParquetPageHeader,
+};
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -135,7 +137,7 @@ fn build_page<R: Read>(
             reader.seen_num_values += header.num_values as i64;
 
             Ok(Some(CompressedDataPage::new(
-                PageHeader::V1(header),
+                DataPageHeader::V1(header),
                 std::mem::take(buffer),
                 reader.compression,
                 page_header.uncompressed_page_size as usize,
@@ -148,7 +150,7 @@ fn build_page<R: Read>(
             reader.seen_num_values += header.num_values as i64;
 
             Ok(Some(CompressedDataPage::new(
-                PageHeader::V2(header),
+                DataPageHeader::V2(header),
                 std::mem::take(buffer),
                 reader.compression,
                 page_header.uncompressed_page_size as usize,

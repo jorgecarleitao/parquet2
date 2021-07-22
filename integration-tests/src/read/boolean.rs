@@ -1,7 +1,7 @@
 use parquet::encoding::Encoding;
 use parquet::error::Result;
 use parquet::metadata::ColumnDescriptor;
-use parquet::read::{Page, PageHeader};
+use parquet::page::{DataPage, DataPageHeader};
 
 const BIT_MASK: [u8; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
 
@@ -25,15 +25,15 @@ fn read_bitmap(values: &[u8], length: usize) -> Vec<Option<bool>> {
     (0..length).map(|i| Some(get_bit(values, i))).collect()
 }
 
-pub fn page_to_vec(page: &Page, _: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
+pub fn page_to_vec(page: &DataPage, _: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
     match page.header() {
-        PageHeader::V1(_) => match page.encoding() {
+        DataPageHeader::V1(_) => match page.encoding() {
             Encoding::Plain | Encoding::PlainDictionary => {
                 Ok(read_bitmap(page.buffer(), page.num_values()))
             }
             _ => todo!(),
         },
-        PageHeader::V2(_) => match page.encoding() {
+        DataPageHeader::V2(_) => match page.encoding() {
             Encoding::Plain | Encoding::PlainDictionary => {
                 Ok(read_bitmap(page.buffer(), page.num_values()))
             }

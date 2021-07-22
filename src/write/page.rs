@@ -1,12 +1,12 @@
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::Arc;
 
-use parquet_format::{PageHeader as ParquetPageHeader, PageType};
+use parquet_format::PageType;
 use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
 
 use crate::error::Result;
-use crate::page::{CompressedDataPage, PageHeader};
+use crate::page::{CompressedDataPage, DataPageHeader, ParquetPageHeader};
 use crate::statistics::Statistics;
 
 /// Contains page write metrics.
@@ -44,8 +44,8 @@ pub fn write_page<W: Write + Seek>(
 fn assemble_page_header(compressed_page: &CompressedDataPage) -> ParquetPageHeader {
     let mut page_header = ParquetPageHeader {
         type_: match compressed_page.header() {
-            PageHeader::V1(_) => PageType::DataPage,
-            PageHeader::V2(_) => PageType::DataPageV2,
+            DataPageHeader::V1(_) => PageType::DataPage,
+            DataPageHeader::V2(_) => PageType::DataPageV2,
         },
         uncompressed_page_size: compressed_page.uncompressed_size() as i32,
         compressed_page_size: compressed_page.compressed_size() as i32,
@@ -57,10 +57,10 @@ fn assemble_page_header(compressed_page: &CompressedDataPage) -> ParquetPageHead
     };
 
     match compressed_page.header() {
-        PageHeader::V1(header) => {
+        DataPageHeader::V1(header) => {
             page_header.data_page_header = Some(header.clone());
         }
-        PageHeader::V2(header) => {
+        DataPageHeader::V2(header) => {
             page_header.data_page_header_v2 = Some(header.clone());
         }
     }

@@ -3,20 +3,23 @@ pub use page_dict::*;
 
 use std::sync::Arc;
 
+use parquet_format::CompressionCodec;
 use parquet_format::Encoding;
-use parquet_format::{CompressionCodec, DataPageHeader, DataPageHeaderV2};
+pub use parquet_format::{
+    DataPageHeader as DataPageHeaderV1, DataPageHeaderV2, PageHeader as ParquetPageHeader,
+};
 
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
 use crate::statistics::{deserialize_statistics, Statistics};
 
-/// A [`CompressedDataPage`] is compressed, encoded representation of a Parquet page. It holds actual data
+/// A [`CompressedDataPage`] is compressed, encoded representation of a Parquet data page. It holds actual data
 /// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
 /// as soon as it is not needed, thereby reducing memory usage.
 #[derive(Debug)]
 pub struct CompressedDataPage {
-    pub(crate) header: PageHeader,
+    pub(crate) header: DataPageHeader,
     pub(crate) buffer: Vec<u8>,
     compression: CompressionCodec,
     uncompressed_page_size: usize,
@@ -26,7 +29,7 @@ pub struct CompressedDataPage {
 
 impl CompressedDataPage {
     pub fn new(
-        header: PageHeader,
+        header: DataPageHeader,
         buffer: Vec<u8>,
         compression: CompressionCodec,
         uncompressed_page_size: usize,
@@ -43,7 +46,7 @@ impl CompressedDataPage {
         }
     }
 
-    pub fn header(&self) -> &PageHeader {
+    pub fn header(&self) -> &DataPageHeader {
         &self.header
     }
 
@@ -61,19 +64,19 @@ impl CompressedDataPage {
 
     pub fn num_values(&self) -> usize {
         match &self.header {
-            PageHeader::V1(d) => d.num_values as usize,
-            PageHeader::V2(d) => d.num_values as usize,
+            DataPageHeader::V1(d) => d.num_values as usize,
+            DataPageHeader::V2(d) => d.num_values as usize,
         }
     }
 
     /// Decodes the raw statistics into a statistics
     pub fn statistics(&self) -> Option<Result<Arc<dyn Statistics>>> {
         match &self.header {
-            PageHeader::V1(d) => d
+            DataPageHeader::V1(d) => d
                 .statistics
                 .as_ref()
                 .map(|x| deserialize_statistics(x, self.descriptor().clone())),
-            PageHeader::V2(d) => d
+            DataPageHeader::V2(d) => d
                 .statistics
                 .as_ref()
                 .map(|x| deserialize_statistics(x, self.descriptor().clone())),
@@ -86,25 +89,25 @@ impl CompressedDataPage {
 }
 
 #[derive(Debug, Clone)]
-pub enum PageHeader {
-    V1(DataPageHeader),
+pub enum DataPageHeader {
+    V1(DataPageHeaderV1),
     V2(DataPageHeaderV2),
 }
 
-/// A [`Page`] is an uncompressed, encoded representation of a Parquet page. It holds actual data
+/// A [`Page`] is an uncompressed, encoded representation of a Parquet data page. It holds actual data
 /// and thus cloning it is expensive. Favor passing this enum by value, as it deallocates it
 /// as soon as it is not needed, thereby reducing memory usage.
 #[derive(Debug, Clone)]
-pub struct Page {
-    header: PageHeader,
+pub struct DataPage {
+    header: DataPageHeader,
     pub(super) buffer: Vec<u8>,
     dictionary_page: Option<Arc<dyn PageDict>>,
     descriptor: ColumnDescriptor,
 }
 
-impl Page {
+impl DataPage {
     pub fn new(
-        header: PageHeader,
+        header: DataPageHeader,
         buffer: Vec<u8>,
         dictionary_page: Option<Arc<dyn PageDict>>,
         descriptor: ColumnDescriptor,
@@ -117,7 +120,7 @@ impl Page {
         }
     }
 
-    pub fn header(&self) -> &PageHeader {
+    pub fn header(&self) -> &DataPageHeader {
         &self.header
     }
 
@@ -131,26 +134,26 @@ impl Page {
 
     pub fn num_values(&self) -> usize {
         match &self.header {
-            PageHeader::V1(d) => d.num_values as usize,
-            PageHeader::V2(d) => d.num_values as usize,
+            DataPageHeader::V1(d) => d.num_values as usize,
+            DataPageHeader::V2(d) => d.num_values as usize,
         }
     }
 
     pub fn encoding(&self) -> Encoding {
         match &self.header {
-            PageHeader::V1(d) => d.encoding,
-            PageHeader::V2(d) => d.encoding,
+            DataPageHeader::V1(d) => d.encoding,
+            DataPageHeader::V2(d) => d.encoding,
         }
     }
 
     /// Decodes the raw statistics into a statistics
     pub fn statistics(&self) -> Option<Result<Arc<dyn Statistics>>> {
         match &self.header {
-            PageHeader::V1(d) => d
+            DataPageHeader::V1(d) => d
                 .statistics
                 .as_ref()
                 .map(|x| deserialize_statistics(x, self.descriptor().clone())),
-            PageHeader::V2(d) => d
+            DataPageHeader::V2(d) => d
                 .statistics
                 .as_ref()
                 .map(|x| deserialize_statistics(x, self.descriptor().clone())),
@@ -162,5 +165,5 @@ impl Page {
     }
 }
 
-// read: CompressedDataPage -> Page
-// write: Page -> CompressedDataPage
+// read: CompressedDataPage -> DataPage
+// write: DataPage -> CompressedDataPage

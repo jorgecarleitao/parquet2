@@ -9,7 +9,7 @@ mod utils;
 
 use parquet::error::Result;
 use parquet::metadata::ColumnDescriptor;
-use parquet::read::Page;
+use parquet::page::DataPage;
 use parquet::schema::types::ParquetType;
 use parquet::schema::types::PhysicalType;
 
@@ -17,7 +17,7 @@ use crate::Array;
 
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
-pub fn page_to_array(page: &Page, descriptor: &ColumnDescriptor) -> Result<Array> {
+pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Array> {
     match (descriptor.type_(), descriptor.max_rep_level()) {
         (ParquetType::PrimitiveType { physical_type, .. }, 0) => match page.dictionary_page() {
             Some(_) => match physical_type {
