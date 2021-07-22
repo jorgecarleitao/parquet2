@@ -61,6 +61,7 @@ with them from spark, thereby hindering robust integration tests.
 * `read`: read metadata and pages
 * `write`: write metadata and pages
 * `encoding`: encoders and decoders of the different parquet encodings
+* `page`: page declarations
 * `metadata`: parquet files metadata (e.g. `FileMetaData`)
 * `schema`: types metadata declaration (e.g. `ConvertedType`)
 * `types.rs`: physical type declaration (i.e. how things are represented in memory).

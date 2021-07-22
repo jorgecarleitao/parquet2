@@ -1,3 +1,6 @@
+mod page_dict;
+pub use page_dict::*;
+
 use std::sync::Arc;
 
 use parquet_format::Encoding;
@@ -6,7 +9,6 @@ use parquet_format::{CompressionCodec, DataPageHeader, DataPageHeaderV2};
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
-use super::page_dict::PageDict;
 use crate::statistics::{deserialize_statistics, Statistics};
 
 /// A [`CompressedDataPage`] is compressed, encoded representation of a Parquet page. It holds actual data

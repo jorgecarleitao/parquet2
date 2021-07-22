@@ -8,7 +8,7 @@ use parquet_format::{CompressionCodec, RowGroup};
 use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    read::CompressedDataPage,
+    page::CompressedDataPage,
 };
 
 use super::{column_chunk::write_column_chunk, DynIter};

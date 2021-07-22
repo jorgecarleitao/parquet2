@@ -6,8 +6,7 @@ use thrift::protocol::TCompactOutputProtocol;
 use thrift::protocol::TOutputProtocol;
 
 use crate::error::Result;
-use crate::read::CompressedDataPage;
-use crate::read::PageHeader;
+use crate::page::{CompressedDataPage, PageHeader};
 use crate::statistics::Statistics;
 
 /// Contains page write metrics.

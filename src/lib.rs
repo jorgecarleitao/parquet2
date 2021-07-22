@@ -6,6 +6,7 @@ pub mod error;
 pub mod compression;
 pub mod encoding;
 pub mod metadata;
+pub mod page;
 pub mod read;
 pub mod schema;
 pub mod statistics;

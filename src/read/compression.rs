@@ -3,8 +3,8 @@ use parquet_format::DataPageHeaderV2;
 use crate::compression::{create_codec, Codec};
 use crate::error::Result;
 
-use super::page::{CompressedDataPage, PageHeader};
-use super::{Page, PageIterator, StreamingIterator};
+use super::{PageIterator, StreamingIterator};
+use crate::page::{CompressedDataPage, Page, PageHeader};
 
 fn decompress_v1(compressed: &[u8], decompressor: &mut dyn Codec, buffer: &mut [u8]) -> Result<()> {
     decompressor.decompress(compressed, buffer)

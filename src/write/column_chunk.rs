@@ -9,7 +9,7 @@ use crate::statistics::serialize_statistics;
 use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    read::CompressedDataPage,
+    page::CompressedDataPage,
     schema::types::{physical_type_to_type, ParquetType},
 };
 

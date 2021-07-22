@@ -6,9 +6,7 @@ use thrift::protocol::TCompactInputProtocol;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
-use super::page::CompressedDataPage;
-use super::page::PageHeader;
-use super::page_dict::{read_page_dict, PageDict};
+use crate::page::{read_page_dict, CompressedDataPage, PageDict, PageHeader};
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
