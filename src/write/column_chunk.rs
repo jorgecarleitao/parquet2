@@ -72,7 +72,13 @@ pub fn write_column_chunk<
                     Encoding::Rle,
                 ]
             }
-            PageType::DictionaryPage => todo!(),
+            PageType::DictionaryPage => vec![
+                spec.header
+                    .dictionary_page_header
+                    .as_ref()
+                    .unwrap()
+                    .encoding,
+            ],
             PageType::IndexPage => todo!(),
         })
         .flatten()

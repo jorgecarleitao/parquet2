@@ -90,7 +90,7 @@ fn assemble_dict_page_header(page: &CompressedDictPage) -> ParquetPageHeader {
         index_page_header: None,
         dictionary_page_header: Some(DictionaryPageHeader {
             num_values: page.num_values as i32,
-            encoding: Encoding::Rle,
+            encoding: Encoding::Plain,
             is_sorted: None,
         }),
         data_page_header_v2: None,
