@@ -43,12 +43,12 @@ fn read_buffer<T: NativeType>(
 ) -> Vec<Option<T>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::Rle, true) => read_buffer_impl(
+        (Encoding::RLE, true) => read_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             max_def_level,
         ),
-        (Encoding::Rle, false) => {
+        (Encoding::RLE, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             read_buffer_impl(def_levels, values, max_def_level)
@@ -90,14 +90,14 @@ fn read_dict_buffer<'a, T: NativeType>(
 ) -> Vec<Option<T>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::Rle, true) => read_dict_buffer_impl(
+        (Encoding::RLE, true) => read_dict_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             length,
             max_def_level,
             dict,
         ),
-        (Encoding::Rle, false) => {
+        (Encoding::RLE, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             read_dict_buffer_impl(def_levels, values, length, max_def_level, dict)
@@ -144,7 +144,7 @@ pub fn page_dict_to_vec<T: NativeType>(
                     values,
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
-                    (&Encoding::Rle, descriptor.max_def_level()),
+                    (&Encoding::RLE, descriptor.max_def_level()),
                 ))
             }
             _ => todo!(),
@@ -185,7 +185,7 @@ pub fn page_to_vec<T: NativeType>(
                     def_levels,
                     values,
                     page.num_values() as u32,
-                    (&Encoding::Rle, descriptor.max_def_level()),
+                    (&Encoding::RLE, descriptor.max_def_level()),
                 ))
             }
             _ => todo!(),

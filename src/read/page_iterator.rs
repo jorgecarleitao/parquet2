@@ -129,7 +129,7 @@ fn build_page<R: Read>(
     }
 
     match page_header.type_ {
-        PageType::DictionaryPage => {
+        PageType::DICTIONARY_PAGE => {
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
@@ -147,7 +147,7 @@ fn build_page<R: Read>(
             reader.current_dictionary = Some(page);
             Ok(None)
         }
-        PageType::DataPage => {
+        PageType::DATA_PAGE => {
             let header = page_header.data_page_header.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
@@ -160,7 +160,7 @@ fn build_page<R: Read>(
                 reader.descriptor.clone(),
             )))
         }
-        PageType::DataPageV2 => {
+        PageType::DATA_PAGE_V2 => {
             let header = page_header.data_page_header_v2.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
@@ -173,6 +173,6 @@ fn build_page<R: Read>(
                 reader.descriptor.clone(),
             )))
         }
-        PageType::IndexPage => Ok(None),
+        _ => Ok(None),
     }
 }

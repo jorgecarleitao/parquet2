@@ -97,7 +97,7 @@ impl ParquetType {
 /// Constructors
 impl ParquetType {
     pub fn new_root(name: String, fields: Vec<ParquetType>) -> Self {
-        let basic_info = BasicTypeInfo::new(name, Repetition::Optional, None, true);
+        let basic_info = BasicTypeInfo::new(name, Repetition::OPTIONAL, None, true);
         ParquetType::GroupType {
             basic_info,
             fields,
@@ -114,7 +114,7 @@ impl ParquetType {
         id: Option<i32>,
     ) -> Self {
         let basic_info =
-            BasicTypeInfo::new(name, repetition.unwrap_or(Repetition::Optional), id, false);
+            BasicTypeInfo::new(name, repetition.unwrap_or(Repetition::OPTIONAL), id, false);
         ParquetType::GroupType {
             basic_info,
             fields,
@@ -145,7 +145,7 @@ impl ParquetType {
     }
 
     pub fn from_physical(name: String, physical_type: PhysicalType) -> Self {
-        let basic_info = BasicTypeInfo::new(name, Repetition::Optional, None, false);
+        let basic_info = BasicTypeInfo::new(name, Repetition::OPTIONAL, None, false);
         ParquetType::PrimitiveType {
             basic_info,
             converted_type: None,

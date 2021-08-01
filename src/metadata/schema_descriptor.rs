@@ -66,7 +66,7 @@ impl SchemaDescriptor {
 
     pub(crate) fn into_thrift(self) -> Result<Vec<SchemaElement>> {
         ParquetType::GroupType {
-            basic_info: BasicTypeInfo::new(self.name, Repetition::Optional, None, true),
+            basic_info: BasicTypeInfo::new(self.name, Repetition::OPTIONAL, None, true),
             logical_type: None,
             converted_type: None,
             fields: self.fields,
@@ -106,10 +106,10 @@ fn build_tree<'a>(
 ) {
     path_so_far.push(tp.name());
     match tp.get_basic_info().repetition() {
-        Repetition::Optional => {
+        &Repetition::OPTIONAL => {
             max_def_level += 1;
         }
-        Repetition::Repeated => {
+        &Repetition::REPEATED => {
             max_def_level += 1;
             max_rep_level += 1;
         }

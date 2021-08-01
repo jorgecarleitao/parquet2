@@ -91,6 +91,8 @@ impl FileMetaData {
             key_value_metadata: self.key_value_metadata,
             created_by: self.created_by,
             column_orders: None, // todo
+            encryption_algorithm: None,
+            footer_signing_key_metadata: None,
         })
     }
 }

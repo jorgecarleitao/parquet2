@@ -81,6 +81,8 @@ where
         key_value_metadata,
         created_by,
         None,
+        None,
+        None,
     );
 
     end_file(writer, metadata)?;

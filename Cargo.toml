@@ -12,8 +12,8 @@ name = "parquet2"
 bench = false
 
 [dependencies]
-parquet-format = "~2.6.1"
-thrift = "0.13"
+parquet-format = { path = "../parquet-format-rs" }
+thrift = { path = "../thrift/lib/rs" }
 bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
 streaming-iterator = "0.1.5"
 

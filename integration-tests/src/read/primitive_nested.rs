@@ -79,14 +79,14 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
         (rep_level_encoding.0, max_rep_level == 0),
         (def_level_encoding.0, max_def_level == 0),
     ) {
-        ((Encoding::Rle, true), (Encoding::Rle, true)) => compose_array(
+        ((Encoding::RLE, true), (Encoding::RLE, true)) => compose_array(
             std::iter::repeat(0).take(length as usize),
             std::iter::repeat(0).take(length as usize),
             max_rep_level,
             max_def_level,
             values,
         ),
-        ((Encoding::Rle, false), (Encoding::Rle, true)) => {
+        ((Encoding::RLE, false), (Encoding::RLE, true)) => {
             let num_bits = get_bit_width(rep_level_encoding.1);
             let rep_levels = RLEDecoder::new(rep_levels, num_bits, length);
             compose_array(
@@ -97,7 +97,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
                 values,
             )
         }
-        ((Encoding::Rle, true), (Encoding::Rle, false)) => {
+        ((Encoding::RLE, true), (Encoding::RLE, false)) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             compose_array(
@@ -108,7 +108,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
                 values,
             )
         }
-        ((Encoding::Rle, false), (Encoding::Rle, false)) => {
+        ((Encoding::RLE, false), (Encoding::RLE, false)) => {
             let rep_levels =
                 RLEDecoder::new(rep_levels, get_bit_width(rep_level_encoding.1), length);
             let def_levels =

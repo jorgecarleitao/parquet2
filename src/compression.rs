@@ -36,19 +36,18 @@ pub trait Codec: std::fmt::Debug {
 /// bytes for the compression type.
 /// This returns `None` if the codec type is `UNCOMPRESSED`.
 pub fn create_codec(codec: &CompressionCodec) -> Result<Option<Box<dyn Codec>>> {
-    use CompressionCodec::*;
     match codec {
         #[cfg(feature = "brotli")]
-        Brotli => Ok(Some(Box::new(BrotliCodec::new()))),
+        &CompressionCodec::BROTLI => Ok(Some(Box::new(BrotliCodec::new()))),
         #[cfg(feature = "gzip")]
-        Gzip => Ok(Some(Box::new(GZipCodec::new()))),
+        &CompressionCodec::GZIP => Ok(Some(Box::new(GZipCodec::new()))),
         #[cfg(feature = "snappy")]
-        Snappy => Ok(Some(Box::new(SnappyCodec::new()))),
+        &CompressionCodec::SNAPPY => Ok(Some(Box::new(SnappyCodec::new()))),
         #[cfg(feature = "lz4")]
-        Lz4 => Ok(Some(Box::new(Lz4Codec::new()))),
+        &CompressionCodec::LZ4 => Ok(Some(Box::new(Lz4Codec::new()))),
         #[cfg(feature = "zstd")]
-        Zstd => Ok(Some(Box::new(ZstdCodec::new()))),
-        Uncompressed => Ok(None),
+        &CompressionCodec::ZSTD => Ok(Some(Box::new(ZstdCodec::new()))),
+        &CompressionCodec::UNCOMPRESSED => Ok(None),
         _ => Err(general_err!(
             "CompressionCodec {:?} is not installed",
             codec

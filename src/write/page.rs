@@ -57,8 +57,8 @@ pub fn write_page<W: Write + Seek>(
 fn assemble_data_page_header(compressed_page: &CompressedDataPage) -> ParquetPageHeader {
     let mut page_header = ParquetPageHeader {
         type_: match compressed_page.header() {
-            DataPageHeader::V1(_) => PageType::DataPage,
-            DataPageHeader::V2(_) => PageType::DataPageV2,
+            DataPageHeader::V1(_) => PageType::DATA_PAGE,
+            DataPageHeader::V2(_) => PageType::DATA_PAGE_V2,
         },
         uncompressed_page_size: compressed_page.uncompressed_size() as i32,
         compressed_page_size: compressed_page.compressed_size() as i32,
@@ -82,7 +82,7 @@ fn assemble_data_page_header(compressed_page: &CompressedDataPage) -> ParquetPag
 
 fn assemble_dict_page_header(page: &CompressedDictPage) -> ParquetPageHeader {
     ParquetPageHeader {
-        type_: PageType::DictionaryPage,
+        type_: PageType::DICTIONARY_PAGE,
         uncompressed_page_size: page.buffer.len() as i32,
         compressed_page_size: page.buffer.len() as i32,
         crc: None,
@@ -90,7 +90,7 @@ fn assemble_dict_page_header(page: &CompressedDictPage) -> ParquetPageHeader {
         index_page_header: None,
         dictionary_page_header: Some(DictionaryPageHeader {
             num_values: page.num_values as i32,
-            encoding: Encoding::Plain,
+            encoding: Encoding::PLAIN,
             is_sorted: None,
         }),
         data_page_header_v2: None,

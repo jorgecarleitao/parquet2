@@ -21,7 +21,7 @@ pub fn write_column_chunk<
     I: Iterator<Item = std::result::Result<CompressedPage, E>>,
     E: Error + Send + Sync + 'static,
 >(
-    mut writer: &mut W,
+    writer: &mut W,
     descriptor: &ColumnDescriptor,
     codec: CompressionCodec,
     compressed_pages: I,
@@ -52,8 +52,8 @@ pub fn write_column_chunk<
     let num_values = specs
         .iter()
         .map(|spec| match spec.header.type_ {
-            PageType::DataPage => spec.header.data_page_header.as_ref().unwrap().num_values as i64,
-            PageType::DataPageV2 => {
+            PageType::DATA_PAGE => spec.header.data_page_header.as_ref().unwrap().num_values as i64,
+            PageType::DATA_PAGE_V2 => {
                 spec.header.data_page_header_v2.as_ref().unwrap().num_values as i64
             }
             _ => 0, // only data pages contribute
@@ -62,24 +62,24 @@ pub fn write_column_chunk<
     let encodings = specs
         .iter()
         .map(|spec| match spec.header.type_ {
-            PageType::DataPage => vec![
+            PageType::DATA_PAGE => vec![
                 spec.header.data_page_header.as_ref().unwrap().encoding,
-                Encoding::Rle,
+                Encoding::RLE,
             ],
-            PageType::DataPageV2 => {
+            PageType::DATA_PAGE_V2 => {
                 vec![
                     spec.header.data_page_header_v2.as_ref().unwrap().encoding,
-                    Encoding::Rle,
+                    Encoding::RLE,
                 ]
             }
-            PageType::DictionaryPage => vec![
+            PageType::DICTIONARY_PAGE => vec![
                 spec.header
                     .dictionary_page_header
                     .as_ref()
                     .unwrap()
                     .encoding,
             ],
-            PageType::IndexPage => todo!(),
+            _ => todo!(),
         })
         .flatten()
         .collect::<HashSet<_>>() // unique
@@ -113,6 +113,7 @@ pub fn write_column_chunk<
         dictionary_page_offset: None,
         statistics,
         encoding_stats: None,
+        bloom_filter_offset: None,
     };
 
     let column_chunk = ColumnChunk {
@@ -123,10 +124,12 @@ pub fn write_column_chunk<
         offset_index_length: None,
         column_index_offset: None,
         column_index_length: None,
+        crypto_metadata: None,
+        encrypted_column_metadata: None,
     };
 
     // write metadata
-    let mut protocol = TCompactOutputProtocol::new(&mut writer);
+    let mut protocol = TCompactOutputProtocol::new(writer);
     column_chunk.write_to_out_protocol(&mut protocol)?;
     protocol.flush()?;
 
