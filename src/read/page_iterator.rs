@@ -1,14 +1,14 @@
 use std::{io::Read, sync::Arc};
 
-use parquet_format::{CompressionCodec, PageHeader as ParquetPageHeader, PageType};
+use parquet_format::{CompressionCodec, PageType};
 use thrift::protocol::TCompactInputProtocol;
 
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
-use super::page::CompressedPage;
-use super::page::PageHeader;
-use super::page_dict::{read_page_dict, PageDict};
+use crate::page::{
+    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, ParquetPageHeader,
+};
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -26,7 +26,7 @@ pub struct PageIterator<'a, R: Read> {
     total_num_values: i64,
 
     // Arc: it will be shared between multiple pages and pages should be Send + Sync.
-    current_dictionary: Option<Arc<dyn PageDict>>,
+    current_dictionary: Option<Arc<dyn DictPage>>,
 
     descriptor: ColumnDescriptor,
 
@@ -66,7 +66,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
 }
 
 impl<'a, R: Read> Iterator for PageIterator<'a, R> {
-    type Item = Result<CompressedPage>;
+    type Item = Result<CompressedDataPage>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buffer = std::mem::take(&mut self.buffer);
@@ -84,7 +84,7 @@ impl<'a, R: Read> Iterator for PageIterator<'a, R> {
 fn next_page<R: Read>(
     reader: &mut PageIterator<R>,
     buffer: &mut Vec<u8>,
-) -> Result<Option<CompressedPage>> {
+) -> Result<Option<CompressedDataPage>> {
     let total_values = reader.total_num_values;
     let mut seen_values = reader.seen_num_values;
     if seen_values >= total_values {
@@ -104,7 +104,7 @@ fn next_page<R: Read>(
 fn build_page<R: Read>(
     reader: &mut PageIterator<R>,
     buffer: &mut Vec<u8>,
-) -> Result<Option<CompressedPage>> {
+) -> Result<Option<CompressedDataPage>> {
     let page_header = reader.read_page_header()?;
 
     let read_size = page_header.compressed_page_size as usize;
@@ -118,8 +118,8 @@ fn build_page<R: Read>(
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
-            let page = read_page_dict(
-                &buffer,
+            let page = read_dict_page(
+                buffer,
                 dict_header.num_values as u32,
                 (
                     reader.compression,
@@ -136,8 +136,8 @@ fn build_page<R: Read>(
             let header = page_header.data_page_header.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
-            Ok(Some(CompressedPage::new(
-                PageHeader::V1(header),
+            Ok(Some(CompressedDataPage::new(
+                DataPageHeader::V1(header),
                 std::mem::take(buffer),
                 reader.compression,
                 page_header.uncompressed_page_size as usize,
@@ -149,8 +149,8 @@ fn build_page<R: Read>(
             let header = page_header.data_page_header_v2.unwrap();
             reader.seen_num_values += header.num_values as i64;
 
-            Ok(Some(CompressedPage::new(
-                PageHeader::V2(header),
+            Ok(Some(CompressedDataPage::new(
+                DataPageHeader::V2(header),
                 std::mem::take(buffer),
                 reader.compression,
                 page_header.uncompressed_page_size as usize,

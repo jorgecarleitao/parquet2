@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use crate::error::Result;
 use crate::schema::types::PhysicalType;
 
-use super::PageDict;
+use super::DictPage;
 
 #[derive(Debug)]
 pub struct FixedLenByteArrayPageDict {
@@ -30,7 +30,7 @@ impl FixedLenByteArrayPageDict {
     }
 }
 
-impl PageDict for FixedLenByteArrayPageDict {
+impl DictPage for FixedLenByteArrayPageDict {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -44,7 +44,7 @@ fn read_plain(bytes: &[u8], size: usize, length: usize) -> Vec<u8> {
     bytes[..size * length].to_vec()
 }
 
-pub fn read(buf: &[u8], size: i32, num_values: u32) -> Result<Arc<dyn PageDict>> {
+pub fn read(buf: &[u8], size: i32, num_values: u32) -> Result<Arc<dyn DictPage>> {
     let values = read_plain(buf, size as usize, num_values as usize);
     Ok(Arc::new(FixedLenByteArrayPageDict::new(
         values,

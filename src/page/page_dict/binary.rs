@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use crate::error::Result;
 use crate::{encoding::get_length, schema::types::PhysicalType};
 
-use super::PageDict;
+use super::DictPage;
 
 #[derive(Debug)]
 pub struct BinaryPageDict {
@@ -25,7 +25,7 @@ impl BinaryPageDict {
     }
 }
 
-impl PageDict for BinaryPageDict {
+impl DictPage for BinaryPageDict {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -53,7 +53,7 @@ fn read_plain(bytes: &[u8], length: usize) -> (Vec<u8>, Vec<i32>) {
     (values, offsets)
 }
 
-pub fn read(buf: &[u8], num_values: u32) -> Result<Arc<dyn PageDict>> {
+pub fn read(buf: &[u8], num_values: u32) -> Result<Arc<dyn DictPage>> {
     let (values, offsets) = read_plain(buf, num_values as usize);
     Ok(Arc::new(BinaryPageDict::new(values, offsets)))
 }

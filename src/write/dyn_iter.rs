@@ -1,3 +1,4 @@
+/// [`DynIter`] is an implementation of a single-threaded, dynamically-typed iterator.
 pub struct DynIter<'a, V> {
     iter: Box<dyn Iterator<Item = V> + 'a>,
 }

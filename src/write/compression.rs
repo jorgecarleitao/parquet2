@@ -1,7 +1,7 @@
 use crate::error::Result;
 use crate::{
     compression::{create_codec, Codec},
-    read::{CompressedPage, Page, PageHeader},
+    read::{CompressedDataPage, Page, PageHeader},
 };
 
 fn compress_(buffer: &[u8], decompressor: &mut dyn Codec) -> Result<Vec<u8>> {
@@ -27,22 +27,22 @@ fn compress_v2(mut page: PageV2, codec: &mut dyn Codec) -> Result<PageV2> {
 }
 
 /// decompresses a page in place. This only changes the pages' internal buffer.
-pub fn compress(page: Page) -> Result<CompressedPage> {
+pub fn compress(page: Page) -> Result<CompressedDataPage> {
     match page {
         Page::V1(page) => {
             let codec = create_codec(&page.compression)?;
             if let Some(mut codec) = codec {
-                compress_v1(page, codec.as_mut()).map(CompressedPage::V1)
+                compress_v1(page, codec.as_mut()).map(CompressedDataPage::V1)
             } else {
-                Ok(CompressedPage::V1(page))
+                Ok(CompressedDataPage::V1(page))
             }
         }
         Page::V2(page) => {
             let codec = create_codec(&page.compression)?;
             if let Some(mut codec) = codec {
-                compress_v2(page, codec.as_mut()).map(CompressedPage::V2)
+                compress_v2(page, codec.as_mut()).map(CompressedDataPage::V2)
             } else {
-                Ok(CompressedPage::V2(page))
+                Ok(CompressedDataPage::V2(page))
             }
         }
     }

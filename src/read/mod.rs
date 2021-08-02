@@ -1,8 +1,6 @@
 mod compression;
 pub mod levels;
 mod metadata;
-mod page;
-mod page_dict;
 mod page_iterator;
 
 pub use streaming_iterator;
@@ -17,8 +15,6 @@ use std::io::{Read, Seek, SeekFrom};
 use crate::metadata::RowGroupMetaData;
 use crate::{error::Result, metadata::FileMetaData};
 
-pub use page::{CompressedPage, Page, PageHeader};
-pub use page_dict::{BinaryPageDict, FixedLenByteArrayPageDict, PageDict, PrimitivePageDict};
 pub use page_iterator::PageIterator;
 
 /// Filters row group metadata to only those row groups,

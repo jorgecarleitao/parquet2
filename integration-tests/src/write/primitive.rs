@@ -1,13 +1,11 @@
 use parquet::{
+    encoding::Encoding,
     metadata::ColumnDescriptor,
-    read::PageHeader,
-    schema::{DataPageHeader, Encoding},
-    statistics::serialize_statistics,
-    statistics::PrimitiveStatistics,
-    statistics::Statistics,
+    page::{CompressedDataPage, CompressedPage, DataPageHeader, DataPageHeaderV1},
+    statistics::{serialize_statistics, PrimitiveStatistics, Statistics},
+    types::NativeType,
     write::WriteOptions,
     {compression::create_codec, encoding::hybrid_rle::encode_bool, error::Result},
-    {read::CompressedPage, types::NativeType},
 };
 
 fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)> {
@@ -76,7 +74,7 @@ pub fn array_to_page_v1<T: NativeType>(
         None
     };
 
-    let header = DataPageHeader {
+    let header = DataPageHeaderV1 {
         num_values: array.len() as i32,
         encoding: Encoding::Plain,
         definition_level_encoding: Encoding::Rle,
@@ -84,12 +82,12 @@ pub fn array_to_page_v1<T: NativeType>(
         statistics,
     };
 
-    Ok(CompressedPage::new(
-        PageHeader::V1(header),
+    Ok(CompressedPage::Data(CompressedDataPage::new(
+        DataPageHeader::V1(header),
         buffer,
         options.compression,
         uncompressed_page_size,
         None,
         descriptor.clone(),
-    ))
+    )))
 }

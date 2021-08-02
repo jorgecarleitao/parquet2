@@ -13,7 +13,7 @@ pub use dyn_iter::DynIter;
 pub use file::write_file;
 use parquet_format::CompressionCodec;
 
-use crate::read::CompressedPage;
+use crate::page::CompressedPage;
 
 pub type RowGroupIter<'a, E> =
     DynIter<'a, std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>>;

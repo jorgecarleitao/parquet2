@@ -15,19 +15,32 @@ use crate::error::{ParquetError, Result};
 use crate::schema::types::PhysicalType;
 
 /// A dynamic trait describing a decompressed and decoded Dictionary Page.
-pub trait PageDict: std::fmt::Debug + Send + Sync {
+pub trait DictPage: std::fmt::Debug + Send + Sync {
     fn as_any(&self) -> &dyn Any;
 
     fn physical_type(&self) -> &PhysicalType;
 }
 
-pub fn read_page_dict(
+/// A compressed dictionary page.
+#[derive(Debug)]
+pub struct CompressedDictPage {
+    pub(crate) buffer: Vec<u8>,
+    pub(crate) num_values: usize,
+}
+
+impl CompressedDictPage {
+    pub fn new(buffer: Vec<u8>, num_values: usize) -> Self {
+        Self { buffer, num_values }
+    }
+}
+
+pub fn read_dict_page(
     buf: &[u8],
     num_values: u32,
     compression: (CompressionCodec, usize),
     is_sorted: bool,
     physical_type: &PhysicalType,
-) -> Result<Arc<dyn PageDict>> {
+) -> Result<Arc<dyn DictPage>> {
     let decompressor = create_codec(&compression.0)?;
     if let Some(mut decompressor) = decompressor {
         let mut decompressed = vec![0; compression.1];
@@ -43,17 +56,17 @@ fn deserialize(
     num_values: u32,
     is_sorted: bool,
     physical_type: &PhysicalType,
-) -> Result<Arc<dyn PageDict>> {
+) -> Result<Arc<dyn DictPage>> {
     match physical_type {
         PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
             "Boolean physical type cannot be dictionary-encoded".to_string(),
         )),
-        PhysicalType::Int32 => primitive::read::<i32>(&buf, num_values, is_sorted),
-        PhysicalType::Int64 => primitive::read::<i64>(&buf, num_values, is_sorted),
-        PhysicalType::Int96 => primitive::read::<[u32; 3]>(&buf, num_values, is_sorted),
-        PhysicalType::Float => primitive::read::<f32>(&buf, num_values, is_sorted),
-        PhysicalType::Double => primitive::read::<f64>(&buf, num_values, is_sorted),
-        PhysicalType::ByteArray => binary::read(&buf, num_values),
-        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(&buf, *size, num_values),
+        PhysicalType::Int32 => primitive::read::<i32>(buf, num_values, is_sorted),
+        PhysicalType::Int64 => primitive::read::<i64>(buf, num_values, is_sorted),
+        PhysicalType::Int96 => primitive::read::<[u32; 3]>(buf, num_values, is_sorted),
+        PhysicalType::Float => primitive::read::<f32>(buf, num_values, is_sorted),
+        PhysicalType::Double => primitive::read::<f64>(buf, num_values, is_sorted),
+        PhysicalType::ByteArray => binary::read(buf, num_values),
+        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(buf, *size, num_values),
     }
 }

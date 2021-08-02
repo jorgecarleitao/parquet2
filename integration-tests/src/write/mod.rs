@@ -1,7 +1,7 @@
 pub(crate) mod primitive;
 
 use parquet::{
-    error::Result, metadata::ColumnDescriptor, read::CompressedPage, write::WriteOptions,
+    error::Result, metadata::ColumnDescriptor, page::CompressedPage, write::WriteOptions,
 };
 
 use super::Array;

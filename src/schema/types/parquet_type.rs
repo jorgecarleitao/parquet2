@@ -32,8 +32,8 @@ impl ParquetType {
     /// Returns [`BasicTypeInfo`] information about the type.
     pub fn get_basic_info(&self) -> &BasicTypeInfo {
         match *self {
-            Self::PrimitiveType { ref basic_info, .. } => &basic_info,
-            Self::GroupType { ref basic_info, .. } => &basic_info,
+            Self::PrimitiveType { ref basic_info, .. } => basic_info,
+            Self::GroupType { ref basic_info, .. } => basic_info,
         }
     }
 

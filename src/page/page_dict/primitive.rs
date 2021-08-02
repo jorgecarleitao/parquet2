@@ -3,7 +3,7 @@ use std::{any::Any, sync::Arc};
 use crate::error::Result;
 use crate::{schema::types::PhysicalType, types, types::NativeType};
 
-use super::PageDict;
+use super::DictPage;
 
 #[derive(Debug)]
 pub struct PrimitivePageDict<T: NativeType> {
@@ -20,7 +20,7 @@ impl<T: NativeType> PrimitivePageDict<T> {
     }
 }
 
-impl<T: NativeType> PageDict for PrimitivePageDict<T> {
+impl<T: NativeType> DictPage for PrimitivePageDict<T> {
     fn as_any(&self) -> &dyn Any {
         self
     }
@@ -41,7 +41,7 @@ pub fn read<T: NativeType>(
     buf: &[u8],
     num_values: u32,
     _is_sorted: bool,
-) -> Result<Arc<dyn PageDict>> {
+) -> Result<Arc<dyn DictPage>> {
     let typed_size = num_values as usize * std::mem::size_of::<T>();
     let values = read_plain::<T>(&buf[..typed_size]);
     Ok(Arc::new(PrimitivePageDict::new(values)))

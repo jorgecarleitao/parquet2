@@ -9,7 +9,7 @@ use crate::statistics::serialize_statistics;
 use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    read::CompressedPage,
+    page::CompressedPage,
     schema::types::{physical_type_to_type, ParquetType},
 };
 
@@ -72,7 +72,13 @@ pub fn write_column_chunk<
                     Encoding::Rle,
                 ]
             }
-            PageType::DictionaryPage => todo!(),
+            PageType::DictionaryPage => vec![
+                spec.header
+                    .dictionary_page_header
+                    .as_ref()
+                    .unwrap()
+                    .encoding,
+            ],
             PageType::IndexPage => todo!(),
         })
         .flatten()
