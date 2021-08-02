@@ -105,11 +105,11 @@ fn build_tree<'a>(
     path_so_far: &mut Vec<&'a str>,
 ) {
     path_so_far.push(tp.name());
-    match tp.get_basic_info().repetition() {
-        &Repetition::OPTIONAL => {
+    match *tp.get_basic_info().repetition() {
+        Repetition::OPTIONAL => {
             max_def_level += 1;
         }
-        &Repetition::REPEATED => {
+        Repetition::REPEATED => {
             max_def_level += 1;
             max_rep_level += 1;
         }

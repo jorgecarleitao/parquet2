@@ -2,6 +2,7 @@ mod compression;
 pub mod levels;
 mod metadata;
 mod page_iterator;
+mod stream;
 
 pub use streaming_iterator;
 pub use streaming_iterator::StreamingIterator;
@@ -9,6 +10,7 @@ pub use streaming_iterator::StreamingIterator;
 pub use compression::{decompress, Decompressor};
 
 pub use metadata::read_metadata;
+pub use stream::read_metadata as read_metadata_async;
 
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;

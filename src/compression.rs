@@ -36,18 +36,18 @@ pub trait Codec: std::fmt::Debug {
 /// bytes for the compression type.
 /// This returns `None` if the codec type is `UNCOMPRESSED`.
 pub fn create_codec(codec: &CompressionCodec) -> Result<Option<Box<dyn Codec>>> {
-    match codec {
+    match *codec {
         #[cfg(feature = "brotli")]
-        &CompressionCodec::BROTLI => Ok(Some(Box::new(BrotliCodec::new()))),
+        CompressionCodec::BROTLI => Ok(Some(Box::new(BrotliCodec::new()))),
         #[cfg(feature = "gzip")]
-        &CompressionCodec::GZIP => Ok(Some(Box::new(GZipCodec::new()))),
+        CompressionCodec::GZIP => Ok(Some(Box::new(GZipCodec::new()))),
         #[cfg(feature = "snappy")]
-        &CompressionCodec::SNAPPY => Ok(Some(Box::new(SnappyCodec::new()))),
+        CompressionCodec::SNAPPY => Ok(Some(Box::new(SnappyCodec::new()))),
         #[cfg(feature = "lz4")]
-        &CompressionCodec::LZ4 => Ok(Some(Box::new(Lz4Codec::new()))),
+        CompressionCodec::LZ4 => Ok(Some(Box::new(Lz4Codec::new()))),
         #[cfg(feature = "zstd")]
-        &CompressionCodec::ZSTD => Ok(Some(Box::new(ZstdCodec::new()))),
-        &CompressionCodec::UNCOMPRESSED => Ok(None),
+        CompressionCodec::ZSTD => Ok(Some(Box::new(ZstdCodec::new()))),
+        CompressionCodec::UNCOMPRESSED => Ok(None),
         _ => Err(general_err!(
             "CompressionCodec {:?} is not installed",
             codec
@@ -312,26 +312,26 @@ mod tests {
 
     #[test]
     fn test_codec_snappy() {
-        test_codec(CompressionCodec::Snappy);
+        test_codec(CompressionCodec::SNAPPY);
     }
 
     #[test]
     fn test_codec_gzip() {
-        test_codec(CompressionCodec::Gzip);
+        test_codec(CompressionCodec::GZIP);
     }
 
     #[test]
     fn test_codec_brotli() {
-        test_codec(CompressionCodec::Brotli);
+        test_codec(CompressionCodec::BROTLI);
     }
 
     #[test]
     fn test_codec_lz4() {
-        test_codec(CompressionCodec::Lz4);
+        test_codec(CompressionCodec::LZ4);
     }
 
     #[test]
     fn test_codec_zstd() {
-        test_codec(CompressionCodec::Zstd);
+        test_codec(CompressionCodec::ZSTD);
     }
 }

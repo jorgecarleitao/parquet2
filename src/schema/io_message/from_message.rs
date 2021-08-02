@@ -946,7 +946,7 @@ mod tests {
         let a2 = ParquetType::try_from_primitive(
             "a2".to_string(),
             PhysicalType::ByteArray,
-            Repetition::Repeated,
+            Repetition::REPEATED,
             Some(PrimitiveConvertedType::Utf8),
             None,
             None,
@@ -964,7 +964,7 @@ mod tests {
                 ParquetType::from_physical("b3".to_string(), PhysicalType::Int32),
                 ParquetType::from_physical("b4".to_string(), PhysicalType::Double),
             ],
-            Some(Repetition::Repeated),
+            Some(Repetition::REPEATED),
             None,
             None,
         );
@@ -978,7 +978,7 @@ mod tests {
         let a0 = ParquetType::from_converted(
             "a0".to_string(),
             vec![a1, b1],
-            Some(Repetition::Required),
+            Some(Repetition::REQUIRED),
             None,
             None,
         );
@@ -1011,7 +1011,7 @@ mod tests {
         let f1 = ParquetType::try_from_primitive(
             "_1".to_string(),
             PhysicalType::Int32,
-            Repetition::Required,
+            Repetition::REQUIRED,
             Some(PrimitiveConvertedType::Int8),
             None,
             None,
@@ -1019,7 +1019,7 @@ mod tests {
         let f2 = ParquetType::try_from_primitive(
             "_2".to_string(),
             PhysicalType::Int32,
-            Repetition::Required,
+            Repetition::REQUIRED,
             Some(PrimitiveConvertedType::Int16),
             None,
             None,
@@ -1027,7 +1027,7 @@ mod tests {
         let f3 = ParquetType::try_from_primitive(
             "_3".to_string(),
             PhysicalType::Float,
-            Repetition::Required,
+            Repetition::REQUIRED,
             None,
             None,
             None,
@@ -1035,7 +1035,7 @@ mod tests {
         let f4 = ParquetType::try_from_primitive(
             "_4".to_string(),
             PhysicalType::Double,
-            Repetition::Required,
+            Repetition::REQUIRED,
             None,
             None,
             None,
@@ -1089,7 +1089,7 @@ mod tests {
         let f1 = ParquetType::try_from_primitive(
             "_1".to_string(),
             PhysicalType::Int32,
-            Repetition::Required,
+            Repetition::REQUIRED,
             None,
             Some(LogicalType::INTEGER(IntType {
                 bit_width: 8,
@@ -1100,7 +1100,7 @@ mod tests {
         let f2 = ParquetType::try_from_primitive(
             "_2".to_string(),
             PhysicalType::Int32,
-            Repetition::Required,
+            Repetition::REQUIRED,
             None,
             Some(LogicalType::INTEGER(IntType {
                 bit_width: 16,
@@ -1111,7 +1111,7 @@ mod tests {
         let f3 = ParquetType::try_from_primitive(
             "_3".to_string(),
             PhysicalType::Float,
-            Repetition::Required,
+            Repetition::REQUIRED,
             None,
             None,
             None,
@@ -1119,7 +1119,7 @@ mod tests {
         let f4 = ParquetType::try_from_primitive(
             "_4".to_string(),
             PhysicalType::Double,
-            Repetition::Required,
+            Repetition::REQUIRED,
             None,
             None,
             None,

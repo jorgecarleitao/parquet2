@@ -32,7 +32,7 @@ use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_M
 use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
 
-fn metadata_len(buffer: &[u8], len: usize) -> i32 {
+pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
 }
 
@@ -138,7 +138,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
 /// Parses column orders from Thrift definition.
 /// If no column orders are defined, returns `None`.
-fn parse_column_orders(
+pub(super) fn parse_column_orders(
     orders: &[TColumnOrder],
     schema_descr: &SchemaDescriptor,
 ) -> Vec<ColumnOrder> {
@@ -229,7 +229,7 @@ mod tests {
                     basic_info,
                     ..
                 } => {
-                    assert_eq!(basic_info.repetition(), &FieldRepetitionType::Optional);
+                    assert_eq!(basic_info.repetition(), &FieldRepetitionType::OPTIONAL);
                     *physical_type
                 }
                 _ => {

@@ -104,32 +104,32 @@ pub fn converted_to_primitive_converted(
     maybe_decimal: Option<(i32, i32)>,
 ) -> Result<PrimitiveConvertedType> {
     use PrimitiveConvertedType::*;
-    Ok(match ty {
-        &ConvertedType::UTF8 => Utf8,
-        &ConvertedType::ENUM => Enum,
-        &ConvertedType::DECIMAL => {
+    Ok(match *ty {
+        ConvertedType::UTF8 => Utf8,
+        ConvertedType::ENUM => Enum,
+        ConvertedType::DECIMAL => {
             if let Some(maybe_decimal) = maybe_decimal {
                 Decimal(maybe_decimal.0, maybe_decimal.1)
             } else {
                 return Err(general_err!("Decimal requires a precision and scale"));
             }
         }
-        &ConvertedType::DATE => Date,
-        &ConvertedType::TIME_MILLIS => TimeMillis,
-        &ConvertedType::TIME_MICROS => TimeMicros,
-        &ConvertedType::TIMESTAMP_MILLIS => TimestampMillis,
-        &ConvertedType::TIMESTAMP_MICROS => TimestampMicros,
-        &ConvertedType::UINT_8 => Uint8,
-        &ConvertedType::UINT_16 => Uint16,
-        &ConvertedType::UINT_32 => Uint32,
-        &ConvertedType::UINT_64 => Uint64,
-        &ConvertedType::INT_8 => Int8,
-        &ConvertedType::INT_16 => Int16,
-        &ConvertedType::INT_32 => Int32,
-        &ConvertedType::INT_64 => Int64,
-        &ConvertedType::JSON => Json,
-        &ConvertedType::BSON => Bson,
-        &ConvertedType::INTERVAL => Interval,
+        ConvertedType::DATE => Date,
+        ConvertedType::TIME_MILLIS => TimeMillis,
+        ConvertedType::TIME_MICROS => TimeMicros,
+        ConvertedType::TIMESTAMP_MILLIS => TimestampMillis,
+        ConvertedType::TIMESTAMP_MICROS => TimestampMicros,
+        ConvertedType::UINT_8 => Uint8,
+        ConvertedType::UINT_16 => Uint16,
+        ConvertedType::UINT_32 => Uint32,
+        ConvertedType::UINT_64 => Uint64,
+        ConvertedType::INT_8 => Int8,
+        ConvertedType::INT_16 => Int16,
+        ConvertedType::INT_32 => Int32,
+        ConvertedType::INT_64 => Int64,
+        ConvertedType::JSON => Json,
+        ConvertedType::BSON => Bson,
+        ConvertedType::INTERVAL => Interval,
         _ => {
             return Err(general_err!(
                 "Converted type \"{:?}\" cannot be applied to a primitive type",
@@ -141,10 +141,10 @@ pub fn converted_to_primitive_converted(
 
 pub fn converted_to_group_converted(ty: &ConvertedType) -> Result<GroupConvertedType> {
     use GroupConvertedType::*;
-    Ok(match ty {
-        &ConvertedType::MAP => Map,
-        &ConvertedType::LIST => List,
-        &ConvertedType::MAP_KEY_VALUE => MapKeyValue,
+    Ok(match *ty {
+        ConvertedType::MAP => Map,
+        ConvertedType::LIST => List,
+        ConvertedType::MAP_KEY_VALUE => MapKeyValue,
         _ => {
             return Err(general_err!(
                 "Converted type \"{:?}\" cannot be applied to a primitive type",
