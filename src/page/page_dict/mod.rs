@@ -8,7 +8,7 @@ pub use primitive::PrimitivePageDict;
 
 use std::{any::Any, sync::Arc};
 
-use parquet_format::CompressionCodec;
+use parquet_format_async_temp::CompressionCodec;
 
 use crate::compression::create_codec;
 use crate::error::{ParquetError, Result};

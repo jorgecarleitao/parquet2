@@ -3,7 +3,7 @@ use std::{
     io::{Seek, Write},
 };
 
-use parquet_format::{CompressionCodec, RowGroup};
+use parquet_format_async_temp::{CompressionCodec, RowGroup};
 
 use crate::{
     error::{ParquetError, Result},

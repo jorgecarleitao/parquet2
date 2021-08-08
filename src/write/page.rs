@@ -1,9 +1,9 @@
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::Arc;
 
-use parquet_format::{DictionaryPageHeader, Encoding, PageType};
-use thrift::protocol::TCompactOutputProtocol;
-use thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
+use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::{DictionaryPageHeader, Encoding, PageType};
 
 use crate::error::Result;
 use crate::page::{

@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub use parquet_format::CompressionCodec;
+pub use parquet_format_async_temp::CompressionCodec;
 
 use crate::error::{ParquetError, Result};
 

@@ -21,8 +21,8 @@ use std::{
     io::{Cursor, Read, Seek, SeekFrom},
 };
 
-use parquet_format::{ColumnOrder as TColumnOrder, FileMetaData as TFileMetaData};
-use thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::{ColumnOrder as TColumnOrder, FileMetaData as TFileMetaData};
 
 use super::super::metadata::get_sort_order;
 use super::super::metadata::ColumnOrder;
@@ -174,7 +174,7 @@ pub(super) fn parse_column_orders(
 mod tests {
     use std::fs::File;
 
-    use parquet_format::FieldRepetitionType;
+    use parquet_format_async_temp::FieldRepetitionType;
 
     use super::*;
 

@@ -1,9 +1,11 @@
 use std::io::{Seek, Write};
 use std::{collections::HashSet, error::Error};
 
-use parquet_format::{ColumnChunk, ColumnMetaData, CompressionCodec, Encoding, PageType};
-use thrift::protocol::TCompactOutputProtocol;
-use thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
+use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::{
+    ColumnChunk, ColumnMetaData, CompressionCodec, Encoding, PageType,
+};
 
 use crate::statistics::serialize_statistics;
 use crate::{

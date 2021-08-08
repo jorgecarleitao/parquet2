@@ -49,7 +49,7 @@ use super::super::types::{
 use super::super::*;
 use crate::error::{ParquetError, Result};
 
-use parquet_format::ConvertedType;
+use parquet_format_async_temp::ConvertedType;
 
 fn is_logical_type(s: &str) -> bool {
     matches!(
@@ -453,7 +453,7 @@ impl<'a> Parser<'a> {
 
             // converted type decimal
             let (converted_type, maybe_decimal) = match converted_type {
-                Some(parquet_format::ConvertedType::DECIMAL) => self.parse_converted_decimal()?,
+                Some(parquet_format_async_temp::ConvertedType::DECIMAL) => self.parse_converted_decimal()?,
                 other => (other, None),
             };
             let converted_type = converted_type
@@ -512,7 +512,7 @@ impl<'a> Parser<'a> {
 
         assert_token(self.tokenizer.next(), ")")?;
         Ok((
-            Some(parquet_format::ConvertedType::DECIMAL),
+            Some(parquet_format_async_temp::ConvertedType::DECIMAL),
             Some((precision, scale)),
         ))
     }

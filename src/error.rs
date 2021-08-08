@@ -42,8 +42,8 @@ impl From<snap::Error> for ParquetError {
     }
 }
 
-impl From<thrift::Error> for ParquetError {
-    fn from(e: thrift::Error) -> ParquetError {
+impl From<parquet_format_async_temp::thrift::Error> for ParquetError {
+    fn from(e: parquet_format_async_temp::thrift::Error) -> ParquetError {
         ParquetError::General(format!("underlying thrift error: {}", e))
     }
 }

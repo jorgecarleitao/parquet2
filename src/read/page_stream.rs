@@ -2,8 +2,8 @@ use std::io::SeekFrom;
 
 use async_stream::try_stream;
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Stream};
-use parquet_format::CompressionCodec;
-use thrift::protocol::TCompactInputStreamProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
+use parquet_format_async_temp::CompressionCodec;
 
 use crate::error::Result;
 use crate::metadata::{ColumnDescriptor, FileMetaData};

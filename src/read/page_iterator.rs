@@ -1,7 +1,7 @@
 use std::{io::Read, sync::Arc};
 
-use parquet_format::{CompressionCodec, PageType};
-use thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::{CompressionCodec, PageType};
 
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;

@@ -11,7 +11,7 @@ mod dyn_iter;
 pub use dyn_iter::DynIter;
 
 pub use file::write_file;
-use parquet_format::CompressionCodec;
+use parquet_format_async_temp::CompressionCodec;
 
 use crate::page::CompressedPage;
 

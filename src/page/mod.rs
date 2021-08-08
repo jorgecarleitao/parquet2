@@ -3,9 +3,9 @@ pub use page_dict::*;
 
 use std::sync::Arc;
 
-use parquet_format::CompressionCodec;
-use parquet_format::Encoding;
-pub use parquet_format::{
+use parquet_format_async_temp::CompressionCodec;
+use parquet_format_async_temp::Encoding;
+pub use parquet_format_async_temp::{
     DataPageHeader as DataPageHeaderV1, DataPageHeaderV2, PageHeader as ParquetPageHeader,
 };
 

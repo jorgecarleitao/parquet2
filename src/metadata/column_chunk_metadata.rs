@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use parquet_format::{ColumnChunk, ColumnMetaData, Encoding};
+use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::error::Result;

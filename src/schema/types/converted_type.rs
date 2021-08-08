@@ -1,5 +1,5 @@
 use crate::error::{ParquetError, Result};
-use parquet_format::ConvertedType;
+use parquet_format_async_temp::ConvertedType;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum PrimitiveConvertedType {

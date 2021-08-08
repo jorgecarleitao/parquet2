@@ -1,8 +1,8 @@
 use std::io::SeekFrom;
 
 use futures::{io::Cursor, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
-use parquet_format::FileMetaData as TFileMetaData;
-use thrift::protocol::TCompactInputStreamProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
+use parquet_format_async_temp::FileMetaData as TFileMetaData;
 
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 use super::metadata::{metadata_len, parse_column_orders};
