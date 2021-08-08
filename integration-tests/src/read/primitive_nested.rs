@@ -6,7 +6,7 @@ use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::{DataPage, DataPageHeader, PrimitivePageDict},
+    page::{DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
     read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
     types::NativeType,
 };
@@ -79,14 +79,14 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
         (rep_level_encoding.0, max_rep_level == 0),
         (def_level_encoding.0, max_def_level == 0),
     ) {
-        ((Encoding::RLE, true), (Encoding::RLE, true)) => compose_array(
+        ((Encoding::Rle, true), (Encoding::Rle, true)) => compose_array(
             std::iter::repeat(0).take(length as usize),
             std::iter::repeat(0).take(length as usize),
             max_rep_level,
             max_def_level,
             values,
         ),
-        ((Encoding::RLE, false), (Encoding::RLE, true)) => {
+        ((Encoding::Rle, false), (Encoding::Rle, true)) => {
             let num_bits = get_bit_width(rep_level_encoding.1);
             let rep_levels = RLEDecoder::new(rep_levels, num_bits, length);
             compose_array(
@@ -97,7 +97,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
                 values,
             )
         }
-        ((Encoding::RLE, true), (Encoding::RLE, false)) => {
+        ((Encoding::Rle, true), (Encoding::Rle, false)) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             compose_array(
@@ -108,7 +108,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
                 values,
             )
         }
-        ((Encoding::RLE, false), (Encoding::RLE, false)) => {
+        ((Encoding::Rle, false), (Encoding::Rle, false)) => {
             let rep_levels =
                 RLEDecoder::new(rep_levels, get_bit_width(rep_level_encoding.1), length);
             let def_levels =
@@ -152,11 +152,11 @@ pub fn page_to_array<T: NativeType>(
                     values,
                     page.num_values() as u32,
                     (
-                        &header.repetition_level_encoding,
+                        &header.repetition_level_encoding(),
                         descriptor.max_rep_level(),
                     ),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))
@@ -204,7 +204,7 @@ pub fn page_dict_to_array<T: NativeType>(
 ) -> Result<Array> {
     assert_eq!(descriptor.max_rep_level(), 1);
     match page.header() {
-        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
+        DataPageHeader::V1(header) => match (page.encoding(), &page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => {
                 let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
                 Ok(read_dict_array::<T>(
@@ -214,11 +214,11 @@ pub fn page_dict_to_array<T: NativeType>(
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
                     (
-                        &header.repetition_level_encoding,
+                        &header.repetition_level_encoding(),
                         descriptor.max_rep_level(),
                     ),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))

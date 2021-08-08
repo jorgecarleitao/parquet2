@@ -3,9 +3,10 @@ use std::{
     io::{Seek, Write},
 };
 
-use parquet_format_async_temp::{CompressionCodec, RowGroup};
+use parquet_format_async_temp::RowGroup;
 
 use crate::{
+    compression::Compression,
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
     page::CompressedPage,
@@ -31,7 +32,7 @@ pub fn write_row_group<
 >(
     writer: &mut W,
     descriptors: &[ColumnDescriptor],
-    codec: CompressionCodec,
+    compression: Compression,
     columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>,
 ) -> Result<RowGroup>
 where
@@ -45,7 +46,7 @@ where
             write_column_chunk(
                 writer,
                 descriptor,
-                codec,
+                compression,
                 page_iter.map_err(ParquetError::from_external_error)?,
             )
         })

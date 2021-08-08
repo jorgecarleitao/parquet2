@@ -1,17 +1,18 @@
+use std::convert::TryInto;
 use std::io::{Seek, Write};
 use std::{collections::HashSet, error::Error};
 
 use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
-use parquet_format_async_temp::{
-    ColumnChunk, ColumnMetaData, CompressionCodec, Encoding, PageType,
-};
+use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
 
 use crate::statistics::serialize_statistics;
 use crate::{
+    compression::Compression,
+    encoding::Encoding,
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::CompressedPage,
+    page::{CompressedPage, PageType},
     schema::types::{physical_type_to_type, ParquetType},
 };
 
@@ -25,7 +26,7 @@ pub fn write_column_chunk<
 >(
     writer: &mut W,
     descriptor: &ColumnDescriptor,
-    codec: CompressionCodec,
+    compression: Compression,
     compressed_pages: I,
 ) -> Result<ColumnChunk> {
     // write every page
@@ -53,35 +54,43 @@ pub fn write_column_chunk<
     let data_page_offset = specs.first().map(|spec| spec.offset).unwrap_or(0) as i64;
     let num_values = specs
         .iter()
-        .map(|spec| match spec.header.type_ {
-            PageType::DATA_PAGE => spec.header.data_page_header.as_ref().unwrap().num_values as i64,
-            PageType::DATA_PAGE_V2 => {
-                spec.header.data_page_header_v2.as_ref().unwrap().num_values as i64
+        .map(|spec| {
+            let type_ = spec.header.type_.try_into().unwrap();
+            match type_ {
+                PageType::DataPage => {
+                    spec.header.data_page_header.as_ref().unwrap().num_values as i64
+                }
+                PageType::DataPageV2 => {
+                    spec.header.data_page_header_v2.as_ref().unwrap().num_values as i64
+                }
+                _ => 0, // only data pages contribute
             }
-            _ => 0, // only data pages contribute
         })
         .sum();
     let encodings = specs
         .iter()
-        .map(|spec| match spec.header.type_ {
-            PageType::DATA_PAGE => vec![
-                spec.header.data_page_header.as_ref().unwrap().encoding,
-                Encoding::RLE,
-            ],
-            PageType::DATA_PAGE_V2 => {
-                vec![
-                    spec.header.data_page_header_v2.as_ref().unwrap().encoding,
-                    Encoding::RLE,
-                ]
+        .map(|spec| {
+            let type_ = spec.header.type_.try_into().unwrap();
+            match type_ {
+                PageType::DataPage => vec![
+                    spec.header.data_page_header.as_ref().unwrap().encoding,
+                    Encoding::Rle.into(),
+                ],
+                PageType::DataPageV2 => {
+                    vec![
+                        spec.header.data_page_header_v2.as_ref().unwrap().encoding,
+                        Encoding::Rle.into(),
+                    ]
+                }
+                PageType::DictionaryPage => vec![
+                    spec.header
+                        .dictionary_page_header
+                        .as_ref()
+                        .unwrap()
+                        .encoding,
+                ],
+                _ => todo!(),
             }
-            PageType::DICTIONARY_PAGE => vec![
-                spec.header
-                    .dictionary_page_header
-                    .as_ref()
-                    .unwrap()
-                    .encoding,
-            ],
-            _ => todo!(),
         })
         .flatten()
         .collect::<HashSet<_>>() // unique
@@ -105,7 +114,7 @@ pub fn write_column_chunk<
         type_,
         encodings,
         path_in_schema: descriptor.path_in_schema().to_vec(),
-        codec,
+        codec: compression.into(),
         num_values,
         total_uncompressed_size,
         total_compressed_size,

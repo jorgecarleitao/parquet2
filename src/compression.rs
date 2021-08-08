@@ -15,7 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-pub use parquet_format_async_temp::CompressionCodec;
+pub use super::parquet_bridge::Compression;
 
 use crate::error::{ParquetError, Result};
 
@@ -35,23 +35,20 @@ pub trait Codec: std::fmt::Debug {
 /// Given the compression type `codec`, returns a codec used to compress and decompress
 /// bytes for the compression type.
 /// This returns `None` if the codec type is `UNCOMPRESSED`.
-pub fn create_codec(codec: &CompressionCodec) -> Result<Option<Box<dyn Codec>>> {
+pub fn create_codec(codec: &Compression) -> Result<Option<Box<dyn Codec>>> {
     match *codec {
         #[cfg(feature = "brotli")]
-        CompressionCodec::BROTLI => Ok(Some(Box::new(BrotliCodec::new()))),
+        Compression::Brotli => Ok(Some(Box::new(BrotliCodec::new()))),
         #[cfg(feature = "gzip")]
-        CompressionCodec::GZIP => Ok(Some(Box::new(GZipCodec::new()))),
+        Compression::Gzip => Ok(Some(Box::new(GZipCodec::new()))),
         #[cfg(feature = "snappy")]
-        CompressionCodec::SNAPPY => Ok(Some(Box::new(SnappyCodec::new()))),
+        Compression::Snappy => Ok(Some(Box::new(SnappyCodec::new()))),
         #[cfg(feature = "lz4")]
-        CompressionCodec::LZ4 => Ok(Some(Box::new(Lz4Codec::new()))),
+        Compression::Lz4 => Ok(Some(Box::new(Lz4Codec::new()))),
         #[cfg(feature = "zstd")]
-        CompressionCodec::ZSTD => Ok(Some(Box::new(ZstdCodec::new()))),
-        CompressionCodec::UNCOMPRESSED => Ok(None),
-        _ => Err(general_err!(
-            "CompressionCodec {:?} is not installed",
-            codec
-        )),
+        Compression::Zsld => Ok(Some(Box::new(ZstdCodec::new()))),
+        Compression::Uncompressed => Ok(None),
+        _ => Err(general_err!("Compression {:?} is not installed", codec)),
     }
 }
 
@@ -249,7 +246,7 @@ mod zstd_codec {
         }
     }
 
-    /// CompressionCodec level (1-21) for ZSTD. Choose 1 here for better compression speed.
+    /// Compression level (1-21) for ZSTD. Choose 1 here for better compression speed.
     const ZSTD_COMPRESSION_LEVEL: i32 = 1;
 
     impl Codec for ZstdCodec {
@@ -275,7 +272,7 @@ pub use zstd_codec::*;
 mod tests {
     use super::*;
 
-    fn test_roundtrip(c: CompressionCodec, data: &[u8]) {
+    fn test_roundtrip(c: Compression, data: &[u8]) {
         let mut c1 = create_codec(&c).unwrap().unwrap();
         let mut c2 = create_codec(&c).unwrap().unwrap();
 
@@ -302,7 +299,7 @@ mod tests {
         assert_eq!(data, decompressed.as_slice());
     }
 
-    fn test_codec(c: CompressionCodec) {
+    fn test_codec(c: Compression) {
         let sizes = vec![100, 10000, 100000];
         for size in sizes {
             let data = (0..size).map(|x| (x % 255) as u8).collect::<Vec<_>>();
@@ -312,26 +309,26 @@ mod tests {
 
     #[test]
     fn test_codec_snappy() {
-        test_codec(CompressionCodec::SNAPPY);
+        test_codec(Compression::Snappy);
     }
 
     #[test]
     fn test_codec_gzip() {
-        test_codec(CompressionCodec::GZIP);
+        test_codec(Compression::Gzip);
     }
 
     #[test]
     fn test_codec_brotli() {
-        test_codec(CompressionCodec::BROTLI);
+        test_codec(Compression::Brotli);
     }
 
     #[test]
     fn test_codec_lz4() {
-        test_codec(CompressionCodec::LZ4);
+        test_codec(Compression::Lz4);
     }
 
     #[test]
     fn test_codec_zstd() {
-        test_codec(CompressionCodec::ZSTD);
+        test_codec(Compression::Zsld);
     }
 }

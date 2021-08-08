@@ -40,7 +40,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
             let element = SchemaElement {
                 type_: Some(type_),
                 type_length,
-                repetition_type: Some(*basic_info.repetition()),
+                repetition_type: Some((*basic_info.repetition()).into()),
                 name: basic_info.name().to_owned(),
                 num_children: None,
                 converted_type,
@@ -72,7 +72,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
             let element = SchemaElement {
                 type_: None,
                 type_length: None,
-                repetition_type,
+                repetition_type: repetition_type.map(|x| x.into()),
                 name: basic_info.name().to_owned(),
                 num_children: Some(fields.len() as i32),
                 converted_type,

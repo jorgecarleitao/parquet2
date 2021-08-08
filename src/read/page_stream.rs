@@ -3,11 +3,10 @@ use std::io::SeekFrom;
 use async_stream::try_stream;
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Stream};
 use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
-use parquet_format_async_temp::CompressionCodec;
 
+use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::{ColumnDescriptor, FileMetaData};
-
 use crate::page::{CompressedDataPage, ParquetPageHeader};
 
 use super::page_iterator::{finish_page, FinishedPage};
@@ -26,7 +25,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
     Ok(_get_page_stream(
         reader,
         column_metadata.num_values(),
-        *column_metadata.compression(),
+        column_metadata.compression(),
         column_metadata.descriptor(),
         buffer,
     ))
@@ -35,7 +34,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
 fn _get_page_stream<'a, R: AsyncRead + Unpin + Send>(
     reader: &'a mut R,
     total_num_values: i64,
-    compression: CompressionCodec,
+    compression: Compression,
     descriptor: &'a ColumnDescriptor,
     mut buffer: Vec<u8>,
 ) -> impl Stream<Item = Result<CompressedDataPage>> + 'a {

@@ -1,3 +1,5 @@
+use std::convert::TryInto;
+
 use parquet_format_async_temp::SchemaElement;
 
 use crate::error::{ParquetError, Result};
@@ -52,9 +54,13 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
         // have to handle this case too.
         None | Some(0) => {
             // primitive type
-            let repetition = element.repetition_type.ok_or_else(|| {
-                general_err!("Repetition level must be defined for a primitive type")
-            })?;
+            let repetition = element
+                .repetition_type
+                .ok_or_else(|| {
+                    general_err!("Repetition level must be defined for a primitive type")
+                })?
+                .try_into()
+                .unwrap();
             let physical_type = element.type_.ok_or_else(|| {
                 general_err!("Physical type must be defined for a primitive type")
             })?;
@@ -89,7 +95,7 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
             Ok((index + 1, tp))
         }
         Some(n) => {
-            let repetition = element.repetition_type;
+            let repetition = element.repetition_type.map(|x| x.try_into().unwrap());
             let mut fields = vec![];
             let mut next_index = index + 1;
             for _ in 0..n {

@@ -1,13 +1,14 @@
+use std::convert::TryInto;
 use std::{io::Read, sync::Arc};
 
 use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
-use parquet_format_async_temp::{CompressionCodec, PageType};
 
+use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
 use crate::page::{
-    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, ParquetPageHeader,
+    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, PageType, ParquetPageHeader,
 };
 
 /// Type declaration for a page filter
@@ -19,7 +20,7 @@ pub struct PageIterator<'a, R: Read> {
     // The source
     reader: &'a mut R,
 
-    compression: CompressionCodec,
+    compression: Compression,
 
     // The number of values we have seen so far.
     seen_num_values: i64,
@@ -42,7 +43,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
     pub fn new(
         reader: &'a mut R,
         total_num_values: i64,
-        compression: CompressionCodec,
+        compression: Compression,
         descriptor: ColumnDescriptor,
         pages_filter: PageFilter,
         buffer: Vec<u8>,
@@ -158,12 +159,13 @@ pub(super) enum FinishedPage {
 pub(super) fn finish_page(
     page_header: ParquetPageHeader,
     buffer: &mut Vec<u8>,
-    compression: CompressionCodec,
+    compression: Compression,
     current_dictionary: &Option<Arc<dyn DictPage>>,
     descriptor: &ColumnDescriptor,
 ) -> Result<FinishedPage> {
-    match page_header.type_ {
-        PageType::DICTIONARY_PAGE => {
+    let type_ = page_header.type_.try_into()?;
+    match type_ {
+        PageType::DictionaryPage => {
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
@@ -177,7 +179,7 @@ pub(super) fn finish_page(
 
             Ok(FinishedPage::Dict(page))
         }
-        PageType::DATA_PAGE => {
+        PageType::DataPage => {
             let header = page_header.data_page_header.unwrap();
             let seen_num_values = header.num_values as i64;
 
@@ -193,7 +195,7 @@ pub(super) fn finish_page(
                 seen_num_values,
             ))
         }
-        PageType::DATA_PAGE_V2 => {
+        PageType::DataPageV2 => {
             let header = page_header.data_page_header_v2.unwrap();
             let seen_num_values = header.num_values as i64;
 
@@ -209,6 +211,6 @@ pub(super) fn finish_page(
                 seen_num_values,
             ))
         }
-        _ => Ok(FinishedPage::Index),
+        PageType::IndexPage => Ok(FinishedPage::Index),
     }
 }

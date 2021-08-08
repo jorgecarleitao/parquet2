@@ -2,7 +2,7 @@ use parquet::{
     encoding::{bitpacking, plain_byte_array, uleb128, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
-    page::{BinaryPageDict, DataPage, DataPageHeader},
+    page::{BinaryPageDict, DataPage, DataPageHeader, DataPageHeaderExt},
     read::levels,
 };
 
@@ -49,14 +49,14 @@ fn read_dict_buffer(
 ) -> Vec<Option<Vec<u8>>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::RLE, true) => read_dict_buffer_impl(
+        (Encoding::Rle, true) => read_dict_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             length,
             max_def_level,
             dict,
         ),
-        (Encoding::RLE, false) => {
+        (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             read_dict_buffer_impl(def_levels, values, length, max_def_level, dict)
@@ -81,7 +81,7 @@ pub fn page_dict_to_vec(
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))
@@ -113,13 +113,13 @@ fn read_buffer(
 ) -> Vec<Option<Vec<u8>>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::RLE, true) => read_buffer_impl(
+        (Encoding::Rle, true) => read_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             length,
             max_def_level,
         ),
-        (Encoding::RLE, false) => {
+        (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             read_buffer_impl(def_levels, values, length, max_def_level)
@@ -140,7 +140,7 @@ pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec
                     values,
                     page.num_values() as u32,
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))

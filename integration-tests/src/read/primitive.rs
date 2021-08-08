@@ -6,7 +6,7 @@ use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::{DataPage, DataPageHeader, PrimitivePageDict},
+    page::{DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
     read::levels::{get_bit_width, split_buffer_v1, split_buffer_v2, RLEDecoder},
     types::NativeType,
 };
@@ -43,12 +43,12 @@ fn read_buffer<T: NativeType>(
 ) -> Vec<Option<T>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::RLE, true) => read_buffer_impl(
+        (Encoding::Rle, true) => read_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             max_def_level,
         ),
-        (Encoding::RLE, false) => {
+        (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             read_buffer_impl(def_levels, values, max_def_level)
@@ -90,14 +90,14 @@ fn read_dict_buffer<'a, T: NativeType>(
 ) -> Vec<Option<T>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::RLE, true) => read_dict_buffer_impl(
+        (Encoding::Rle, true) => read_dict_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             length,
             max_def_level,
             dict,
         ),
-        (Encoding::RLE, false) => {
+        (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
             let def_levels = RLEDecoder::new(def_levels, num_bits, length);
             read_dict_buffer_impl(def_levels, values, length, max_def_level, dict)
@@ -122,7 +122,7 @@ pub fn page_dict_to_vec<T: NativeType>(
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))
@@ -132,7 +132,7 @@ pub fn page_dict_to_vec<T: NativeType>(
             )),
             _ => todo!(),
         },
-        DataPageHeader::V2(header) => match (&header.encoding, &page.dictionary_page()) {
+        DataPageHeader::V2(header) => match (&header.encoding(), &page.dictionary_page()) {
             (Encoding::RleDictionary, Some(dict)) | (Encoding::PlainDictionary, Some(dict)) => {
                 let (_, def_levels, values) = split_buffer_v2(
                     page.buffer(),
@@ -144,7 +144,7 @@ pub fn page_dict_to_vec<T: NativeType>(
                     values,
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
-                    (&Encoding::RLE, descriptor.max_def_level()),
+                    (&Encoding::Rle, descriptor.max_def_level()),
                 ))
             }
             _ => todo!(),
@@ -158,7 +158,7 @@ pub fn page_to_vec<T: NativeType>(
 ) -> Result<Vec<Option<T>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
     match page.header() {
-        DataPageHeader::V1(header) => match (&header.encoding, &page.dictionary_page()) {
+        DataPageHeader::V1(header) => match (&header.encoding(), &page.dictionary_page()) {
             (Encoding::Plain, None) => {
                 let (_, def_levels, values) =
                     split_buffer_v1(page.buffer(), false, descriptor.max_def_level() > 0);
@@ -167,14 +167,14 @@ pub fn page_to_vec<T: NativeType>(
                     values,
                     page.num_values() as u32,
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))
             }
             _ => todo!(),
         },
-        DataPageHeader::V2(header) => match (&header.encoding, &page.dictionary_page()) {
+        DataPageHeader::V2(header) => match (&header.encoding(), &page.dictionary_page()) {
             (Encoding::Plain, None) => {
                 let (_, def_levels, values) = split_buffer_v2(
                     page.buffer(),
@@ -185,7 +185,7 @@ pub fn page_to_vec<T: NativeType>(
                     def_levels,
                     values,
                     page.num_values() as u32,
-                    (&Encoding::RLE, descriptor.max_def_level()),
+                    (&Encoding::Rle, descriptor.max_def_level()),
                 ))
             }
             _ => todo!(),

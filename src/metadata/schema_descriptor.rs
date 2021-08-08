@@ -2,10 +2,7 @@ use parquet_format_async_temp::SchemaElement;
 
 use crate::{
     error::ParquetError,
-    schema::{
-        io_message::from_message,
-        types::{ParquetType, Repetition},
-    },
+    schema::{io_message::from_message, types::ParquetType, Repetition},
 };
 use crate::{error::Result, schema::types::BasicTypeInfo};
 
@@ -66,7 +63,7 @@ impl SchemaDescriptor {
 
     pub(crate) fn into_thrift(self) -> Result<Vec<SchemaElement>> {
         ParquetType::GroupType {
-            basic_info: BasicTypeInfo::new(self.name, Repetition::OPTIONAL, None, true),
+            basic_info: BasicTypeInfo::new(self.name, Repetition::Optional, None, true),
             logical_type: None,
             converted_type: None,
             fields: self.fields,
@@ -106,10 +103,10 @@ fn build_tree<'a>(
 ) {
     path_so_far.push(tp.name());
     match *tp.get_basic_info().repetition() {
-        Repetition::OPTIONAL => {
+        Repetition::Optional => {
             max_def_level += 1;
         }
-        Repetition::REPEATED => {
+        Repetition::Repeated => {
             max_def_level += 1;
             max_rep_level += 1;
         }

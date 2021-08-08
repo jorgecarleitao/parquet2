@@ -174,11 +174,9 @@ pub(super) fn parse_column_orders(
 mod tests {
     use std::fs::File;
 
-    use parquet_format_async_temp::FieldRepetitionType;
-
     use super::*;
 
-    use crate::schema::types::PhysicalType;
+    use crate::schema::{types::PhysicalType, Repetition};
     use crate::tests::get_path;
 
     #[test]
@@ -229,7 +227,7 @@ mod tests {
                     basic_info,
                     ..
                 } => {
-                    assert_eq!(basic_info.repetition(), &FieldRepetitionType::OPTIONAL);
+                    assert_eq!(basic_info.repetition(), &Repetition::Optional);
                     *physical_type
                 }
                 _ => {

@@ -59,7 +59,7 @@ pub fn get_page_iterator<'a, RR: Read + Seek>(
     Ok(PageIterator::new(
         reader,
         column_metadata.num_values(),
-        *column_metadata.compression(),
+        column_metadata.compression(),
         column_metadata.descriptor().clone(),
         pages_filter,
         buffer,

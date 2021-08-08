@@ -1,4 +1,4 @@
-use super::Repetition;
+use super::super::Repetition;
 
 /// Common type information.
 #[derive(Clone, Debug, PartialEq)]

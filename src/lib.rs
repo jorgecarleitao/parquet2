@@ -7,6 +7,7 @@ pub mod compression;
 pub mod encoding;
 pub mod metadata;
 pub mod page;
+mod parquet_bridge;
 pub mod read;
 pub mod schema;
 pub mod statistics;
