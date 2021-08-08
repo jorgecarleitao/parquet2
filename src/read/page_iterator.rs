@@ -128,6 +128,40 @@ fn build_page<R: Read>(
         reader.reader.read_exact(buffer)?;
     }
 
+    let result = finish_page(
+        page_header,
+        buffer,
+        reader.compression,
+        &reader.current_dictionary,
+        &reader.descriptor,
+    )?;
+
+    match result {
+        FinishedPage::Data(page, seen_values) => {
+            reader.seen_num_values += seen_values;
+            Ok(Some(page))
+        }
+        FinishedPage::Dict(dict) => {
+            reader.current_dictionary = Some(dict);
+            Ok(None)
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(super) enum FinishedPage {
+    Data(CompressedDataPage, i64),
+    Dict(Arc<dyn DictPage>),
+    Index,
+}
+
+pub(super) fn finish_page(
+    page_header: ParquetPageHeader,
+    buffer: &mut Vec<u8>,
+    compression: CompressionCodec,
+    current_dictionary: &Option<Arc<dyn DictPage>>,
+    descriptor: &ColumnDescriptor,
+) -> Result<FinishedPage> {
     match page_header.type_ {
         PageType::DICTIONARY_PAGE => {
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
@@ -136,43 +170,45 @@ fn build_page<R: Read>(
             let page = read_dict_page(
                 buffer,
                 dict_header.num_values as u32,
-                (
-                    reader.compression,
-                    page_header.uncompressed_page_size as usize,
-                ),
+                (compression, page_header.uncompressed_page_size as usize),
                 is_sorted,
-                reader.descriptor.physical_type(),
+                descriptor.physical_type(),
             )?;
 
-            reader.current_dictionary = Some(page);
-            Ok(None)
+            Ok(FinishedPage::Dict(page))
         }
         PageType::DATA_PAGE => {
             let header = page_header.data_page_header.unwrap();
-            reader.seen_num_values += header.num_values as i64;
+            let seen_num_values = header.num_values as i64;
 
-            Ok(Some(CompressedDataPage::new(
-                DataPageHeader::V1(header),
-                std::mem::take(buffer),
-                reader.compression,
-                page_header.uncompressed_page_size as usize,
-                reader.current_dictionary.clone(),
-                reader.descriptor.clone(),
-            )))
+            Ok(FinishedPage::Data(
+                CompressedDataPage::new(
+                    DataPageHeader::V1(header),
+                    std::mem::take(buffer),
+                    compression,
+                    page_header.uncompressed_page_size as usize,
+                    current_dictionary.clone(),
+                    descriptor.clone(),
+                ),
+                seen_num_values,
+            ))
         }
         PageType::DATA_PAGE_V2 => {
             let header = page_header.data_page_header_v2.unwrap();
-            reader.seen_num_values += header.num_values as i64;
+            let seen_num_values = header.num_values as i64;
 
-            Ok(Some(CompressedDataPage::new(
-                DataPageHeader::V2(header),
-                std::mem::take(buffer),
-                reader.compression,
-                page_header.uncompressed_page_size as usize,
-                reader.current_dictionary.clone(),
-                reader.descriptor.clone(),
-            )))
+            Ok(FinishedPage::Data(
+                CompressedDataPage::new(
+                    DataPageHeader::V2(header),
+                    std::mem::take(buffer),
+                    compression,
+                    page_header.uncompressed_page_size as usize,
+                    current_dictionary.clone(),
+                    descriptor.clone(),
+                ),
+                seen_num_values,
+            ))
         }
-        _ => Ok(None),
+        _ => Ok(FinishedPage::Index),
     }
 }

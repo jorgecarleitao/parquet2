@@ -2,6 +2,9 @@ mod compression;
 pub mod levels;
 mod metadata;
 mod page_iterator;
+#[cfg(feature = "stream")]
+mod page_stream;
+#[cfg(feature = "stream")]
 mod stream;
 
 pub use streaming_iterator;
@@ -10,6 +13,7 @@ pub use streaming_iterator::StreamingIterator;
 pub use compression::{decompress, Decompressor};
 
 pub use metadata::read_metadata;
+#[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
 use std::io::{Read, Seek, SeekFrom};
@@ -19,6 +23,8 @@ use crate::metadata::RowGroupMetaData;
 use crate::{error::Result, metadata::FileMetaData};
 
 pub use page_iterator::{PageFilter, PageIterator};
+#[cfg(feature = "stream")]
+pub use page_stream::get_page_stream;
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true

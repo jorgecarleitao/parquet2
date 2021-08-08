@@ -82,7 +82,6 @@ impl AsyncRead for RangedStreamer {
         let min_request_size = self.min_request_size;
         match &mut self.state {
             State::HasChunk(output) => {
-                //let _ = self.process(buf, &output);
                 let existing_range = (output.start as usize, output.data.len());
                 if range_includes(existing_range, requested_range) {
                     let offset = requested_range.0 - existing_range.0;

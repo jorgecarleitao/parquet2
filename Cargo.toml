@@ -17,6 +17,7 @@ thrift = { path = "../thrift/lib/rs" }
 bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
 streaming-iterator = "0.1.5"
 
+async-stream = { version = "0.3.2", optional = true }
 futures = { version = "0.3", optional = true }
 
 snap = { version = "^1.0", optional = true }
@@ -29,4 +30,4 @@ zstd = { version = "^0.9", optional = true }
 default = ["snappy", "gzip", "lz4", "zstd", "brotli", "stream"]
 snappy = ["snap"]
 gzip = ["flate2"]
-stream = ["futures"]
+stream = ["futures", "async-stream"]
