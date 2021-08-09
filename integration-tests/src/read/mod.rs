@@ -102,7 +102,7 @@ pub(crate) mod tests {
             .descriptor()
             .clone();
 
-        let iterator = get_page_iterator(&metadata, row_group, column, reader, vec![])?;
+        let iterator = get_page_iterator(&metadata, row_group, column, reader, None, vec![])?;
 
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);

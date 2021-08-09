@@ -10,9 +10,11 @@ use crate::page::{
     read_dict_page, CompressedDataPage, DataPageHeader, DictPage, ParquetPageHeader,
 };
 
+/// Type declaration for a page filter
+pub type PageFilter = Arc<dyn Fn(&ColumnDescriptor, &DataPageHeader) -> bool>;
+
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
-#[derive(Debug)]
 pub struct PageIterator<'a, R: Read> {
     // The source
     reader: &'a mut R,
@@ -28,6 +30,8 @@ pub struct PageIterator<'a, R: Read> {
     // Arc: it will be shared between multiple pages and pages should be Send + Sync.
     current_dictionary: Option<Arc<dyn DictPage>>,
 
+    pages_filter: PageFilter,
+
     descriptor: ColumnDescriptor,
 
     // The currently allocated buffer.
@@ -40,6 +44,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
         total_num_values: i64,
         compression: CompressionCodec,
         descriptor: ColumnDescriptor,
+        pages_filter: PageFilter,
         buffer: Vec<u8>,
     ) -> Self {
         Self {
@@ -49,6 +54,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
             seen_num_values: 0,
             current_dictionary: None,
             descriptor,
+            pages_filter,
             buffer,
         }
     }
@@ -70,12 +76,21 @@ impl<'a, R: Read> Iterator for PageIterator<'a, R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buffer = std::mem::take(&mut self.buffer);
-        let result = next_page(self, &mut buffer).transpose();
-        if result.is_none() {
-            // if no page, we take back the buffer
+        let maybe_maybe_page = next_page(self, &mut buffer).transpose();
+        if let Some(ref maybe_page) = maybe_maybe_page {
+            if let Ok(page) = maybe_page {
+                // check if we should filter it
+                let to_consume = (self.pages_filter)(&self.descriptor, page.header());
+                if !to_consume {
+                    self.buffer = std::mem::take(&mut buffer);
+                    return self.next();
+                }
+            }
+        } else {
+            // no page => we take back the buffer
             self.buffer = std::mem::take(&mut buffer);
         }
-        result
+        maybe_maybe_page
     }
 }
 
