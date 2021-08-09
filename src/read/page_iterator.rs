@@ -122,6 +122,9 @@ fn build_page<R: Read>(
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedDataPage>> {
     let page_header = reader.read_page_header()?;
+    reader.seen_num_values += get_page_header(&page_header)
+        .map(|x| x.num_values() as i64)
+        .unwrap_or_default();
 
     let read_size = page_header.compressed_page_size as usize;
     if read_size > 0 {
@@ -138,10 +141,7 @@ fn build_page<R: Read>(
     )?;
 
     match result {
-        FinishedPage::Data(page, seen_values) => {
-            reader.seen_num_values += seen_values;
-            Ok(Some(page))
-        }
+        FinishedPage::Data(page) => Ok(Some(page)),
         FinishedPage::Dict(dict) => {
             reader.current_dictionary = Some(dict);
             Ok(None)
@@ -151,7 +151,7 @@ fn build_page<R: Read>(
 }
 
 pub(super) enum FinishedPage {
-    Data(CompressedDataPage, i64),
+    Data(CompressedDataPage),
     Dict(Arc<dyn DictPage>),
     Index,
 }
@@ -181,36 +181,43 @@ pub(super) fn finish_page(
         }
         PageType::DataPage => {
             let header = page_header.data_page_header.unwrap();
-            let seen_num_values = header.num_values as i64;
 
-            Ok(FinishedPage::Data(
-                CompressedDataPage::new(
-                    DataPageHeader::V1(header),
-                    std::mem::take(buffer),
-                    compression,
-                    page_header.uncompressed_page_size as usize,
-                    current_dictionary.clone(),
-                    descriptor.clone(),
-                ),
-                seen_num_values,
-            ))
+            Ok(FinishedPage::Data(CompressedDataPage::new(
+                DataPageHeader::V1(header),
+                std::mem::take(buffer),
+                compression,
+                page_header.uncompressed_page_size as usize,
+                current_dictionary.clone(),
+                descriptor.clone(),
+            )))
         }
         PageType::DataPageV2 => {
             let header = page_header.data_page_header_v2.unwrap();
-            let seen_num_values = header.num_values as i64;
 
-            Ok(FinishedPage::Data(
-                CompressedDataPage::new(
-                    DataPageHeader::V2(header),
-                    std::mem::take(buffer),
-                    compression,
-                    page_header.uncompressed_page_size as usize,
-                    current_dictionary.clone(),
-                    descriptor.clone(),
-                ),
-                seen_num_values,
-            ))
+            Ok(FinishedPage::Data(CompressedDataPage::new(
+                DataPageHeader::V2(header),
+                std::mem::take(buffer),
+                compression,
+                page_header.uncompressed_page_size as usize,
+                current_dictionary.clone(),
+                descriptor.clone(),
+            )))
         }
         PageType::IndexPage => Ok(FinishedPage::Index),
+    }
+}
+
+pub(super) fn get_page_header(header: &ParquetPageHeader) -> Option<DataPageHeader> {
+    let type_ = header.type_.try_into().unwrap();
+    match type_ {
+        PageType::DataPage => {
+            let header = header.data_page_header.clone().unwrap();
+            Some(DataPageHeader::V1(header))
+        }
+        PageType::DataPageV2 => {
+            let header = header.data_page_header_v2.clone().unwrap();
+            Some(DataPageHeader::V2(header))
+        }
+        _ => None,
     }
 }

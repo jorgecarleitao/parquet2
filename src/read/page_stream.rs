@@ -9,7 +9,7 @@ use crate::error::Result;
 use crate::metadata::{ColumnDescriptor, FileMetaData};
 use crate::page::{CompressedDataPage, ParquetPageHeader};
 
-use super::page_iterator::{finish_page, FinishedPage};
+use super::page_iterator::{finish_page, get_page_header, FinishedPage};
 use super::PageFilter;
 
 /// Returns a stream of compressed data pages
@@ -34,7 +34,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
     ))
 }
 
-fn _get_page_stream<'a, R: AsyncRead + Unpin + Send>(
+fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
     reader: &'a mut R,
     total_num_values: i64,
     compression: Compression,
@@ -49,8 +49,21 @@ fn _get_page_stream<'a, R: AsyncRead + Unpin + Send>(
             // the header
             let page_header = read_page_header(reader).await?;
 
+            let data_header = get_page_header(&page_header);
+            seen_values += data_header.as_ref().map(|x| x.num_values() as i64).unwrap_or_default();
+
+            let read_size = page_header.compressed_page_size as i64;
+
+            if let Some(data_header) = data_header {
+                if !pages_filter(descriptor, &data_header) {
+                    // page to be skipped, we sill need to seek
+                    reader.seek(SeekFrom::Current(read_size)).await?;
+                    continue
+                }
+            }
+
             // followed by the buffer
-            let read_size = page_header.compressed_page_size as usize;
+            let read_size = read_size as usize;
             if read_size > 0 {
                 buffer.resize(read_size, 0);
                 reader.read_exact(&mut buffer).await?;
@@ -64,13 +77,8 @@ fn _get_page_stream<'a, R: AsyncRead + Unpin + Send>(
             )?;
 
             match result {
-                FinishedPage::Data(page, new_seen_values) => {
-                    seen_values += new_seen_values;
-                    if pages_filter(descriptor, page.header()) {
-                        yield page
-                    } else {
-                        continue
-                    }
+                FinishedPage::Data(page) => {
+                    yield page
                 }
                 FinishedPage::Dict(dict) => {
                     current_dictionary = Some(dict);

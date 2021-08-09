@@ -65,10 +65,7 @@ impl CompressedDataPage {
     }
 
     pub fn num_values(&self) -> usize {
-        match &self.header {
-            DataPageHeader::V1(d) => d.num_values as usize,
-            DataPageHeader::V2(d) => d.num_values as usize,
-        }
+        self.header.num_values()
     }
 
     /// Decodes the raw statistics into a statistics
@@ -94,6 +91,15 @@ impl CompressedDataPage {
 pub enum DataPageHeader {
     V1(DataPageHeaderV1),
     V2(DataPageHeaderV2),
+}
+
+impl DataPageHeader {
+    pub fn num_values(&self) -> usize {
+        match &self {
+            DataPageHeader::V1(d) => d.num_values as usize,
+            DataPageHeader::V2(d) => d.num_values as usize,
+        }
+    }
 }
 
 /// A [`DataPage`] is an uncompressed, encoded representation of a Parquet data page. It holds actual data
@@ -134,10 +140,7 @@ impl DataPage {
     }
 
     pub fn num_values(&self) -> usize {
-        match &self.header {
-            DataPageHeader::V1(d) => d.num_values as usize,
-            DataPageHeader::V2(d) => d.num_values as usize,
-        }
+        self.header.num_values()
     }
 
     pub fn encoding(&self) -> Encoding {
