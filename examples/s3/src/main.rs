@@ -1,3 +1,4 @@
+use futures::future::BoxFuture;
 use futures::pin_mut;
 use futures::StreamExt;
 use parquet2::error::Result;
@@ -7,7 +8,7 @@ use parquet2::statistics::BinaryStatistics;
 use s3::Bucket;
 
 mod stream;
-use stream::RangedStreamer;
+use stream::{RangedStreamer, SeekOutput};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -19,7 +20,23 @@ async fn main() -> Result<()> {
     let (data, _) = bucket.head_object(&path).await.unwrap();
     let length = data.content_length.unwrap() as usize;
 
-    let mut reader = RangedStreamer::new(length, bucket, path, 1024 * 1024);
+    let range_get = std::sync::Arc::new(move |start: u64, length: usize| {
+        let bucket = bucket.clone();
+        let path = path.clone();
+        Box::pin(async move {
+            let bucket = bucket.clone();
+            let path = path.clone();
+            let (mut data, _) = bucket
+                .get_object_range(&path, start, Some(start + length as u64))
+                .await
+                .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))?;
+
+            data.truncate(length);
+            Ok(SeekOutput { start, data })
+        }) as BoxFuture<'static, std::io::Result<SeekOutput>>
+    });
+
+    let mut reader = RangedStreamer::new(length, 1024 * 1024, range_get);
 
     let metadata = read_metadata_async(&mut reader).await?;
 

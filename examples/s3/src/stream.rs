@@ -7,45 +7,13 @@ use futures::{
     io::{AsyncRead, AsyncSeek},
     Future,
 };
-use s3::Bucket;
 
 pub struct RangedStreamer {
     pos: u64,
     length: u64, // total size
     state: State,
-    path: String,
+    range_get: F,
     min_request_size: usize, // requests have at least this size
-}
-
-impl RangedStreamer {
-    pub fn new(length: usize, bucket: Bucket, path: String, min_request_size: usize) -> Self {
-        let length = length as u64;
-        Self {
-            pos: 0,
-            length,
-            state: State::HasChunk(SeekOutput {
-                start: 0,
-                bucket,
-                data: vec![],
-            }),
-            path,
-            min_request_size,
-        }
-    }
-}
-
-async fn read_s3(start: u64, length: usize, bucket: Bucket, path: String) -> Result<SeekOutput> {
-    let (mut data, _) = bucket
-        .get_object_range(&path, start, Some(start + length as u64))
-        .await
-        .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))?;
-
-    data.truncate(length);
-    Ok(SeekOutput {
-        start,
-        bucket,
-        data,
-    })
 }
 
 enum State {
@@ -53,10 +21,29 @@ enum State {
     Seeking(BoxFuture<'static, std::io::Result<SeekOutput>>),
 }
 
-struct SeekOutput {
-    start: u64,
-    bucket: Bucket,
-    data: Vec<u8>,
+pub struct SeekOutput {
+    pub start: u64,
+    pub data: Vec<u8>,
+}
+
+pub type F = std::sync::Arc<
+    dyn Fn(u64, usize) -> BoxFuture<'static, std::io::Result<SeekOutput>> + Send + Sync,
+>;
+
+impl RangedStreamer {
+    pub fn new(length: usize, min_request_size: usize, range_get: F) -> Self {
+        let length = length as u64;
+        Self {
+            pos: 0,
+            length,
+            state: State::HasChunk(SeekOutput {
+                start: 0,
+                data: vec![],
+            }),
+            range_get,
+            min_request_size,
+        }
+    }
 }
 
 // whether `test_interval` is inside `a` (start, length).
@@ -89,12 +76,9 @@ impl AsyncRead for RangedStreamer {
                     self.pos += buf.len() as u64;
                     std::task::Poll::Ready(Ok(buf.len()))
                 } else {
-                    let future = read_s3(
-                        requested_range.0 as u64,
-                        std::cmp::max(min_request_size, requested_range.1),
-                        output.bucket.clone(),
-                        self.path.clone(),
-                    );
+                    let start = requested_range.0 as u64;
+                    let length = std::cmp::max(min_request_size, requested_range.1);
+                    let future = (self.range_get)(start, length);
                     self.state = State::Seeking(Box::pin(future));
                     self.poll_read(cx, buf)
                 }
