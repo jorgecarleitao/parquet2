@@ -2,9 +2,9 @@
 use crate::error::Result;
 use std::collections::HashMap;
 
+use super::super::Repetition;
 use super::{
     spec, BasicTypeInfo, GroupConvertedType, LogicalType, PhysicalType, PrimitiveConvertedType,
-    Repetition,
 };
 
 /// Representation of a Parquet type.

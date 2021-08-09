@@ -8,9 +8,7 @@ pub use primitive::PrimitivePageDict;
 
 use std::{any::Any, sync::Arc};
 
-use parquet_format::CompressionCodec;
-
-use crate::compression::create_codec;
+use crate::compression::{create_codec, Compression};
 use crate::error::{ParquetError, Result};
 use crate::schema::types::PhysicalType;
 
@@ -37,7 +35,7 @@ impl CompressedDictPage {
 pub fn read_dict_page(
     buf: &[u8],
     num_values: u32,
-    compression: (CompressionCodec, usize),
+    compression: (Compression, usize),
     is_sorted: bool,
     physical_type: &PhysicalType,
 ) -> Result<Arc<dyn DictPage>> {

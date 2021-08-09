@@ -76,9 +76,9 @@ pub fn array_to_page_v1<T: NativeType>(
 
     let header = DataPageHeaderV1 {
         num_values: array.len() as i32,
-        encoding: Encoding::Plain,
-        definition_level_encoding: Encoding::Rle,
-        repetition_level_encoding: Encoding::Rle,
+        encoding: Encoding::Plain.into(),
+        definition_level_encoding: Encoding::Rle.into(),
+        repetition_level_encoding: Encoding::Rle.into(),
         statistics,
     };
 

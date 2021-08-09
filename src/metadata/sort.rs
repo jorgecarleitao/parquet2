@@ -1,4 +1,4 @@
-use parquet_format::LogicalType;
+use parquet_format_async_temp::LogicalType;
 
 use crate::schema::types::{PhysicalType, PrimitiveConvertedType};
 

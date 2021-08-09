@@ -7,7 +7,7 @@ use std::{
     io::{Seek, Write},
 };
 
-use parquet_format::FileMetaData;
+use parquet_format_async_temp::FileMetaData;
 
 pub use crate::metadata::KeyValue;
 use crate::{
@@ -55,6 +55,8 @@ where
         row_groups,
         key_value_metadata,
         created_by,
+        None,
+        None,
         None,
     );
 

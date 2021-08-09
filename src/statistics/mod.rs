@@ -5,7 +5,7 @@ mod primitive;
 
 use std::{any::Any, sync::Arc};
 
-pub use parquet_format::Statistics as ParquetStatistics;
+pub use parquet_format_async_temp::Statistics as ParquetStatistics;
 
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;

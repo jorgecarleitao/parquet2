@@ -1,10 +1,10 @@
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
 use crate::error::Result;
 
-pub type KeyValue = parquet_format::KeyValue;
+pub type KeyValue = parquet_format_async_temp::KeyValue;
 
 /// Metadata for a Parquet file.
-// This is almost equal to `parquet_format::FileMetaData` but contains the descriptors,
+// This is almost equal to `parquet_format_async_temp::FileMetaData` but contains the descriptors,
 // which are crucial to deserialize pages.
 #[derive(Debug, Clone)]
 pub struct FileMetaData {
@@ -78,8 +78,8 @@ impl FileMetaData {
             .unwrap_or(ColumnOrder::Undefined)
     }
 
-    pub fn into_thrift(self) -> Result<parquet_format::FileMetaData> {
-        Ok(parquet_format::FileMetaData {
+    pub fn into_thrift(self) -> Result<parquet_format_async_temp::FileMetaData> {
+        Ok(parquet_format_async_temp::FileMetaData {
             version: self.version,
             schema: self.schema_descr.into_thrift()?,
             num_rows: self.num_rows as i64,
@@ -91,6 +91,8 @@ impl FileMetaData {
             key_value_metadata: self.key_value_metadata,
             created_by: self.created_by,
             column_orders: None, // todo
+            encryption_algorithm: None,
+            footer_signing_key_metadata: None,
         })
     }
 }

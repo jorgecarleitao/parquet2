@@ -1,4 +1,4 @@
-use parquet_format::RowGroup;
+use parquet_format_async_temp::RowGroup;
 
 use super::{column_chunk_metadata::ColumnChunkMetaData, schema_descriptor::SchemaDescriptor};
 use crate::error::Result;
@@ -69,6 +69,9 @@ impl RowGroupMetaData {
             total_byte_size: self.total_byte_size,
             num_rows: self.num_rows,
             sorting_columns: None,
+            file_offset: None,
+            total_compressed_size: None,
+            ordinal: None,
         }
     }
 }

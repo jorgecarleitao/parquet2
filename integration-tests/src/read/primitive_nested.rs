@@ -6,7 +6,7 @@ use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::{DataPage, DataPageHeader, PrimitivePageDict},
+    page::{DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
     read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
     types::NativeType,
 };
@@ -152,11 +152,11 @@ pub fn page_to_array<T: NativeType>(
                     values,
                     page.num_values() as u32,
                     (
-                        &header.repetition_level_encoding,
+                        &header.repetition_level_encoding(),
                         descriptor.max_rep_level(),
                     ),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))
@@ -204,7 +204,7 @@ pub fn page_dict_to_array<T: NativeType>(
 ) -> Result<Array> {
     assert_eq!(descriptor.max_rep_level(), 1);
     match page.header() {
-        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
+        DataPageHeader::V1(header) => match (page.encoding(), &page.dictionary_page()) {
             (Encoding::PlainDictionary, Some(dict)) => {
                 let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
                 Ok(read_dict_array::<T>(
@@ -214,11 +214,11 @@ pub fn page_dict_to_array<T: NativeType>(
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
                     (
-                        &header.repetition_level_encoding,
+                        &header.repetition_level_encoding(),
                         descriptor.max_rep_level(),
                     ),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))

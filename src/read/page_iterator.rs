@@ -1,13 +1,14 @@
+use std::convert::TryInto;
 use std::{io::Read, sync::Arc};
 
-use parquet_format::{CompressionCodec, PageType};
-use thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 
+use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
 use crate::page::{
-    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, ParquetPageHeader,
+    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, PageType, ParquetPageHeader,
 };
 
 /// Type declaration for a page filter
@@ -19,7 +20,7 @@ pub struct PageIterator<'a, R: Read> {
     // The source
     reader: &'a mut R,
 
-    compression: CompressionCodec,
+    compression: Compression,
 
     // The number of values we have seen so far.
     seen_num_values: i64,
@@ -42,7 +43,7 @@ impl<'a, R: Read> PageIterator<'a, R> {
     pub fn new(
         reader: &'a mut R,
         total_num_values: i64,
-        compression: CompressionCodec,
+        compression: Compression,
         descriptor: ColumnDescriptor,
         pages_filter: PageFilter,
         buffer: Vec<u8>,
@@ -121,6 +122,9 @@ fn build_page<R: Read>(
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedDataPage>> {
     let page_header = reader.read_page_header()?;
+    reader.seen_num_values += get_page_header(&page_header)
+        .map(|x| x.num_values() as i64)
+        .unwrap_or_default();
 
     let read_size = page_header.compressed_page_size as usize;
     if read_size > 0 {
@@ -128,7 +132,39 @@ fn build_page<R: Read>(
         reader.reader.read_exact(buffer)?;
     }
 
-    match page_header.type_ {
+    let result = finish_page(
+        page_header,
+        buffer,
+        reader.compression,
+        &reader.current_dictionary,
+        &reader.descriptor,
+    )?;
+
+    match result {
+        FinishedPage::Data(page) => Ok(Some(page)),
+        FinishedPage::Dict(dict) => {
+            reader.current_dictionary = Some(dict);
+            Ok(None)
+        }
+        _ => Ok(None),
+    }
+}
+
+pub(super) enum FinishedPage {
+    Data(CompressedDataPage),
+    Dict(Arc<dyn DictPage>),
+    Index,
+}
+
+pub(super) fn finish_page(
+    page_header: ParquetPageHeader,
+    buffer: &mut Vec<u8>,
+    compression: Compression,
+    current_dictionary: &Option<Arc<dyn DictPage>>,
+    descriptor: &ColumnDescriptor,
+) -> Result<FinishedPage> {
+    let type_ = page_header.type_.try_into()?;
+    match type_ {
         PageType::DictionaryPage => {
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
@@ -136,43 +172,52 @@ fn build_page<R: Read>(
             let page = read_dict_page(
                 buffer,
                 dict_header.num_values as u32,
-                (
-                    reader.compression,
-                    page_header.uncompressed_page_size as usize,
-                ),
+                (compression, page_header.uncompressed_page_size as usize),
                 is_sorted,
-                reader.descriptor.physical_type(),
+                descriptor.physical_type(),
             )?;
 
-            reader.current_dictionary = Some(page);
-            Ok(None)
+            Ok(FinishedPage::Dict(page))
         }
         PageType::DataPage => {
             let header = page_header.data_page_header.unwrap();
-            reader.seen_num_values += header.num_values as i64;
 
-            Ok(Some(CompressedDataPage::new(
+            Ok(FinishedPage::Data(CompressedDataPage::new(
                 DataPageHeader::V1(header),
                 std::mem::take(buffer),
-                reader.compression,
+                compression,
                 page_header.uncompressed_page_size as usize,
-                reader.current_dictionary.clone(),
-                reader.descriptor.clone(),
+                current_dictionary.clone(),
+                descriptor.clone(),
             )))
         }
         PageType::DataPageV2 => {
             let header = page_header.data_page_header_v2.unwrap();
-            reader.seen_num_values += header.num_values as i64;
 
-            Ok(Some(CompressedDataPage::new(
+            Ok(FinishedPage::Data(CompressedDataPage::new(
                 DataPageHeader::V2(header),
                 std::mem::take(buffer),
-                reader.compression,
+                compression,
                 page_header.uncompressed_page_size as usize,
-                reader.current_dictionary.clone(),
-                reader.descriptor.clone(),
+                current_dictionary.clone(),
+                descriptor.clone(),
             )))
         }
-        PageType::IndexPage => Ok(None),
+        PageType::IndexPage => Ok(FinishedPage::Index),
+    }
+}
+
+pub(super) fn get_page_header(header: &ParquetPageHeader) -> Option<DataPageHeader> {
+    let type_ = header.type_.try_into().unwrap();
+    match type_ {
+        PageType::DataPage => {
+            let header = header.data_page_header.clone().unwrap();
+            Some(DataPageHeader::V1(header))
+        }
+        PageType::DataPageV2 => {
+            let header = header.data_page_header_v2.clone().unwrap();
+            Some(DataPageHeader::V2(header))
+        }
+        _ => None,
     }
 }

@@ -29,7 +29,7 @@ mod tests {
 
     use crate::tests::{alltypes_plain, alltypes_statistics};
 
-    use parquet::compression::CompressionCodec;
+    use parquet::compression::Compression;
     use parquet::error::Result;
     use parquet::metadata::SchemaDescriptor;
     use parquet::statistics::Statistics;
@@ -47,7 +47,7 @@ mod tests {
 
         let options = WriteOptions {
             write_statistics: true,
-            compression: CompressionCodec::Uncompressed,
+            compression: Compression::Uncompressed,
             version: Version::V1,
         };
 
@@ -136,7 +136,7 @@ mod tests2 {
 
     use crate::write::primitive::array_to_page_v1;
     use parquet::{
-        compression::CompressionCodec,
+        compression::Compression,
         error::Result,
         metadata::SchemaDescriptor,
         read::read_metadata,
@@ -157,7 +157,7 @@ mod tests2 {
 
         let options = WriteOptions {
             write_statistics: false,
-            compression: CompressionCodec::Uncompressed,
+            compression: Compression::Uncompressed,
             version: Version::V1,
         };
 

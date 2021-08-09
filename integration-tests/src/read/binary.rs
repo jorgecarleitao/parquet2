@@ -2,7 +2,7 @@ use parquet::{
     encoding::{bitpacking, plain_byte_array, uleb128, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
-    page::{BinaryPageDict, DataPage, DataPageHeader},
+    page::{BinaryPageDict, DataPage, DataPageHeader, DataPageHeaderExt},
     read::levels,
 };
 
@@ -81,7 +81,7 @@ pub fn page_dict_to_vec(
                     page.num_values() as u32,
                     dict.as_any().downcast_ref().unwrap(),
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))
@@ -140,7 +140,7 @@ pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec
                     values,
                     page.num_values() as u32,
                     (
-                        &header.definition_level_encoding,
+                        &header.definition_level_encoding(),
                         descriptor.max_def_level(),
                     ),
                 ))

@@ -3,10 +3,10 @@ use std::{
     io::{Seek, SeekFrom, Write},
 };
 
-use parquet_format::FileMetaData;
+use parquet_format_async_temp::FileMetaData;
 
-use thrift::protocol::TCompactOutputProtocol;
-use thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
+use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
 
 pub use crate::metadata::KeyValue;
 use crate::{
@@ -80,6 +80,8 @@ where
         row_groups,
         key_value_metadata,
         created_by,
+        None,
+        None,
         None,
     );
 

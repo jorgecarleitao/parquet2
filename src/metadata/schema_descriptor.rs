@@ -1,11 +1,8 @@
-use parquet_format::SchemaElement;
+use parquet_format_async_temp::SchemaElement;
 
 use crate::{
     error::ParquetError,
-    schema::{
-        io_message::from_message,
-        types::{ParquetType, Repetition},
-    },
+    schema::{io_message::from_message, types::ParquetType, Repetition},
 };
 use crate::{error::Result, schema::types::BasicTypeInfo};
 
@@ -105,7 +102,7 @@ fn build_tree<'a>(
     path_so_far: &mut Vec<&'a str>,
 ) {
     path_so_far.push(tp.name());
-    match tp.get_basic_info().repetition() {
+    match *tp.get_basic_info().repetition() {
         Repetition::Optional => {
             max_def_level += 1;
         }

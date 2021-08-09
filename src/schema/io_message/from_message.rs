@@ -49,6 +49,8 @@ use super::super::types::{
 use super::super::*;
 use crate::error::{ParquetError, Result};
 
+use parquet_format_async_temp::*;
+
 fn is_logical_type(s: &str) -> bool {
     matches!(
         s,
@@ -113,38 +115,36 @@ fn logical_type_from_str(s: &str) -> Result<Option<LogicalType>> {
     }))
 }
 
-fn converted_group_from_str(s: &str) -> Result<parquet_format::ConvertedType> {
-    use parquet_format::ConvertedType::*;
+fn converted_group_from_str(s: &str) -> Result<ConvertedType> {
     Ok(match s {
-        "MAP" => Map,
-        "MAP_KEY_VALUE" => MapKeyValue,
-        "LIST" => List,
+        "MAP" => ConvertedType::MAP,
+        "MAP_KEY_VALUE" => ConvertedType::MAP_KEY_VALUE,
+        "LIST" => ConvertedType::LIST,
         other => return Err(general_err!("Invalid converted type {}", other)),
     })
 }
 
-fn converted_primitive_from_str(s: &str) -> Option<parquet_format::ConvertedType> {
-    use parquet_format::ConvertedType::*;
+fn converted_primitive_from_str(s: &str) -> Option<ConvertedType> {
     Some(match s {
-        "UTF8" => Utf8,
-        "ENUM" => Enum,
-        "DECIMAL" => Decimal,
-        "DATE" => Date,
-        "TIME_MILLIS" => TimeMillis,
-        "TIME_MICROS" => TimeMicros,
-        "TIMESTAMP_MILLIS" => TimestampMillis,
-        "TIMESTAMP_MICROS" => TimestampMicros,
-        "UINT_8" => Uint8,
-        "UINT_16" => Uint16,
-        "UINT_32" => Uint32,
-        "UINT_64" => Uint64,
-        "INT_8" => Int8,
-        "INT_16" => Int16,
-        "INT_32" => Int32,
-        "INT_64" => Int64,
-        "JSON" => Json,
-        "BSON" => Bson,
-        "INTERVAL" => Interval,
+        "UTF8" => ConvertedType::UTF8,
+        "ENUM" => ConvertedType::ENUM,
+        "DECIMAL" => ConvertedType::DECIMAL,
+        "DATE" => ConvertedType::DATE,
+        "TIME_MILLIS" => ConvertedType::TIME_MILLIS,
+        "TIME_MICROS" => ConvertedType::TIME_MICROS,
+        "TIMESTAMP_MILLIS" => ConvertedType::TIMESTAMP_MILLIS,
+        "TIMESTAMP_MICROS" => ConvertedType::TIMESTAMP_MICROS,
+        "UINT_8" => ConvertedType::UINT_8,
+        "UINT_16" => ConvertedType::UINT_16,
+        "UINT_32" => ConvertedType::UINT_32,
+        "UINT_64" => ConvertedType::UINT_64,
+        "INT_8" => ConvertedType::INT_8,
+        "INT_16" => ConvertedType::INT_16,
+        "INT_32" => ConvertedType::INT_32,
+        "INT_64" => ConvertedType::INT_64,
+        "JSON" => ConvertedType::JSON,
+        "BSON" => ConvertedType::BSON,
+        "INTERVAL" => ConvertedType::INTERVAL,
         _ => return None,
     })
 }
@@ -160,14 +160,14 @@ fn repetition_from_str(s: &str) -> Result<Repetition> {
 
 fn type_from_str(s: &str) -> Result<Type> {
     match s {
-        "BOOLEAN" => Ok(Type::Boolean),
-        "INT32" => Ok(Type::Int32),
-        "INT64" => Ok(Type::Int64),
-        "INT96" => Ok(Type::Int96),
-        "FLOAT" => Ok(Type::Float),
-        "DOUBLE" => Ok(Type::Double),
-        "BYTE_ARRAY" | "BINARY" => Ok(Type::ByteArray),
-        "FIXED_LEN_BYTE_ARRAY" => Ok(Type::FixedLenByteArray),
+        "BOOLEAN" => Ok(Type::BOOLEAN),
+        "INT32" => Ok(Type::INT32),
+        "INT64" => Ok(Type::INT64),
+        "INT96" => Ok(Type::INT96),
+        "FLOAT" => Ok(Type::FLOAT),
+        "DOUBLE" => Ok(Type::DOUBLE),
+        "BYTE_ARRAY" | "BINARY" => Ok(Type::BYTE_ARRAY),
+        "FIXED_LEN_BYTE_ARRAY" => Ok(Type::FIXED_LEN_BYTE_ARRAY),
         other => Err(general_err!("Invalid type {}", other)),
     }
 }
@@ -406,7 +406,7 @@ impl<'a> Parser<'a> {
         physical_type: Type,
     ) -> Result<ParquetType> {
         // Read type length if the type is FIXED_LEN_BYTE_ARRAY.
-        let length = if physical_type == Type::FixedLenByteArray {
+        let length = if physical_type == Type::FIXED_LEN_BYTE_ARRAY {
             assert_token(self.tokenizer.next(), "(")?;
             let length = parse_i32(
                 self.tokenizer.next(),
@@ -453,7 +453,9 @@ impl<'a> Parser<'a> {
 
             // converted type decimal
             let (converted_type, maybe_decimal) = match converted_type {
-                Some(parquet_format::ConvertedType::Decimal) => self.parse_converted_decimal()?,
+                Some(parquet_format_async_temp::ConvertedType::DECIMAL) => {
+                    self.parse_converted_decimal()?
+                }
                 other => (other, None),
             };
             let converted_type = converted_type
@@ -512,7 +514,7 @@ impl<'a> Parser<'a> {
 
         assert_token(self.tokenizer.next(), ")")?;
         Ok((
-            Some(parquet_format::ConvertedType::Decimal),
+            Some(parquet_format_async_temp::ConvertedType::DECIMAL),
             Some((precision, scale)),
         ))
     }

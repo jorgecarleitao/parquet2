@@ -115,7 +115,7 @@ pub fn check_logical_invariants(
     physical_type: &PhysicalType,
     logical_type: &Option<LogicalType>,
 ) -> Result<()> {
-    use parquet_format::LogicalType::*;
+    use parquet_format_async_temp::LogicalType::*;
     if logical_type.is_none() {
         return Ok(());
     };

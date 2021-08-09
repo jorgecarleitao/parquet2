@@ -1,4 +1,4 @@
-use parquet_format::DataPageHeaderV2;
+use parquet_format_async_temp::DataPageHeaderV2;
 
 use crate::compression::{create_codec, Codec};
 use crate::error::Result;

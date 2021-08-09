@@ -11,8 +11,8 @@ mod dyn_iter;
 pub use dyn_iter::DynIter;
 
 pub use file::write_file;
-use parquet_format::CompressionCodec;
 
+use crate::compression::Compression;
 use crate::page::CompressedPage;
 
 pub type RowGroupIter<'a, E> =
@@ -21,7 +21,7 @@ pub type RowGroupIter<'a, E> =
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct WriteOptions {
     pub write_statistics: bool,
-    pub compression: CompressionCodec,
+    pub compression: Compression,
     pub version: Version,
 }
 

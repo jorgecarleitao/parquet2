@@ -21,8 +21,8 @@ use std::{
     io::{Cursor, Read, Seek, SeekFrom},
 };
 
-use parquet_format::{ColumnOrder as TColumnOrder, FileMetaData as TFileMetaData};
-use thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
+use parquet_format_async_temp::{ColumnOrder as TColumnOrder, FileMetaData as TFileMetaData};
 
 use super::super::metadata::get_sort_order;
 use super::super::metadata::ColumnOrder;
@@ -32,7 +32,7 @@ use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_M
 use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
 
-fn metadata_len(buffer: &[u8], len: usize) -> i32 {
+pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
 }
 
@@ -138,7 +138,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
 /// Parses column orders from Thrift definition.
 /// If no column orders are defined, returns `None`.
-fn parse_column_orders(
+pub(super) fn parse_column_orders(
     orders: &[TColumnOrder],
     schema_descr: &SchemaDescriptor,
 ) -> Vec<ColumnOrder> {
@@ -174,11 +174,9 @@ fn parse_column_orders(
 mod tests {
     use std::fs::File;
 
-    use parquet_format::FieldRepetitionType;
-
     use super::*;
 
-    use crate::schema::types::PhysicalType;
+    use crate::schema::{types::PhysicalType, Repetition};
     use crate::tests::get_path;
 
     #[test]
@@ -229,7 +227,7 @@ mod tests {
                     basic_info,
                     ..
                 } => {
-                    assert_eq!(basic_info.repetition(), &FieldRepetitionType::Optional);
+                    assert_eq!(basic_info.repetition(), &Repetition::Optional);
                     *physical_type
                 }
                 _ => {

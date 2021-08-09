@@ -1,5 +1,7 @@
-pub use parquet_format::FieldRepetitionType as Repetition;
-pub use parquet_format::{LogicalType, TimeType, TimeUnit, Type};
+//pub use parquet_format_async_temp::FieldRepetitionType as Repetition;
+pub use parquet_format_async_temp::{
+    DecimalType, IntType, LogicalType, TimeType, TimeUnit, TimestampType, Type,
+};
 
 mod spec;
 

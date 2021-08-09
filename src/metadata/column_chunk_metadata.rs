@@ -1,12 +1,13 @@
+use std::convert::TryInto;
 use std::sync::Arc;
 
-use parquet_format::{ColumnChunk, ColumnMetaData, Encoding};
+use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::error::Result;
 use crate::schema::types::{ParquetType, PhysicalType};
 use crate::statistics::{deserialize_statistics, Statistics};
-use crate::{compression::CompressionCodec, schema::types::Type};
+use crate::{compression::Compression, schema::types::Type};
 
 /// Metadata for a column chunk.
 // This contains the `ColumnDescriptor` associated with the chunk so that deserializers have
@@ -69,9 +70,9 @@ impl ColumnChunkMetaData {
         self.column_metadata().num_values
     }
 
-    /// CompressionCodec for this column.
-    pub fn compression(&self) -> &CompressionCodec {
-        &self.column_metadata().codec
+    /// [`Compression`] for this column.
+    pub fn compression(&self) -> Compression {
+        self.column_metadata().codec.try_into().unwrap()
     }
 
     /// Returns the total compressed data size of this column chunk.
