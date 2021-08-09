@@ -1,5 +1,19 @@
 # Changelog
 
+## [v0.3.0](https://github.com/jorgecarleitao/parquet2/tree/v0.3.0) (2021-08-09)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.2.0...v0.3.0)
+
+**Breaking changes:**
+
+- Added option to apply filter pushdown to data pages. [\#34](https://github.com/jorgecarleitao/parquet2/pull/34) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Add support to read async [\#33](https://github.com/jorgecarleitao/parquet2/pull/33) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**New features:**
+
+- Add support for async read [\#32](https://github.com/jorgecarleitao/parquet2/issues/32)
+- Added option to apply filter pushdown to data pages. [\#34](https://github.com/jorgecarleitao/parquet2/pull/34) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.2.0](https://github.com/jorgecarleitao/parquet2/tree/v0.2.0) (2021-08-03)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.1.0...v0.2.0)
