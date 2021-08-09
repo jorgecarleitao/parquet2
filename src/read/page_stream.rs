@@ -10,6 +10,7 @@ use crate::metadata::{ColumnDescriptor, FileMetaData};
 use crate::page::{CompressedDataPage, ParquetPageHeader};
 
 use super::page_iterator::{finish_page, FinishedPage};
+use super::PageFilter;
 
 /// Returns a stream of compressed data pages
 pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
@@ -18,6 +19,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
     column: usize,
     reader: &'a mut RR,
     buffer: Vec<u8>,
+    pages_filter: PageFilter,
 ) -> Result<impl Stream<Item = Result<CompressedDataPage>> + 'a> {
     let column_metadata = metadata.row_groups[row_group].column(column);
     let (col_start, _) = column_metadata.byte_range();
@@ -28,6 +30,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
         column_metadata.compression(),
         column_metadata.descriptor(),
         buffer,
+        pages_filter,
     ))
 }
 
@@ -37,6 +40,7 @@ fn _get_page_stream<'a, R: AsyncRead + Unpin + Send>(
     compression: Compression,
     descriptor: &'a ColumnDescriptor,
     mut buffer: Vec<u8>,
+    pages_filter: PageFilter,
 ) -> impl Stream<Item = Result<CompressedDataPage>> + 'a {
     let mut seen_values = 0i64;
     let mut current_dictionary = None;
@@ -62,7 +66,11 @@ fn _get_page_stream<'a, R: AsyncRead + Unpin + Send>(
             match result {
                 FinishedPage::Data(page, new_seen_values) => {
                     seen_values += new_seen_values;
-                    yield page
+                    if pages_filter(descriptor, page.header()) {
+                        yield page
+                    } else {
+                        continue
+                    }
                 }
                 FinishedPage::Dict(dict) => {
                     current_dictionary = Some(dict);

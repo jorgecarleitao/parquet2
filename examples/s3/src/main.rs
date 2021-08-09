@@ -1,10 +1,15 @@
-use futures::future::BoxFuture;
-use futures::pin_mut;
-use futures::StreamExt;
-use parquet2::error::Result;
-use parquet2::read::get_page_stream;
-use parquet2::read::read_metadata_async;
-use parquet2::statistics::BinaryStatistics;
+use std::sync::Arc;
+
+use futures::{
+    future::BoxFuture,
+    pin_mut,
+    StreamExt
+};
+use parquet2::{
+    error::Result,
+    read::{get_page_stream, read_metadata_async},
+    statistics::BinaryStatistics,
+};
 use s3::Bucket;
 
 mod stream;
@@ -44,7 +49,7 @@ async fn main() -> Result<()> {
     println!("{}", metadata.num_rows);
 
     // pages of the first row group and first column
-    let pages = get_page_stream(&metadata, 0, 0, &mut reader, vec![]).await?;
+    let pages = get_page_stream(&metadata, 0, 0, &mut reader, vec![], Arc::new(|_, _| true)).await?;
 
     pin_mut!(pages); // needed for iteration
 
