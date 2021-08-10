@@ -1,10 +1,6 @@
 use std::sync::Arc;
 
-use futures::{
-    future::BoxFuture,
-    pin_mut,
-    StreamExt
-};
+use futures::{future::BoxFuture, pin_mut, StreamExt};
 use parquet2::{
     error::Result,
     read::{get_page_stream, read_metadata_async},
@@ -24,6 +20,7 @@ async fn main() -> Result<()> {
 
     let (data, _) = bucket.head_object(&path).await.unwrap();
     let length = data.content_length.unwrap() as usize;
+    println!("blob size: {} mb", length / 1024 / 1024);
 
     let range_get = std::sync::Arc::new(move |start: u64, length: usize| {
         let bucket = bucket.clone();
@@ -31,11 +28,13 @@ async fn main() -> Result<()> {
         Box::pin(async move {
             let bucket = bucket.clone();
             let path = path.clone();
+            println!("requested: {} kb", length / 1024);
             let (mut data, _) = bucket
                 .get_object_range(&path, start, Some(start + length as u64))
                 .await
                 .map_err(|x| std::io::Error::new(std::io::ErrorKind::Other, x.to_string()))?;
 
+            println!("received: {} kb", data.len() / 1024);
             data.truncate(length);
             Ok(SeekOutput { start, data })
         }) as BoxFuture<'static, std::io::Result<SeekOutput>>
@@ -46,12 +45,13 @@ async fn main() -> Result<()> {
     let metadata = read_metadata_async(&mut reader).await?;
 
     // metadata
-    println!("{}", metadata.num_rows);
+    println!("number of rows: {}", metadata.num_rows);
 
-    // * first row group 
+    // * first row group
     // * first column
     // * do not skip any pages
-    let pages = get_page_stream(&metadata, 0, 0, &mut reader, vec![], Arc::new(|_, _| true)).await?;
+    let pages =
+        get_page_stream(&metadata, 0, 0, &mut reader, vec![], Arc::new(|_, _| true)).await?;
 
     pin_mut!(pages); // needed for iteration
 
@@ -60,8 +60,8 @@ async fn main() -> Result<()> {
     // first unwrap: they exist
     let a = first_page.statistics().unwrap()?;
     let a = a.as_any().downcast_ref::<BinaryStatistics>().unwrap();
-    println!("{:?}", a.min_value);
-    println!("{:?}", a.max_value);
-    println!("{:?}", a.null_count);
+    println!("min: {:?}", a.min_value);
+    println!("max: {:?}", a.max_value);
+    println!("nulls: {:?}", a.null_count);
     Ok(())
 }
