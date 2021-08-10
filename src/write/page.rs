@@ -1,8 +1,10 @@
 use std::io::{Seek, SeekFrom, Write};
 use std::sync::Arc;
 
-use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
-use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use futures::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
+use parquet_format_async_temp::thrift::protocol::{
+    TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
+};
 use parquet_format_async_temp::{DictionaryPageHeader, Encoding, PageType};
 
 use crate::error::Result;
@@ -44,6 +46,40 @@ pub fn write_page<W: Write + Seek>(
     };
 
     let end_pos = writer.seek(SeekFrom::Current(0))?;
+
+    Ok(PageWriteSpec {
+        header,
+        header_size,
+        offset: start_pos,
+        bytes_written: end_pos - start_pos,
+        statistics,
+    })
+}
+
+pub async fn write_page_async<W: AsyncWrite + AsyncSeek + Unpin + Send>(
+    writer: &mut W,
+    compressed_page: CompressedPage,
+) -> Result<PageWriteSpec> {
+    let header = match &compressed_page {
+        CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),
+        CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
+    };
+
+    let start_pos = writer.seek(SeekFrom::Current(0)).await?;
+
+    let header_size = write_page_header_async(writer, &header).await?;
+
+    match &compressed_page {
+        CompressedPage::Data(compressed_page) => writer.write_all(&compressed_page.buffer).await?,
+        CompressedPage::Dict(compressed_page) => writer.write_all(&compressed_page.buffer).await?,
+    }
+
+    let statistics = match &compressed_page {
+        CompressedPage::Data(compressed_page) => compressed_page.statistics().transpose()?,
+        CompressedPage::Dict(_) => None,
+    };
+
+    let end_pos = writer.seek(SeekFrom::Current(0)).await?;
 
     Ok(PageWriteSpec {
         header,
@@ -109,5 +145,20 @@ fn write_page_header<W: Write + Seek>(
         protocol.flush()?;
     }
     let end_pos = writer.seek(SeekFrom::Current(0))?;
+    Ok((end_pos - start_pos) as usize)
+}
+
+/// writes the page header into `writer`, returning the number of bytes used in the process.
+async fn write_page_header_async<W: AsyncWrite + AsyncSeek + Unpin + Send>(
+    mut writer: &mut W,
+    header: &ParquetPageHeader,
+) -> Result<usize> {
+    let start_pos = writer.seek(SeekFrom::Current(0)).await?;
+    {
+        let mut protocol = TCompactOutputStreamProtocol::new(&mut writer);
+        header.write_to_out_stream_protocol(&mut protocol).await?;
+        protocol.flush().await?;
+    }
+    let end_pos = writer.seek(SeekFrom::Current(0)).await?;
     Ok((end_pos - start_pos) as usize)
 }

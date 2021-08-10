@@ -1,9 +1,9 @@
 /// [`DynIter`] is an implementation of a single-threaded, dynamically-typed iterator.
-pub struct DynIter<'a, V> {
-    iter: Box<dyn Iterator<Item = V> + 'a>,
+pub struct DynIter<V> {
+    iter: Box<dyn Iterator<Item = V>>,
 }
 
-impl<'iter, V> Iterator for DynIter<'iter, V> {
+impl<V> Iterator for DynIter<V> {
     type Item = V;
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
@@ -14,10 +14,10 @@ impl<'iter, V> Iterator for DynIter<'iter, V> {
     }
 }
 
-impl<'iter, V> DynIter<'iter, V> {
+impl<V> DynIter<V> {
     pub fn new<I>(iter: I) -> Self
     where
-        I: Iterator<Item = V> + 'iter,
+        I: Iterator<Item = V> + 'static,
     {
         Self {
             iter: Box::new(iter),

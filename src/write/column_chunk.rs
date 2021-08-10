@@ -2,8 +2,10 @@ use std::convert::TryInto;
 use std::io::{Seek, Write};
 use std::{collections::HashSet, error::Error};
 
-use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
-use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use futures::{AsyncSeek, AsyncWrite};
+use parquet_format_async_temp::thrift::protocol::{
+    TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
+};
 use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
 
 use crate::statistics::serialize_statistics;
@@ -16,7 +18,7 @@ use crate::{
     schema::types::{physical_type_to_type, ParquetType},
 };
 
-use super::page::{write_page, PageWriteSpec};
+use super::page::{write_page, write_page_async, PageWriteSpec};
 use super::statistics::reduce;
 
 pub fn write_column_chunk<
@@ -45,6 +47,39 @@ pub fn write_column_chunk<
     let mut protocol = TCompactOutputProtocol::new(writer);
     column_chunk.write_to_out_protocol(&mut protocol)?;
     protocol.flush()?;
+
+    Ok(column_chunk)
+}
+
+pub async fn write_column_chunk_async<
+    W: AsyncWrite + AsyncSeek + Unpin + Send,
+    I: Iterator<Item = std::result::Result<CompressedPage, E>>,
+    E: Error + Send + Sync + 'static,
+>(
+    writer: &mut W,
+    descriptor: &ColumnDescriptor,
+    compression: Compression,
+    compressed_pages: I,
+) -> Result<ColumnChunk> {
+    // write every page
+    let mut specs = vec![];
+    for compressed_page in compressed_pages {
+        let spec = write_page_async(
+            writer,
+            compressed_page.map_err(ParquetError::from_external_error)?,
+        )
+        .await?;
+        specs.push(spec);
+    }
+
+    let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
+
+    // write metadata
+    let mut protocol = TCompactOutputStreamProtocol::new(writer);
+    column_chunk
+        .write_to_out_stream_protocol(&mut protocol)
+        .await?;
+    protocol.flush().await?;
 
     Ok(column_chunk)
 }
