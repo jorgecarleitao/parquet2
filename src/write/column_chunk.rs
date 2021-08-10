@@ -16,7 +16,7 @@ use crate::{
     schema::types::{physical_type_to_type, ParquetType},
 };
 
-use super::page::write_page;
+use super::page::{write_page, PageWriteSpec};
 use super::statistics::reduce;
 
 pub fn write_column_chunk<
@@ -39,6 +39,21 @@ pub fn write_column_chunk<
         })
         .collect::<Result<Vec<_>>>()?;
 
+    let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
+
+    // write metadata
+    let mut protocol = TCompactOutputProtocol::new(writer);
+    column_chunk.write_to_out_protocol(&mut protocol)?;
+    protocol.flush()?;
+
+    Ok(column_chunk)
+}
+
+fn build_column_chunk(
+    specs: &[PageWriteSpec],
+    descriptor: &ColumnDescriptor,
+    compression: Compression,
+) -> Result<ColumnChunk> {
     // compute stats to build header at the end of the chunk
 
     // SPEC: the total compressed size is the total compressed size of each page + the header size
@@ -127,7 +142,7 @@ pub fn write_column_chunk<
         bloom_filter_offset: None,
     };
 
-    let column_chunk = ColumnChunk {
+    Ok(ColumnChunk {
         file_path: None, // same file for now.
         file_offset: data_page_offset + total_compressed_size,
         meta_data: Some(metadata),
@@ -137,12 +152,5 @@ pub fn write_column_chunk<
         column_index_length: None,
         crypto_metadata: None,
         encrypted_column_metadata: None,
-    };
-
-    // write metadata
-    let mut protocol = TCompactOutputProtocol::new(writer);
-    column_chunk.write_to_out_protocol(&mut protocol)?;
-    protocol.flush()?;
-
-    Ok(column_chunk)
+    })
 }
