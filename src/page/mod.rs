@@ -1,7 +1,6 @@
 mod page_dict;
 pub use page_dict::*;
 
-use std::convert::TryInto;
 use std::sync::Arc;
 
 pub use parquet_format_async_temp::{
@@ -11,7 +10,7 @@ pub use parquet_format_async_temp::{
 pub use crate::parquet_bridge::{DataPageHeaderExt, PageType};
 
 use crate::compression::Compression;
-use crate::encoding::Encoding;
+use crate::encoding::{get_length, Encoding};
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
@@ -145,8 +144,22 @@ impl DataPage {
 
     pub fn encoding(&self) -> Encoding {
         match &self.header {
-            DataPageHeader::V1(d) => d.encoding.try_into().unwrap(),
-            DataPageHeader::V2(d) => d.encoding.try_into().unwrap(),
+            DataPageHeader::V1(d) => d.encoding(),
+            DataPageHeader::V2(d) => d.encoding(),
+        }
+    }
+
+    pub fn definition_level_encoding(&self) -> Encoding {
+        match &self.header {
+            DataPageHeader::V1(d) => d.definition_level_encoding(),
+            DataPageHeader::V2(_) => Encoding::Rle,
+        }
+    }
+
+    pub fn repetition_level_encoding(&self) -> Encoding {
+        match &self.header {
+            DataPageHeader::V1(d) => d.repetition_level_encoding(),
+            DataPageHeader::V2(_) => Encoding::Rle,
         }
     }
 
@@ -185,5 +198,64 @@ pub enum CompressedPage {
     Dict(CompressedDictPage),
 }
 
-// read: CompressedPage -> Page
-// write: Page -> CompressedPage
+/// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values) for v1 pages.
+#[inline]
+pub fn split_buffer_v1(buffer: &[u8], has_rep: bool, has_def: bool) -> (&[u8], &[u8], &[u8]) {
+    let (rep, buffer) = if has_rep {
+        let level_buffer_length = get_length(buffer) as usize;
+        (
+            &buffer[4..4 + level_buffer_length],
+            &buffer[4 + level_buffer_length..],
+        )
+    } else {
+        (&[] as &[u8], buffer)
+    };
+
+    let (def, buffer) = if has_def {
+        let level_buffer_length = get_length(buffer) as usize;
+        (
+            &buffer[4..4 + level_buffer_length],
+            &buffer[4 + level_buffer_length..],
+        )
+    } else {
+        (&[] as &[u8], buffer)
+    };
+
+    (rep, def, buffer)
+}
+
+/// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values) for v2 pages.
+pub fn split_buffer_v2(
+    buffer: &[u8],
+    rep_level_buffer_length: usize,
+    def_level_buffer_length: usize,
+) -> (&[u8], &[u8], &[u8]) {
+    (
+        &buffer[..rep_level_buffer_length],
+        &buffer[rep_level_buffer_length..rep_level_buffer_length + def_level_buffer_length],
+        &buffer[rep_level_buffer_length + def_level_buffer_length..],
+    )
+}
+
+/// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values).
+pub fn split_buffer<'a>(
+    page: &'a DataPage,
+    descriptor: &ColumnDescriptor,
+) -> (&'a [u8], &'a [u8], &'a [u8]) {
+    match page.header() {
+        DataPageHeader::V1(_) => split_buffer_v1(
+            page.buffer(),
+            descriptor.max_rep_level() > 0,
+            descriptor.max_def_level() > 0,
+        ),
+        DataPageHeader::V2(header) => {
+            let def_level_buffer_length = header.definition_levels_byte_length as usize;
+            let rep_level_buffer_length = header.repetition_levels_byte_length as usize;
+            split_buffer_v2(
+                page.buffer(),
+                rep_level_buffer_length,
+                def_level_buffer_length,
+            )
+        }
+    }
+}

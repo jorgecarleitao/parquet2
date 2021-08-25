@@ -66,6 +66,8 @@ pub fn decompress_buffer(
 }
 
 /// Decompresses the page, using `buffer` for decompression.
+/// If `page.buffer.len() == 0`, there was no decompression and the buffer was moved.
+/// Else, decompression took place.
 pub fn decompress(
     mut compressed_page: CompressedDataPage,
     buffer: &mut Vec<u8>,

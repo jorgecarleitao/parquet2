@@ -1,4 +1,4 @@
-use crate::encoding::{bitpacking, get_length, hybrid_rle};
+use crate::encoding::{bitpacking, hybrid_rle};
 
 /// Returns the number of bits needed to store the given maximum definition or repetition level.
 #[inline]
@@ -101,45 +101,6 @@ impl<'a> Iterator for RLEDecoder<'a> {
 }
 
 impl<'a> ExactSizeIterator for RLEDecoder<'a> {}
-
-/// returns slices corresponding to (rep, def, values) for v1 pages
-#[inline]
-pub fn split_buffer_v1(buffer: &[u8], has_rep: bool, has_def: bool) -> (&[u8], &[u8], &[u8]) {
-    let (rep, buffer) = if has_rep {
-        let level_buffer_length = get_length(buffer) as usize;
-        (
-            &buffer[4..4 + level_buffer_length],
-            &buffer[4 + level_buffer_length..],
-        )
-    } else {
-        (&[] as &[u8], buffer)
-    };
-
-    let (def, buffer) = if has_def {
-        let level_buffer_length = get_length(buffer) as usize;
-        (
-            &buffer[4..4 + level_buffer_length],
-            &buffer[4 + level_buffer_length..],
-        )
-    } else {
-        (&[] as &[u8], buffer)
-    };
-
-    (rep, def, buffer)
-}
-
-/// returns slices corresponding to (rep, def, values) for v2 pages
-pub fn split_buffer_v2(
-    buffer: &[u8],
-    rep_level_buffer_length: usize,
-    def_level_buffer_length: usize,
-) -> (&[u8], &[u8], &[u8]) {
-    (
-        &buffer[..rep_level_buffer_length],
-        &buffer[rep_level_buffer_length..rep_level_buffer_length + def_level_buffer_length],
-        &buffer[rep_level_buffer_length + def_level_buffer_length..],
-    )
-}
 
 #[cfg(test)]
 mod tests {

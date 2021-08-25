@@ -2,7 +2,7 @@ use parquet::{
     encoding::{bitpacking, plain_byte_array, uleb128, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
-    page::{BinaryPageDict, DataPage, DataPageHeader, DataPageHeaderExt},
+    page::{split_buffer, BinaryPageDict, DataPage, DataPageHeader, DataPageHeaderExt},
     read::levels,
 };
 
@@ -70,25 +70,21 @@ pub fn page_dict_to_vec(
     descriptor: &ColumnDescriptor,
 ) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
-    match page.header() {
-        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
-            (Encoding::PlainDictionary, Some(dict)) => {
-                let (_, def_levels, values) =
-                    levels::split_buffer_v1(page.buffer(), false, descriptor.max_def_level() > 0);
-                Ok(read_dict_buffer(
-                    def_levels,
-                    values,
-                    page.num_values() as u32,
-                    dict.as_any().downcast_ref().unwrap(),
-                    (
-                        &header.definition_level_encoding(),
-                        descriptor.max_def_level(),
-                    ),
-                ))
-            }
-            (_, None) => todo!("Dictionary-encoded page requires a dictionary"),
-            _ => todo!(),
-        },
+
+    let (_, def_levels, values) = split_buffer(page, descriptor);
+
+    match (&page.encoding(), &page.dictionary_page()) {
+        (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer(
+            def_levels,
+            values,
+            page.num_values() as u32,
+            dict.as_any().downcast_ref().unwrap(),
+            (
+                &page.definition_level_encoding(),
+                descriptor.max_def_level(),
+            ),
+        )),
+        (_, None) => todo!("Dictionary-encoded page requires a dictionary"),
         _ => todo!(),
     }
 }
@@ -130,23 +126,19 @@ fn read_buffer(
 
 pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(descriptor.max_rep_level(), 0);
-    match page.header() {
-        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
-            (Encoding::Plain, None) => {
-                let (_, def_levels, values) =
-                    levels::split_buffer_v1(page.buffer(), false, descriptor.max_def_level() > 0);
-                Ok(read_buffer(
-                    def_levels,
-                    values,
-                    page.num_values() as u32,
-                    (
-                        &header.definition_level_encoding(),
-                        descriptor.max_def_level(),
-                    ),
-                ))
-            }
-            _ => todo!(),
-        },
+
+    let (_, def_levels, values) = split_buffer(page, descriptor);
+
+    match (&page.encoding(), &page.dictionary_page()) {
+        (Encoding::Plain, None) => Ok(read_buffer(
+            def_levels,
+            values,
+            page.num_values() as u32,
+            (
+                &page.definition_level_encoding(),
+                descriptor.max_def_level(),
+            ),
+        )),
         _ => todo!(),
     }
 }
