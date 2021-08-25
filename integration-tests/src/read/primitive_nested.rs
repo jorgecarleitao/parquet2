@@ -6,8 +6,8 @@ use parquet::{
     encoding::{bitpacking, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::{DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
-    read::levels::{get_bit_width, split_buffer_v1, RLEDecoder},
+    page::{split_buffer, DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
+    read::levels::{get_bit_width, RLEDecoder},
     types::NativeType,
 };
 
@@ -142,28 +142,24 @@ pub fn page_to_array<T: NativeType>(
     page: &DataPage,
     descriptor: &ColumnDescriptor,
 ) -> Result<Array> {
-    match page.header() {
-        DataPageHeader::V1(header) => match (&page.encoding(), &page.dictionary_page()) {
-            (Encoding::Plain, None) => {
-                let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
-                Ok(read_array::<T>(
-                    rep_levels,
-                    def_levels,
-                    values,
-                    page.num_values() as u32,
-                    (
-                        &header.repetition_level_encoding(),
-                        descriptor.max_rep_level(),
-                    ),
-                    (
-                        &header.definition_level_encoding(),
-                        descriptor.max_def_level(),
-                    ),
-                ))
-            }
-            _ => todo!(),
-        },
-        DataPageHeader::V2(_) => todo!(),
+    let (rep_levels, def_levels, values) = split_buffer(page, descriptor);
+
+    match (&page.encoding(), &page.dictionary_page()) {
+        (Encoding::Plain, None) => Ok(read_array::<T>(
+            rep_levels,
+            def_levels,
+            values,
+            page.num_values() as u32,
+            (
+                &page.repetition_level_encoding(),
+                descriptor.max_rep_level(),
+            ),
+            (
+                &page.definition_level_encoding(),
+                descriptor.max_def_level(),
+            ),
+        )),
+        _ => todo!(),
     }
 }
 
@@ -203,31 +199,28 @@ pub fn page_dict_to_array<T: NativeType>(
     descriptor: &ColumnDescriptor,
 ) -> Result<Array> {
     assert_eq!(descriptor.max_rep_level(), 1);
-    match page.header() {
-        DataPageHeader::V1(header) => match (page.encoding(), &page.dictionary_page()) {
-            (Encoding::PlainDictionary, Some(dict)) => {
-                let (rep_levels, def_levels, values) = split_buffer_v1(page.buffer(), true, true);
-                Ok(read_dict_array::<T>(
-                    rep_levels,
-                    def_levels,
-                    values,
-                    page.num_values() as u32,
-                    dict.as_any().downcast_ref().unwrap(),
-                    (
-                        &header.repetition_level_encoding(),
-                        descriptor.max_rep_level(),
-                    ),
-                    (
-                        &header.definition_level_encoding(),
-                        descriptor.max_def_level(),
-                    ),
-                ))
-            }
-            (_, None) => Err(ParquetError::OutOfSpec(
-                "A dictionary-encoded page MUST be preceeded by a dictionary page".to_string(),
-            )),
-            _ => todo!(),
-        },
-        DataPageHeader::V2(_) => todo!(),
+
+    let (rep_levels, def_levels, values) = split_buffer(page, descriptor);
+
+    match (page.encoding(), &page.dictionary_page()) {
+        (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_array::<T>(
+            rep_levels,
+            def_levels,
+            values,
+            page.num_values() as u32,
+            dict.as_any().downcast_ref().unwrap(),
+            (
+                &page.repetition_level_encoding(),
+                descriptor.max_rep_level(),
+            ),
+            (
+                &page.definition_level_encoding(),
+                descriptor.max_def_level(),
+            ),
+        )),
+        (_, None) => Err(ParquetError::OutOfSpec(
+            "A dictionary-encoded page MUST be preceeded by a dictionary page".to_string(),
+        )),
+        _ => todo!(),
     }
 }
