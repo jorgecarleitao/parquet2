@@ -12,7 +12,7 @@ name = "parquet2"
 bench = false
 
 [dependencies]
-parquet-format-async-temp = "0.1.0"
+parquet-format-async-temp = "0.1.1"
 bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
 streaming-iterator = "0.1.5"
 

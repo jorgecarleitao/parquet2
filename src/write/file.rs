@@ -44,7 +44,7 @@ pub(super) fn end_file<W: Write + Seek>(mut writer: &mut W, metadata: FileMetaDa
     Ok(())
 }
 
-pub fn write_file<'a, W, I, E>(
+pub fn write_file<W, I, E>(
     writer: &mut W,
     row_groups: I,
     schema: SchemaDescriptor,
@@ -54,7 +54,7 @@ pub fn write_file<'a, W, I, E>(
 ) -> Result<()>
 where
     W: Write + Seek,
-    I: Iterator<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
+    I: Iterator<Item = std::result::Result<RowGroupIter<E>, E>>,
     E: Error + Send + Sync + 'static,
 {
     start_file(writer)?;

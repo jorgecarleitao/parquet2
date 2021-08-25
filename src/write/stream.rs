@@ -28,7 +28,7 @@ pub async fn write_stream<'a, W, S, E>(
 ) -> Result<()>
 where
     W: Write + Seek,
-    S: Stream<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
+    S: Stream<Item = std::result::Result<RowGroupIter<E>, E>>,
     E: Error + Send + Sync + 'static,
 {
     start_file(writer)?;
@@ -63,3 +63,5 @@ where
     end_file(writer, metadata)?;
     Ok(())
 }
+
+pub use super::stream_stream::write_stream_stream;
