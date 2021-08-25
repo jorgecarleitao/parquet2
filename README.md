@@ -2,6 +2,9 @@
 
 This is a re-write of the official [`parquet` crate](https://crates.io/crates/parquet) with performance, parallelism and safety in mind.
 
+Checkout [the guide](https://jorgecarleitao.github.io/parquet2/) for details on how to use
+this crate to read parquet.
+
 The five main differentiators in comparison with `parquet` are:
 * it uses `#![forbid(unsafe_code)]`
 * delegates parallelism downstream
