@@ -97,20 +97,15 @@ pub(crate) mod tests {
         column: usize,
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
-        let descriptor = metadata.row_groups[row_group]
-            .column(column)
-            .descriptor()
-            .clone();
+        let column_meta = metadata.row_groups[row_group].column(column);
+        let descriptor = column_meta.descriptor().clone();
 
-        let iterator = get_page_iterator(&metadata, row_group, column, reader, None, vec![])?;
+        let iterator = get_page_iterator(&column_meta, reader, None, vec![])?;
 
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
-        let statistics = metadata.row_groups[row_group]
-            .column(column)
-            .statistics()
-            .transpose()?;
+        let statistics = column_meta.statistics().transpose()?;
 
         let page = iterator.next().unwrap().as_ref().unwrap();
 

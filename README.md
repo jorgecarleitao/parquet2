@@ -102,7 +102,8 @@ distribute work across threads. E.g.
 ```rust 
 let handles = vec![];
 for column in columns {
-    let compressed_pages = get_page_iterator(&metadata, row_group, column, &mut file, file)?.collect()?;
+    let column_meta = metadata.row_groups[row_group].column(column);
+    let compressed_pages = get_page_iterator(column_meta, &mut file, file)?.collect()?;
     // each compressed_page has a buffer; cloning is expensive(!). We move it so that the memory
     // is released at the end of the processing.
     handles.push(thread::spawn move {

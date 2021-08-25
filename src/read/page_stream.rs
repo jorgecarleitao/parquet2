@@ -6,7 +6,7 @@ use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 
 use crate::compression::Compression;
 use crate::error::Result;
-use crate::metadata::{ColumnDescriptor, FileMetaData};
+use crate::metadata::{ColumnChunkMetaData, ColumnDescriptor};
 use crate::page::{CompressedDataPage, ParquetPageHeader};
 
 use super::page_iterator::{finish_page, get_page_header, FinishedPage};
@@ -14,14 +14,11 @@ use super::PageFilter;
 
 /// Returns a stream of compressed data pages
 pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
-    metadata: &'a FileMetaData,
-    row_group: usize,
-    column: usize,
+    column_metadata: &'a ColumnChunkMetaData,
     reader: &'a mut RR,
     buffer: Vec<u8>,
     pages_filter: PageFilter,
 ) -> Result<impl Stream<Item = Result<CompressedDataPage>> + 'a> {
-    let column_metadata = metadata.row_groups[row_group].column(column);
     let (col_start, _) = column_metadata.byte_range();
     reader.seek(SeekFrom::Start(col_start)).await?;
     Ok(_get_page_stream(
