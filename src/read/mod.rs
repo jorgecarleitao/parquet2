@@ -19,7 +19,7 @@ pub use stream::read_metadata as read_metadata_async;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
-use crate::metadata::RowGroupMetaData;
+use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::{error::Result, metadata::FileMetaData};
 
 pub use page_iterator::{PageFilter, PageIterator};
@@ -44,16 +44,13 @@ pub fn filter_row_groups(
 }
 
 pub fn get_page_iterator<'a, RR: Read + Seek>(
-    metadata: &FileMetaData,
-    row_group: usize,
-    column: usize,
+    column_metadata: &ColumnChunkMetaData,
     reader: &'a mut RR,
     pages_filter: Option<PageFilter>,
     buffer: Vec<u8>,
 ) -> Result<PageIterator<'a, RR>> {
     let pages_filter = pages_filter.unwrap_or_else(|| Arc::new(|_, _| true));
 
-    let column_metadata = metadata.row_groups[row_group].column(column);
     let (col_start, _) = column_metadata.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
     Ok(PageIterator::new(
@@ -84,8 +81,9 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
+        let column_metadata = metadata.row_groups[row_group].column(column);
         let buffer = vec![];
-        let mut iter = get_page_iterator(&metadata, row_group, column, &mut file, None, buffer)?;
+        let mut iter = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
         let page = iter.next().unwrap().unwrap();
         assert_eq!(page.num_values(), 8);
@@ -102,9 +100,9 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
+        let column_metadata = metadata.row_groups[row_group].column(column);
         let buffer = vec![0];
-        let mut iterator =
-            get_page_iterator(&metadata, row_group, column, &mut file, None, buffer)?;
+        let mut iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
         let page = iterator.next().unwrap().unwrap();
         iterator.reuse_buffer(page.buffer);
@@ -125,8 +123,9 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
+        let column_metadata = metadata.row_groups[row_group].column(column);
         let buffer = vec![1];
-        let iterator = get_page_iterator(&metadata, row_group, column, &mut file, None, buffer)?;
+        let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);

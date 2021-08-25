@@ -49,9 +49,11 @@ async fn main() -> Result<()> {
 
     // * first row group
     // * first column
+    let column_metadata = metadata.row_groups[row_group].column(column);
+
     // * do not skip any pages
     let pages =
-        get_page_stream(&metadata, 0, 0, &mut reader, vec![], Arc::new(|_, _| true)).await?;
+        get_page_stream(&column_metadata, &mut reader, vec![], Arc::new(|_, _| true)).await?;
 
     pin_mut!(pages); // needed for iteration
 

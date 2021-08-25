@@ -47,7 +47,8 @@ where
         writeln!(writer, "{}", SEPARATOR)?;
 
         for column in &columns {
-            let iter = get_page_iterator(&metadata, i, *column, &mut file)?;
+            let column_meta = group.column(column);
+            let iter = get_page_iterator(column_meta, &mut file)?;
             for (page_ind, page) in iter.enumerate() {
                 let page = page?;
                 writeln!(
