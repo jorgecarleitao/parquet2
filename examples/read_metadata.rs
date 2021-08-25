@@ -54,6 +54,26 @@ fn main() -> Result<()> {
     let column_metadata = metadata.row_groups[row_group].column(column);
     // ANCHOR_END: column_metadata
 
+    // ANCHOR: statistics
+    if let Some(maybe_stats) = column_metadata.statistics() {
+        let stats = maybe_stats?;
+        use parquet2::schema::types::PhysicalType;
+        use parquet2::statistics::PrimitiveStatistics;
+        match stats.physical_type() {
+            PhysicalType::Int32 => {
+                let stats = stats
+                    .as_any()
+                    .downcast_ref::<PrimitiveStatistics<i32>>()
+                    .unwrap();
+                let _min: i32 = stats.min_value.unwrap();
+                let _max: i32 = stats.max_value.unwrap();
+                let _null_count: i64 = stats.null_count.unwrap();
+            }
+            _ => todo!(),
+        }
+    }
+    // ANCHOR_END: statistics
+
     // ANCHOR: pages
     use parquet2::read::get_page_iterator;
     let pages = get_page_iterator(column_metadata, &mut reader, None, vec![])?;

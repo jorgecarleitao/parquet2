@@ -39,7 +39,6 @@ In both cases, `metadata: FileMetaData` is the file's metadata.
 ## Columns, Row Groups, Columns chunks and Pages
 
 At this point, it is important to give a small introduction to the format itself.
-
 The metadata does not contain any data. Instead, the metadata contains
 the necessary information to read, decompress, decode and deserialize data. Generally:
 
@@ -67,17 +66,17 @@ pages, `parquet2::read::get_page_stream`:
 {{#include ../../examples/read_metadata.rs:pages}}
 ```
 
-in both cases they yield individual `CompressedDataPage`s (values between
-pages are part of the same array).
+in both cases, they yield individual `CompressedDataPage`s. Note that these
+pages do hold values and own potentially large chunks of (compressed) memory.
 
 At this point, we are missing 3 steps: decompress, decode and deserialize.
-Decompressing is done via `decompress`:
+Decompression is done via `decompress`:
 
 ```rust,no_run,noplayground
 {{#include ../../examples/read_metadata.rs:decompress}}
 ```
 
-Decoding and deserialization is usually done in the same step as follows:
+Decoding and deserialization is usually done in the same step, as follows:
 
 ```rust,no_run,noplayground
 {{#include ../../examples/read_metadata.rs:deserialize}}
@@ -85,7 +84,24 @@ Decoding and deserialization is usually done in the same step as follows:
 
 the details of the `todo!` are highly specific to the target in-memory format to use.
 Thus, here we only describe how to decompose the page buffer in its individual
-components and what you need to worry about. Refer to the integration tests's
-implementation for deserialization to a simple in-memory format,
-and [arrow2](https://github.com/jorgecarleitao/arrow2)'s
-implementation for the Apache Arrow format.
+components and what you need to worry about.
+For example, reading to Apache Arrow often does not require decoding the
+definition levels, as they have the same representation as in Arrow, but do require
+deserialization of some values, as e.g. arrow supports unsigned integers while
+parquet only accepts (potentially encoded) `i32` and `i64` integers.
+Refer to the integration tests's implementation for deserialization to a 
+simple in-memory format, and [arrow2](https://github.com/jorgecarleitao/arrow2)
+for an implementation to the Apache Arrow format.
+
+## Row group statistics
+
+The metadata of row groups can contain row group statistics that
+can be used to pushdown filter operations.
+
+The statistics are encoded based on the physical type of the column and
+are represented via trait objects of the trait `Statistics`,
+which can be downcasted via its `Statistics::physical_type()`:
+
+```rust,no_run,noplayground
+{{#include ../../examples/read_metadata.rs:statistics}}
+```
