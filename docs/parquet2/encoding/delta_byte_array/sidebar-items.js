@@ -1,1 +1,0 @@
-initSidebarItems({"struct":[["Decoder","Decodes according to Delta strings, prefixes, lengths and values"]]});
