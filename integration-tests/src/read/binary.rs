@@ -1,13 +1,12 @@
 use parquet::{
-    encoding::{bitpacking, plain_byte_array, uleb128, Encoding},
+    encoding::{bitpacking, hybrid_rle::HybridRleDecoder, plain_byte_array, uleb128, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
-    page::{split_buffer, BinaryPageDict, DataPage, DataPageHeader, DataPageHeaderExt},
-    read::levels,
+    page::{split_buffer, BinaryPageDict, DataPage},
+    read::levels::get_bit_width,
 };
 
 use super::utils::ValuesDef;
-use levels::{get_bit_width, RLEDecoder};
 
 fn read_dict_buffer_impl<I: Iterator<Item = u32>>(
     def_levels: I,
@@ -58,7 +57,7 @@ fn read_dict_buffer(
         ),
         (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
-            let def_levels = RLEDecoder::new(def_levels, num_bits, length);
+            let def_levels = HybridRleDecoder::new(def_levels, num_bits, length as usize);
             read_dict_buffer_impl(def_levels, values, length, max_def_level, dict)
         }
         _ => todo!(),
@@ -117,7 +116,7 @@ fn read_buffer(
         ),
         (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
-            let def_levels = RLEDecoder::new(def_levels, num_bits, length);
+            let def_levels = HybridRleDecoder::new(def_levels, num_bits, length as usize);
             read_buffer_impl(def_levels, values, length, max_def_level)
         }
         _ => todo!(),
