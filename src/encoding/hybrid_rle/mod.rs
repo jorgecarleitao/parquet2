@@ -190,4 +190,17 @@ mod tests {
 
         assert_eq!(result, (0..1000).collect::<Vec<_>>());
     }
+
+    #[test]
+    fn small() {
+        let data = vec![3, 2];
+
+        let num_bits = 3;
+
+        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 1);
+
+        let result = decoder.collect::<Vec<_>>();
+
+        assert_eq!(result, &[2]);
+    }
 }

@@ -31,6 +31,7 @@ impl<'a> Iterator for Decoder<'a> {
         if indicator & 1 == 1 {
             // is bitpacking
             let bytes = (indicator as usize >> 1) * self.num_bits as usize;
+            let bytes = std::cmp::min(bytes, self.values.len());
             let result = Some(HybridEncoded::Bitpacked(&self.values[..bytes]));
             self.values = &self.values[bytes..];
             result
