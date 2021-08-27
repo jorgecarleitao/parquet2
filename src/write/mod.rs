@@ -17,8 +17,8 @@ pub use file::write_file;
 use crate::compression::Compression;
 use crate::page::CompressedPage;
 
-pub type RowGroupIter<E> =
-    DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>;
+pub type RowGroupIter<'a, E> =
+    DynIter<'a, std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>>;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct WriteOptions {
