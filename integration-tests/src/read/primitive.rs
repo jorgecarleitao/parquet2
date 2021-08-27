@@ -3,11 +3,11 @@ use std::convert::TryInto;
 use super::utils::ValuesDef;
 
 use parquet::{
-    encoding::{bitpacking, uleb128, Encoding},
-    error::{ParquetError, Result},
+    encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
+    error::Result,
     metadata::ColumnDescriptor,
-    page::{split_buffer, DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
-    read::levels::{get_bit_width, RLEDecoder},
+    page::{split_buffer, DataPage, PrimitivePageDict},
+    read::levels::get_bit_width,
     types::NativeType,
 };
 
@@ -50,7 +50,7 @@ fn read_buffer<T: NativeType>(
         ),
         (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
-            let def_levels = RLEDecoder::new(def_levels, num_bits, length);
+            let def_levels = HybridRleDecoder::new(def_levels, num_bits, length as usize);
             read_buffer_impl(def_levels, values, max_def_level)
         }
         _ => todo!(),
@@ -99,7 +99,7 @@ fn read_dict_buffer<'a, T: NativeType>(
         ),
         (Encoding::Rle, false) => {
             let num_bits = get_bit_width(def_level_encoding.1);
-            let def_levels = RLEDecoder::new(def_levels, num_bits, length);
+            let def_levels = HybridRleDecoder::new(def_levels, num_bits, length as usize);
             read_dict_buffer_impl(def_levels, values, length, max_def_level, dict)
         }
         _ => todo!(),

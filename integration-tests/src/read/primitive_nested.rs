@@ -3,11 +3,11 @@ use std::convert::TryInto;
 use super::Array;
 
 use parquet::{
-    encoding::{bitpacking, uleb128, Encoding},
+    encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
-    page::{split_buffer, DataPage, DataPageHeader, DataPageHeaderExt, PrimitivePageDict},
-    read::levels::{get_bit_width, RLEDecoder},
+    page::{split_buffer, DataPage, PrimitivePageDict},
+    read::levels::get_bit_width,
     types::NativeType,
 };
 
@@ -68,7 +68,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
     rep_levels: &[u8],
     def_levels: &[u8],
     values: I,
-    length: u32,
+    length: usize,
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Array {
@@ -88,7 +88,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
         ),
         ((Encoding::Rle, false), (Encoding::Rle, true)) => {
             let num_bits = get_bit_width(rep_level_encoding.1);
-            let rep_levels = RLEDecoder::new(rep_levels, num_bits, length);
+            let rep_levels = HybridRleDecoder::new(rep_levels, num_bits, length);
             compose_array(
                 rep_levels,
                 std::iter::repeat(0).take(length as usize),
@@ -99,7 +99,7 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
         }
         ((Encoding::Rle, true), (Encoding::Rle, false)) => {
             let num_bits = get_bit_width(def_level_encoding.1);
-            let def_levels = RLEDecoder::new(def_levels, num_bits, length);
+            let def_levels = HybridRleDecoder::new(def_levels, num_bits, length);
             compose_array(
                 std::iter::repeat(0).take(length as usize),
                 def_levels,
@@ -110,9 +110,9 @@ fn read_array_impl<T: NativeType, I: Iterator<Item = i64>>(
         }
         ((Encoding::Rle, false), (Encoding::Rle, false)) => {
             let rep_levels =
-                RLEDecoder::new(rep_levels, get_bit_width(rep_level_encoding.1), length);
+                HybridRleDecoder::new(rep_levels, get_bit_width(rep_level_encoding.1), length);
             let def_levels =
-                RLEDecoder::new(def_levels, get_bit_width(def_level_encoding.1), length);
+                HybridRleDecoder::new(def_levels, get_bit_width(def_level_encoding.1), length);
             compose_array(rep_levels, def_levels, max_rep_level, max_def_level, values)
         }
         _ => todo!(),
@@ -132,7 +132,7 @@ fn read_array<T: NativeType>(
         rep_levels,
         def_levels,
         values,
-        length,
+        length as usize,
         rep_level_encoding,
         def_level_encoding,
     )
@@ -188,7 +188,7 @@ fn read_dict_array<T: NativeType>(
         rep_levels,
         def_levels,
         values,
-        length,
+        length as usize,
         rep_level_encoding,
         def_level_encoding,
     )
