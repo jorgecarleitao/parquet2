@@ -42,7 +42,7 @@ fn bitpacked_encode_u32<W: Write, I: Iterator<Item = u32>>(
     let compressed_chunk_size = ceil8(bitpacking::BLOCK_LEN * num_bits as usize);
     // this is the upper bound: we do not know `num_bits` at compile time and thus can't allocate (on the stack)
     // the exact length.
-    let mut compressed_chunk = [0u8; bitpacking::BLOCK_LEN];
+    let mut compressed_chunk = [0u8; 4 * bitpacking::BLOCK_LEN];
 
     for _ in 0..chunks {
         (0..bitpacking::BLOCK_LEN).for_each(|i| {

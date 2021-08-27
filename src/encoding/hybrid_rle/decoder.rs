@@ -2,6 +2,7 @@ use super::super::uleb128;
 use super::{super::ceil8, HybridEncoded};
 
 /// An iterator that, given a slice of bytes, returns `HybridEncoded`
+#[derive(Debug, Clone)]
 pub struct Decoder<'a> {
     values: &'a [u8],
     num_bits: u32,
@@ -10,6 +11,11 @@ pub struct Decoder<'a> {
 impl<'a> Decoder<'a> {
     pub fn new(values: &'a [u8], num_bits: u32) -> Self {
         Self { values, num_bits }
+    }
+
+    /// Returns the number of bits being used by this decoder.
+    pub fn num_bits(&self) -> u32 {
+        self.num_bits
     }
 }
 
