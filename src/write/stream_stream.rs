@@ -52,7 +52,7 @@ async fn end_file<W: AsyncWrite + AsyncSeek + Unpin + Send>(
 
 /// Given a stream of [`RowGroupIter`] and and an `async` writer, returns a future
 /// of writing a parquet file to the writer.
-pub async fn write_stream_stream<W, S, E>(
+pub async fn write_stream_stream<'a, W, S, E>(
     writer: &mut W,
     row_groups: S,
     schema: SchemaDescriptor,
@@ -62,7 +62,7 @@ pub async fn write_stream_stream<W, S, E>(
 ) -> Result<()>
 where
     W: AsyncWrite + AsyncSeek + Unpin + Send,
-    S: Stream<Item = std::result::Result<RowGroupIter<E>, E>>,
+    S: Stream<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
     E: Error + Send + Sync + 'static,
 {
     start_file(writer).await?;

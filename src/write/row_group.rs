@@ -84,13 +84,17 @@ where
 }
 
 pub async fn write_row_group_async<
+    'a,
     W,
     E, // external error any of the iterators may emit
 >(
     writer: &mut W,
     descriptors: &[ColumnDescriptor],
     compression: Compression,
-    columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>,
+    columns: DynIter<
+        'a,
+        std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>,
+    >,
 ) -> Result<RowGroup>
 where
     W: AsyncWrite + AsyncSeek + Unpin + Send,
