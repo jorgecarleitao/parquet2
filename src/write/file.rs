@@ -1,7 +1,4 @@
-use std::{
-    error::Error,
-    io::{Seek, SeekFrom, Write},
-};
+use std::{error::Error, io::Write};
 
 use parquet_format_async_temp::FileMetaData;
 
@@ -17,31 +14,27 @@ use crate::{
 
 use super::{row_group::write_row_group, RowGroupIter, WriteOptions};
 
-pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<()> {
-    Ok(writer.write_all(&PARQUET_MAGIC)?)
+pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<u64> {
+    writer.write_all(&PARQUET_MAGIC)?;
+    Ok(PARQUET_MAGIC.len() as u64)
 }
 
-pub(super) fn end_file<W: Write + Seek>(mut writer: &mut W, metadata: FileMetaData) -> Result<()> {
-    // Write file metadata
-    let start_pos = writer.seek(SeekFrom::Current(0))?;
-    {
-        let mut protocol = TCompactOutputProtocol::new(&mut writer);
-        metadata.write_to_out_protocol(&mut protocol)?;
-        protocol.flush()?
-    }
-    let end_pos = writer.seek(SeekFrom::Current(0))?;
-    let metadata_len = (end_pos - start_pos) as i32;
+pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: FileMetaData) -> Result<u64> {
+    // Write metadata
+    let mut protocol = TCompactOutputProtocol::new(&mut writer);
+    let metadata_len = metadata.write_to_out_protocol(&mut protocol)? as i32;
+    protocol.flush()?;
 
     // Write footer
-    let metadata_len = metadata_len.to_le_bytes();
+    let metadata_bytes = metadata_len.to_le_bytes();
     let mut footer_buffer = [0u8; FOOTER_SIZE as usize];
     (0..4).for_each(|i| {
-        footer_buffer[i] = metadata_len[i];
+        footer_buffer[i] = metadata_bytes[i];
     });
 
     (&mut footer_buffer[4..]).write_all(&PARQUET_MAGIC)?;
     writer.write_all(&footer_buffer)?;
-    Ok(())
+    Ok(metadata_len as u64 + FOOTER_SIZE)
 }
 
 pub fn write_file<'a, W, I, E>(
@@ -51,22 +44,25 @@ pub fn write_file<'a, W, I, E>(
     options: WriteOptions,
     created_by: Option<String>,
     key_value_metadata: Option<Vec<KeyValue>>,
-) -> Result<()>
+) -> Result<u64>
 where
-    W: Write + Seek,
+    W: Write,
     I: Iterator<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
     E: Error + Send + Sync + 'static,
 {
-    start_file(writer)?;
+    let mut offset = start_file(writer)? as u64;
 
     let row_groups = row_groups
         .map(|row_group| {
-            write_row_group(
+            let (group, size) = write_row_group(
                 writer,
+                offset,
                 schema.columns(),
                 options.compression,
                 row_group.map_err(ParquetError::from_external_error)?,
-            )
+            )?;
+            offset += size;
+            Ok(group)
         })
         .collect::<Result<Vec<_>>>()?;
 
@@ -85,8 +81,8 @@ where
         None,
     );
 
-    end_file(writer, metadata)?;
-    Ok(())
+    let len = end_file(writer, metadata)?;
+    Ok(offset + len)
 }
 
 #[cfg(test)]

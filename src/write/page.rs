@@ -1,9 +1,9 @@
-use std::io::{Seek, SeekFrom, Write};
+use std::io::Write;
 use std::sync::Arc;
 
-use futures::{AsyncSeek, AsyncSeekExt, AsyncWrite, AsyncWriteExt};
+use futures::{AsyncWrite, AsyncWriteExt};
 use parquet_format_async_temp::thrift::protocol::{
-    TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
+    TCompactOutputProtocol, TCompactOutputStreamProtocol,
 };
 use parquet_format_async_temp::{DictionaryPageHeader, Encoding, PageType};
 
@@ -16,14 +16,15 @@ use crate::statistics::Statistics;
 /// Contains page write metrics.
 pub struct PageWriteSpec {
     pub header: ParquetPageHeader,
-    pub header_size: usize,
+    pub header_size: u64,
     pub offset: u64,
     pub bytes_written: u64,
     pub statistics: Option<Arc<dyn Statistics>>,
 }
 
-pub fn write_page<W: Write + Seek>(
+pub fn write_page<W: Write>(
     writer: &mut W,
+    offset: u64,
     compressed_page: CompressedPage,
 ) -> Result<PageWriteSpec> {
     let header = match &compressed_page {
@@ -31,33 +32,37 @@ pub fn write_page<W: Write + Seek>(
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
     };
 
-    let start_pos = writer.seek(SeekFrom::Current(0))?;
-
     let header_size = write_page_header(writer, &header)?;
+    let mut bytes_written = header_size as u64;
 
-    match &compressed_page {
-        CompressedPage::Data(compressed_page) => writer.write_all(&compressed_page.buffer)?,
-        CompressedPage::Dict(compressed_page) => writer.write_all(&compressed_page.buffer)?,
-    }
+    bytes_written += match &compressed_page {
+        CompressedPage::Data(compressed_page) => {
+            writer.write_all(&compressed_page.buffer)?;
+            compressed_page.buffer.len() as u64
+        }
+        CompressedPage::Dict(compressed_page) => {
+            writer.write_all(&compressed_page.buffer)?;
+            compressed_page.buffer.len() as u64
+        }
+    };
 
     let statistics = match &compressed_page {
         CompressedPage::Data(compressed_page) => compressed_page.statistics().transpose()?,
         CompressedPage::Dict(_) => None,
     };
 
-    let end_pos = writer.seek(SeekFrom::Current(0))?;
-
     Ok(PageWriteSpec {
         header,
         header_size,
-        offset: start_pos,
-        bytes_written: end_pos - start_pos,
+        offset,
+        bytes_written,
         statistics,
     })
 }
 
-pub async fn write_page_async<W: AsyncWrite + AsyncSeek + Unpin + Send>(
+pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
     writer: &mut W,
+    offset: u64,
     compressed_page: CompressedPage,
 ) -> Result<PageWriteSpec> {
     let header = match &compressed_page {
@@ -65,27 +70,30 @@ pub async fn write_page_async<W: AsyncWrite + AsyncSeek + Unpin + Send>(
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
     };
 
-    let start_pos = writer.seek(SeekFrom::Current(0)).await?;
-
     let header_size = write_page_header_async(writer, &header).await?;
+    let mut bytes_written = header_size as u64;
 
-    match &compressed_page {
-        CompressedPage::Data(compressed_page) => writer.write_all(&compressed_page.buffer).await?,
-        CompressedPage::Dict(compressed_page) => writer.write_all(&compressed_page.buffer).await?,
-    }
+    bytes_written += match &compressed_page {
+        CompressedPage::Data(compressed_page) => {
+            writer.write_all(&compressed_page.buffer).await?;
+            compressed_page.buffer.len() as u64
+        }
+        CompressedPage::Dict(compressed_page) => {
+            writer.write_all(&compressed_page.buffer).await?;
+            compressed_page.buffer.len() as u64
+        }
+    };
 
     let statistics = match &compressed_page {
         CompressedPage::Data(compressed_page) => compressed_page.statistics().transpose()?,
         CompressedPage::Dict(_) => None,
     };
 
-    let end_pos = writer.seek(SeekFrom::Current(0)).await?;
-
     Ok(PageWriteSpec {
         header,
         header_size,
-        offset: start_pos,
-        bytes_written: end_pos - start_pos,
+        offset,
+        bytes_written,
         statistics,
     })
 }
@@ -134,31 +142,16 @@ fn assemble_dict_page_header(page: &CompressedDictPage) -> ParquetPageHeader {
 }
 
 /// writes the page header into `writer`, returning the number of bytes used in the process.
-fn write_page_header<W: Write + Seek>(
-    mut writer: &mut W,
-    header: &ParquetPageHeader,
-) -> Result<usize> {
-    let start_pos = writer.seek(SeekFrom::Current(0))?;
-    {
-        let mut protocol = TCompactOutputProtocol::new(&mut writer);
-        header.write_to_out_protocol(&mut protocol)?;
-        protocol.flush()?;
-    }
-    let end_pos = writer.seek(SeekFrom::Current(0))?;
-    Ok((end_pos - start_pos) as usize)
+fn write_page_header<W: Write>(mut writer: &mut W, header: &ParquetPageHeader) -> Result<u64> {
+    let mut protocol = TCompactOutputProtocol::new(&mut writer);
+    Ok(header.write_to_out_protocol(&mut protocol)? as u64)
 }
 
 /// writes the page header into `writer`, returning the number of bytes used in the process.
-async fn write_page_header_async<W: AsyncWrite + AsyncSeek + Unpin + Send>(
+async fn write_page_header_async<W: AsyncWrite + Unpin + Send>(
     mut writer: &mut W,
     header: &ParquetPageHeader,
-) -> Result<usize> {
-    let start_pos = writer.seek(SeekFrom::Current(0)).await?;
-    {
-        let mut protocol = TCompactOutputStreamProtocol::new(&mut writer);
-        header.write_to_out_stream_protocol(&mut protocol).await?;
-        protocol.flush().await?;
-    }
-    let end_pos = writer.seek(SeekFrom::Current(0)).await?;
-    Ok((end_pos - start_pos) as usize)
+) -> Result<u64> {
+    let mut protocol = TCompactOutputStreamProtocol::new(&mut writer);
+    Ok(header.write_to_out_stream_protocol(&mut protocol).await? as u64)
 }
