@@ -69,10 +69,7 @@ fn read_dict_buffer_impl<T: NativeType, I: Iterator<Item = u32>>(
     let bit_width = values[0];
     let values = &values[1..];
 
-    let (_, consumed) = uleb128::decode(&values);
-    let values = &values[consumed..];
-
-    let indices = bitpacking::Decoder::new(values, bit_width, length as usize);
+    let indices = HybridRleDecoder::new(values, bit_width as u32, length as usize);
 
     let iterator = ValuesDef::new(indices, def_levels, max_def_level);
 
