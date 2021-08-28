@@ -2,26 +2,28 @@
 
 This is a re-write of the official [`parquet` crate](https://crates.io/crates/parquet) with performance, parallelism and safety in mind.
 
-Checkout [the guide](https://jorgecarleitao.github.io/parquet2/) for details on how to use
-this crate to read parquet.
+Checkout [the guide](https://jorgecarleitao.github.io/parquet2/) for details
+on how to use this crate to read parquet.
 
 The five main differentiators in comparison with `parquet` are:
 * it uses `#![forbid(unsafe_code)]`
 * delegates parallelism downstream
 * decouples reading (IO intensive) from computing (CPU intensive)
 * it is faster (10-20x when reading to arrow format)
-* Is integration-tested against pyarrow 3 and (py)spark 3
+* supports `async` read and write.
+* It is integration-tested against pyarrow and (py)spark 3
 
 The overall idea is to offer the ability to read compressed parquet pages
 and a toolkit to decompress them to their favourite in-memory format.
 
-This allows this crate's iterators to perform _minimal_ CPU work, thereby maximizing throughput.
+This allows this crate's iterators to perform _minimal_ CPU work,
+thereby maximizing throughput.
 It is up to the consumers to decide whether they want to take advantage of this
 through parallelism at the expense of memory usage (e.g. decompress and deserialize
 pages in threads) or not.
 
-This crate cannot be used directly to read parquet (except metadata). To read data from parquet,
-checkout [arrow2](https://github.com/jorgecarleitao/arrow2).
+This crate cannot be used directly to read parquet (except metadata).
+To read data from parquet, checkout [arrow2](https://github.com/jorgecarleitao/arrow2).
 
 ## Functionality implemented
 
@@ -49,8 +51,9 @@ of them. They are:
 * [Delta length byte array](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-length-byte-array-delta_length_byte_array--6)
 * [Delta strings](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-strings-delta_byte_array--7)
 
-Delta-encodings are still experimental, as I have been unable to generate large pages encoded
-with them from spark, thereby hindering robust integration tests.
+Delta-encodings are still experimental, as I have been unable to
+generate large pages encoded with them from spark, thereby hindering
+robust integration tests.
 
 #### Encoding
 
@@ -90,12 +93,17 @@ before. This is only needed once (per change in the `integration-tests/integrati
 
 ## How to implement page readers
 
-The in-memory format used to consume parquet pages strongly influences how the pages should be deserialized. As such, this crate does not commit to a particular in-memory format. Consumers are responsible for converting pages to their target in-memory format.
+The in-memory format used to consume parquet pages strongly influences
+how the pages should be deserialized. As such, this crate does
+not commit to a particular in-memory format. Consumers are responsible
+for converting pages to their target in-memory format.
 
-This git repository contains a serialization to a simple in-memory format in `integration`, that is
+This git repository contains a serialization to a simple in-memory
+format in `integration`, that is
 used to validate integration with other implementations.
 
-There is also an implementation for the arrow format [here](https://github.com/jorgecarleitao/arrow2).
+There is also an implementation for the arrow format
+[here](https://github.com/jorgecarleitao/arrow2).
 
 ### Higher Parallelism
 
@@ -116,7 +124,9 @@ for column in columns {
 let columns_from_all_groups = handles.join_all();
 ```
 
-this will read the file as quickly as possible in the main thread and send CPU-intensive work to other threads, thereby maximizing IO reads (at the cost of storing multiple compressed pages in memory; buffering is also an option here).
+this will read the file as quickly as possible in the main thread and send CPU-intensive work to other threads, thereby maximizing IO reads
+(at the cost of storing multiple compressed pages in memory;
+buffering is also an option here).
 
 ## Decoding flow
 
@@ -128,8 +138,10 @@ Generally, a parquet file is read as follows:
 
 This is IO-intensive, requires parsing thrift, and seeking within a file.
 
-Once a compressed page is loaded into memory, it can be decompressed, decoded and deserialized into a specific in-memory format. All of these operations are CPU-intensive
-and are thus left to consumers to perform, as they may want to send this work to threads.
+Once a compressed page is loaded into memory, it can be decompressed, decoded
+and deserialized into a specific in-memory format. All of these
+operations are CPU-intensive and are thus left to consumers to perform,
+as they may want to send this work to threads.
 
 `read -> compressed page -> decompressed page -> decoded bytes -> deserialized`
 

@@ -3,7 +3,8 @@
 Parquet2 is a rust library to interact with the
 [parquet format](https://en.wikipedia.org/wiki/Apache_Parquet), welcome to its guide!
 
-This guide describes on how to efficiently and safely read and write to and from parquet.
+This guide describes on how to efficiently and safely read and write
+to and from parquet.
 Before starting, there are two concepts to introduce in the context of this guide:
 
 * IO-bound operations: perform either disk reads or network calls (e.g. s3)
@@ -17,10 +18,13 @@ operations are not.
 
 ## Metadata
 
-The starting point of reading a parquet file is reading its metadata (at the end of the file).
-To do so, we offer two functions, `parquet2::read::read_metadata`, for sync reads:
+The starting point of reading a parquet file is reading its
+metadata (at the end of the file).
+To do so, we offer two functions for `sync` and `async`:
 
 #### Sync
+
+`parquet2::read::read_metadata` for `sync` reads:
 
 ```rust,no_run,noplayground
 {{#include ../../examples/read_metadata.rs:metadata}}
@@ -28,7 +32,8 @@ To do so, we offer two functions, `parquet2::read::read_metadata`, for sync read
 
 #### Async
 
-and `parquet2::read::read_metadata_async`, for async reads (using `tokio::fs` as example):
+and `parquet2::read::read_metadata_async`, for async reads
+(using `tokio::fs` as example):
 
 ```rust
 {{#include ../../examples/read_metadata_async/src/main.rs}}

@@ -1,5 +1,37 @@
 # Changelog
 
+## [v0.4.0](https://github.com/jorgecarleitao/parquet2/tree/v0.4.0) (2021-08-28)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.3.0...v0.4.0)
+
+**Breaking changes:**
+
+- Make `write_*` return the number of written bytes. [\#45](https://github.com/jorgecarleitao/parquet2/issues/45)
+- move `HybridRleDecoder` from `read::levels` to `encoding::hybrid_rle` [\#41](https://github.com/jorgecarleitao/parquet2/issues/41)
+- Simplified split of page buffer [\#37](https://github.com/jorgecarleitao/parquet2/pull/37) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Simplified API to get page iterator [\#36](https://github.com/jorgecarleitao/parquet2/pull/36) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**New features:**
+
+- Added support to write to async writers. [\#35](https://github.com/jorgecarleitao/parquet2/pull/35) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fixed edge case of a small bitpacked. [\#43](https://github.com/jorgecarleitao/parquet2/pull/43) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Fixed error in decoding RLE-hybrid. [\#40](https://github.com/jorgecarleitao/parquet2/pull/40) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Removed requirement of "Seek" on write. [\#44](https://github.com/jorgecarleitao/parquet2/pull/44) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Documentation updates:**
+
+- Added guide to read [\#38](https://github.com/jorgecarleitao/parquet2/pull/38) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Testing updates:**
+
+- Made tests deserializer use the correct decoder. [\#46](https://github.com/jorgecarleitao/parquet2/pull/46) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.3.0](https://github.com/jorgecarleitao/parquet2/tree/v0.3.0) (2021-08-09)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.2.0...v0.3.0)
