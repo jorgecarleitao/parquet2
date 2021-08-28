@@ -147,7 +147,8 @@
                         <h1 id="parquet2"><a class="header" href="#parquet2">Parquet2</a></h1>
 <p>Parquet2 is a rust library to interact with the
 <a href="https://en.wikipedia.org/wiki/Apache_Parquet">parquet format</a>, welcome to its guide!</p>
-<p>This guide describes on how to efficiently and safely read and write to and from parquet.
+<p>This guide describes on how to efficiently and safely read and write
+to and from parquet.
 Before starting, there are two concepts to introduce in the context of this guide:</p>
 <ul>
 <li>IO-bound operations: perform either disk reads or network calls (e.g. s3)</li>
@@ -158,9 +159,11 @@ IO-bound operations, &quot;decompress&quot;, &quot;compress&quot;, &quot;deseria
 <p>Generally, IO-bound operations are parallelizable with green threads, while CPU-bound
 operations are not. </p>
 <h2 id="metadata"><a class="header" href="#metadata">Metadata</a></h2>
-<p>The starting point of reading a parquet file is reading its metadata (at the end of the file).
-To do so, we offer two functions, <code>parquet2::read::read_metadata</code>, for sync reads:</p>
+<p>The starting point of reading a parquet file is reading its
+metadata (at the end of the file).
+To do so, we offer two functions for <code>sync</code> and <code>async</code>:</p>
 <h4 id="sync"><a class="header" href="#sync">Sync</a></h4>
+<p><code>parquet2::read::read_metadata</code> for <code>sync</code> reads:</p>
 <pre><code class="language-rust no_run noplayground">    use parquet2::read::read_metadata;
     let mut reader = std::fs::File::open(&quot;path&quot;)?;
     let metadata = read_metadata(&amp;mut reader)?;
@@ -168,7 +171,8 @@ To do so, we offer two functions, <code>parquet2::read::read_metadata</code>, fo
     println!(&quot;{:#?}&quot;, metadata);
 </code></pre>
 <h4 id="async"><a class="header" href="#async">Async</a></h4>
-<p>and <code>parquet2::read::read_metadata_async</code>, for async reads (using <code>tokio::fs</code> as example):</p>
+<p>and <code>parquet2::read::read_metadata_async</code>, for async reads
+(using <code>tokio::fs</code> as example):</p>
 <pre><pre class="playground"><code class="language-rust">use async_compat::Compat;
 use parquet2::{error::Result, read::read_metadata_async};
 use tokio::fs;
