@@ -1,9 +1,6 @@
-use std::{
-    error::Error,
-    io::{Seek, Write},
-};
+use std::{error::Error, io::Write};
 
-use futures::{AsyncSeek, AsyncWrite};
+use futures::AsyncWrite;
 use parquet_format_async_temp::RowGroup;
 
 use crate::{
@@ -35,26 +32,32 @@ pub fn write_row_group<
     E, // external error any of the iterators may emit
 >(
     writer: &mut W,
+    mut offset: u64,
     descriptors: &[ColumnDescriptor],
     compression: Compression,
     columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>,
-) -> Result<RowGroup>
+) -> Result<(RowGroup, u64)>
 where
-    W: Write + Seek,
+    W: Write,
     E: Error + Send + Sync + 'static,
 {
     let column_iter = descriptors.iter().zip(columns);
 
+    let initial = offset;
     let columns = column_iter
         .map(|(descriptor, page_iter)| {
-            write_column_chunk(
+            let (column, size) = write_column_chunk(
                 writer,
+                offset,
                 descriptor,
                 compression,
                 page_iter.map_err(ParquetError::from_external_error)?,
-            )
+            )?;
+            offset += size;
+            Ok(column)
         })
         .collect::<Result<Vec<_>>>()?;
+    let bytes_written = offset - initial;
 
     // compute row group stats
     let num_rows = columns
@@ -72,15 +75,18 @@ where
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
         .sum();
 
-    Ok(RowGroup {
-        columns,
-        total_byte_size,
-        num_rows,
-        sorting_columns: None,
-        file_offset: None,
-        total_compressed_size: None,
-        ordinal: None,
-    })
+    Ok((
+        RowGroup {
+            columns,
+            total_byte_size,
+            num_rows,
+            sorting_columns: None,
+            file_offset: None,
+            total_compressed_size: None,
+            ordinal: None,
+        },
+        bytes_written,
+    ))
 }
 
 pub async fn write_row_group_async<
@@ -89,30 +95,35 @@ pub async fn write_row_group_async<
     E, // external error any of the iterators may emit
 >(
     writer: &mut W,
+    mut offset: u64,
     descriptors: &[ColumnDescriptor],
     compression: Compression,
     columns: DynIter<
         'a,
         std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>,
     >,
-) -> Result<RowGroup>
+) -> Result<(RowGroup, u64)>
 where
-    W: AsyncWrite + AsyncSeek + Unpin + Send,
+    W: AsyncWrite + Unpin + Send,
     E: Error + Send + Sync + 'static,
 {
     let column_iter = descriptors.iter().zip(columns);
 
+    let initial = offset;
     let mut columns = vec![];
     for (descriptor, page_iter) in column_iter {
-        let spec = write_column_chunk_async(
+        let (spec, size) = write_column_chunk_async(
             writer,
+            offset,
             descriptor,
             compression,
             page_iter.map_err(ParquetError::from_external_error)?,
         )
         .await?;
+        offset += size as u64;
         columns.push(spec);
     }
+    let bytes_written = offset - initial;
 
     // compute row group stats
     let num_rows = columns
@@ -130,13 +141,16 @@ where
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
         .sum();
 
-    Ok(RowGroup {
-        columns,
-        total_byte_size,
-        num_rows,
-        sorting_columns: None,
-        file_offset: None,
-        total_compressed_size: None,
-        ordinal: None,
-    })
+    Ok((
+        RowGroup {
+            columns,
+            total_byte_size,
+            num_rows,
+            sorting_columns: None,
+            file_offset: None,
+            total_compressed_size: None,
+            ordinal: None,
+        },
+        bytes_written,
+    ))
 }

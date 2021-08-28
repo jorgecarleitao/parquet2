@@ -1,8 +1,8 @@
 use std::convert::TryInto;
-use std::io::{Seek, Write};
+use std::io::Write;
 use std::{collections::HashSet, error::Error};
 
-use futures::{AsyncSeek, AsyncWrite};
+use futures::AsyncWrite;
 use parquet_format_async_temp::thrift::protocol::{
     TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
 };
@@ -22,66 +22,78 @@ use super::page::{write_page, write_page_async, PageWriteSpec};
 use super::statistics::reduce;
 
 pub fn write_column_chunk<
-    W: Write + Seek,
+    W: Write,
     I: Iterator<Item = std::result::Result<CompressedPage, E>>,
     E: Error + Send + Sync + 'static,
 >(
     writer: &mut W,
+    mut offset: u64,
     descriptor: &ColumnDescriptor,
     compression: Compression,
     compressed_pages: I,
-) -> Result<ColumnChunk> {
+) -> Result<(ColumnChunk, u64)> {
     // write every page
+
+    let initial = offset;
     let specs = compressed_pages
         .map(|compressed_page| {
-            write_page(
+            let spec = write_page(
                 writer,
+                offset,
                 compressed_page.map_err(ParquetError::from_external_error)?,
-            )
+            )?;
+            offset += spec.bytes_written;
+            Ok(spec)
         })
         .collect::<Result<Vec<_>>>()?;
+    let mut bytes_written = offset - initial;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
 
     // write metadata
     let mut protocol = TCompactOutputProtocol::new(writer);
-    column_chunk.write_to_out_protocol(&mut protocol)?;
+    bytes_written += column_chunk.write_to_out_protocol(&mut protocol)? as u64;
     protocol.flush()?;
 
-    Ok(column_chunk)
+    Ok((column_chunk, bytes_written))
 }
 
 pub async fn write_column_chunk_async<
-    W: AsyncWrite + AsyncSeek + Unpin + Send,
+    W: AsyncWrite + Unpin + Send,
     I: Iterator<Item = std::result::Result<CompressedPage, E>>,
     E: Error + Send + Sync + 'static,
 >(
     writer: &mut W,
+    mut offset: u64,
     descriptor: &ColumnDescriptor,
     compression: Compression,
     compressed_pages: I,
-) -> Result<ColumnChunk> {
+) -> Result<(ColumnChunk, usize)> {
+    let initial = offset;
     // write every page
     let mut specs = vec![];
     for compressed_page in compressed_pages {
         let spec = write_page_async(
             writer,
+            offset,
             compressed_page.map_err(ParquetError::from_external_error)?,
         )
         .await?;
+        offset += spec.bytes_written;
         specs.push(spec);
     }
+    let mut bytes_written = (offset - initial) as usize;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
 
     // write metadata
     let mut protocol = TCompactOutputStreamProtocol::new(writer);
-    column_chunk
+    bytes_written += column_chunk
         .write_to_out_stream_protocol(&mut protocol)
         .await?;
     protocol.flush().await?;
 
-    Ok(column_chunk)
+    Ok((column_chunk, bytes_written))
 }
 
 fn build_column_chunk(
