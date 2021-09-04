@@ -46,7 +46,7 @@ pub fn create_codec(codec: &Compression) -> Result<Option<Box<dyn Codec>>> {
         #[cfg(feature = "lz4")]
         Compression::Lz4 => Ok(Some(Box::new(Lz4Codec::new()))),
         #[cfg(feature = "zstd")]
-        Compression::Zsld => Ok(Some(Box::new(ZstdCodec::new()))),
+        Compression::Zstd => Ok(Some(Box::new(ZstdCodec::new()))),
         Compression::Uncompressed => Ok(None),
         _ => Err(general_err!("Compression {:?} is not installed", codec)),
     }
@@ -329,6 +329,6 @@ mod tests {
 
     #[test]
     fn test_codec_zstd() {
-        test_codec(Compression::Zsld);
+        test_codec(Compression::Zstd);
     }
 }
