@@ -48,7 +48,7 @@ pub enum Compression {
     Lzo,
     Brotli,
     Lz4,
-    Zsld,
+    Zstd,
 }
 
 impl TryFrom<CompressionCodec> for Compression {
@@ -62,7 +62,7 @@ impl TryFrom<CompressionCodec> for Compression {
             CompressionCodec::LZO => Compression::Lzo,
             CompressionCodec::BROTLI => Compression::Brotli,
             CompressionCodec::LZ4 => Compression::Lz4,
-            CompressionCodec::ZSTD => Compression::Zsld,
+            CompressionCodec::ZSTD => Compression::Zstd,
             _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
         })
     }
@@ -77,7 +77,7 @@ impl From<Compression> for CompressionCodec {
             Compression::Lzo => CompressionCodec::LZO,
             Compression::Brotli => CompressionCodec::BROTLI,
             Compression::Lz4 => CompressionCodec::LZ4,
-            Compression::Zsld => CompressionCodec::ZSTD,
+            Compression::Zstd => CompressionCodec::ZSTD,
         }
     }
 }
