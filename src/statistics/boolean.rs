@@ -24,6 +24,10 @@ impl Statistics for BooleanStatistics {
     fn physical_type(&self) -> &PhysicalType {
         &PhysicalType::Boolean
     }
+
+    fn null_count(&self) -> Option<i64> {
+        self.null_count
+    }
 }
 
 pub fn read(v: &ParquetStatistics) -> Result<Arc<dyn Statistics>> {

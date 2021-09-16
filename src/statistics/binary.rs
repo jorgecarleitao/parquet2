@@ -22,6 +22,10 @@ impl Statistics for BinaryStatistics {
     fn physical_type(&self) -> &PhysicalType {
         &PhysicalType::ByteArray
     }
+
+    fn null_count(&self) -> Option<i64> {
+        self.null_count
+    }
 }
 
 pub fn read(v: &ParquetStatistics, descriptor: ColumnDescriptor) -> Result<Arc<dyn Statistics>> {

@@ -25,6 +25,10 @@ impl Statistics for FixedLenStatistics {
     fn physical_type(&self) -> &PhysicalType {
         &self.physical_type
     }
+
+    fn null_count(&self) -> Option<i64> {
+        self.null_count
+    }
 }
 
 pub fn read(v: &ParquetStatistics, size: i32) -> Result<Arc<dyn Statistics>> {

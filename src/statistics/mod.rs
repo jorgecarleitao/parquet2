@@ -22,6 +22,8 @@ pub trait Statistics: Send + Sync + std::fmt::Debug {
     fn as_any(&self) -> &dyn Any;
 
     fn physical_type(&self) -> &PhysicalType;
+
+    fn null_count(&self) -> Option<i64>;
 }
 
 impl PartialEq for &dyn Statistics {
