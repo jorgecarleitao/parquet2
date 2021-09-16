@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["from_message","Parses message type as string into a Parquet `ParquetType` which, for example, could be used to extract individual columns. Returns Parquet general error when parsing or validation fails."]]});
