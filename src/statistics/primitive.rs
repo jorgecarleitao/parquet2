@@ -27,6 +27,10 @@ impl<T: types::NativeType> Statistics for PrimitiveStatistics<T> {
     fn physical_type(&self) -> &PhysicalType {
         &T::TYPE
     }
+
+    fn null_count(&self) -> Option<i64> {
+        self.null_count
+    }
 }
 
 pub fn read<T: types::NativeType>(
