@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.5.0](https://github.com/jorgecarleitao/parquet2/tree/v0.5.0) (2021-09-18)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.4.0...v0.5.0)
+
+**Breaking changes:**
+
+- Renamed `Compression::Zsld` to `Compression::Zstd` \(typo\) [\#48](https://github.com/jorgecarleitao/parquet2/pull/48) ([vincev](https://github.com/vincev))
+
+**Enhancements:**
+
+- Add `null_count` method to trait `Statistics` [\#49](https://github.com/jorgecarleitao/parquet2/pull/49) ([yjshen](https://github.com/yjshen))
+
 ## [v0.4.0](https://github.com/jorgecarleitao/parquet2/tree/v0.4.0) (2021-08-28)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.3.0...v0.4.0)
