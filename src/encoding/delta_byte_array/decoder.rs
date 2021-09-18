@@ -29,6 +29,7 @@ impl<'a> Decoder<'a> {
 impl<'a> Iterator for Decoder<'a> {
     type Item = u32;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.prefix_lengths.next().map(|x| x as u32)
     }

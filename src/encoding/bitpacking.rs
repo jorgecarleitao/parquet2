@@ -69,6 +69,7 @@ fn decode_pack(compressed: &[u8], num_bits: u8, pack: &mut [u32; BitPacker1x::BL
 }
 
 impl<'a> Decoder<'a> {
+    #[inline]
     pub fn new(compressed: &'a [u8], num_bits: u8, length: usize) -> Self {
         let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
 
@@ -93,6 +94,7 @@ impl<'a> Decoder<'a> {
 impl<'a> Iterator for Decoder<'a> {
     type Item = u32;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
             return None;
@@ -109,6 +111,7 @@ impl<'a> Iterator for Decoder<'a> {
         Some(result)
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
     }

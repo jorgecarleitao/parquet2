@@ -56,6 +56,7 @@ impl<'a> Decoder<'a> {
 impl<'a> Iterator for Decoder<'a> {
     type Item = i32;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.lengths.next();
         if let Some(result) = result {

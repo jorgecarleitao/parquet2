@@ -9,11 +9,13 @@ pub struct Decoder<'a> {
 }
 
 impl<'a> Decoder<'a> {
+    #[inline]
     pub fn new(values: &'a [u8], num_bits: u32) -> Self {
         Self { values, num_bits }
     }
 
     /// Returns the number of bits being used by this decoder.
+    #[inline]
     pub fn num_bits(&self) -> u32 {
         self.num_bits
     }
@@ -22,6 +24,7 @@ impl<'a> Decoder<'a> {
 impl<'a> Iterator for Decoder<'a> {
     type Item = HybridEncoded<'a>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.values.is_empty() {
             return None;

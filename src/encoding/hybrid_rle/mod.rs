@@ -29,6 +29,7 @@ pub struct HybridRleDecoder<'a> {
     remaining: usize,
 }
 
+#[inline]
 fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a> {
     let state = decoder.next().unwrap();
     match state {
@@ -50,6 +51,7 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
 }
 
 impl<'a> HybridRleDecoder<'a> {
+    #[inline]
     pub fn new(data: &'a [u8], num_bits: u32, num_values: usize) -> Self {
         let mut decoder = Decoder::new(data, num_bits);
         let state = read_next(&mut decoder, num_values);
@@ -64,6 +66,7 @@ impl<'a> HybridRleDecoder<'a> {
 impl<'a> Iterator for HybridRleDecoder<'a> {
     type Item = u32;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
             return None;
@@ -81,6 +84,7 @@ impl<'a> Iterator for HybridRleDecoder<'a> {
         }
     }
 
+    #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.remaining, Some(self.remaining))
     }
