@@ -105,7 +105,7 @@ fn read_buffer(
 ) -> Vec<Option<Vec<u8>>> {
     let max_def_level = def_level_encoding.1 as u32;
     match (def_level_encoding.0, max_def_level == 0) {
-        (Encoding::Rle, true) => read_buffer_impl(
+        (Encoding::Rle, true) | (Encoding::BitPacked, true) => read_buffer_impl(
             std::iter::repeat(0).take(length as usize),
             values,
             length,
