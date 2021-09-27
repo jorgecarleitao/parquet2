@@ -177,7 +177,7 @@ fn read_dict_array<T: NativeType>(
     let bit_width = values[0];
     let values = &values[1..];
 
-    let (_, consumed) = uleb128::decode(&values);
+    let (_, consumed) = uleb128::decode(values);
     let values = &values[consumed..];
 
     let indices = bitpacking::Decoder::new(values, bit_width, length as usize);

@@ -21,41 +21,41 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
     match (descriptor.type_(), descriptor.max_rep_level()) {
         (ParquetType::PrimitiveType { physical_type, .. }, 0) => match page.dictionary_page() {
             Some(_) => match physical_type {
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_dict_to_vec(
-                    &page, descriptor,
-                )?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_dict_to_vec(
-                    &page, descriptor,
-                )?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_dict_to_vec(
-                    &page, descriptor,
-                )?)),
+                PhysicalType::Int32 => {
+                    Ok(Array::Int32(primitive::page_dict_to_vec(page, descriptor)?))
+                }
+                PhysicalType::Int64 => {
+                    Ok(Array::Int64(primitive::page_dict_to_vec(page, descriptor)?))
+                }
+                PhysicalType::Int96 => {
+                    Ok(Array::Int96(primitive::page_dict_to_vec(page, descriptor)?))
+                }
                 PhysicalType::Float => Ok(Array::Float32(primitive::page_dict_to_vec(
-                    &page, descriptor,
+                    page, descriptor,
                 )?)),
                 PhysicalType::Double => Ok(Array::Float64(primitive::page_dict_to_vec(
-                    &page, descriptor,
+                    page, descriptor,
                 )?)),
                 PhysicalType::ByteArray => {
-                    Ok(Array::Binary(binary::page_dict_to_vec(&page, descriptor)?))
+                    Ok(Array::Binary(binary::page_dict_to_vec(page, descriptor)?))
                 }
                 _ => todo!(),
             },
             None => match physical_type {
                 PhysicalType::Boolean => {
-                    Ok(Array::Boolean(boolean::page_to_vec(&page, descriptor)?))
+                    Ok(Array::Boolean(boolean::page_to_vec(page, descriptor)?))
                 }
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(&page, descriptor)?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(&page, descriptor)?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(&page, descriptor)?)),
+                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page, descriptor)?)),
+                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page, descriptor)?)),
+                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page, descriptor)?)),
                 PhysicalType::Float => {
-                    Ok(Array::Float32(primitive::page_to_vec(&page, descriptor)?))
+                    Ok(Array::Float32(primitive::page_to_vec(page, descriptor)?))
                 }
                 PhysicalType::Double => {
-                    Ok(Array::Float64(primitive::page_to_vec(&page, descriptor)?))
+                    Ok(Array::Float64(primitive::page_to_vec(page, descriptor)?))
                 }
                 PhysicalType::ByteArray => {
-                    Ok(Array::Binary(binary::page_to_vec(&page, descriptor)?))
+                    Ok(Array::Binary(binary::page_to_vec(page, descriptor)?))
                 }
                 _ => todo!(),
             },
@@ -63,13 +63,13 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
         (ParquetType::PrimitiveType { physical_type, .. }, _) => match page.dictionary_page() {
             None => match physical_type {
                 PhysicalType::Int64 => {
-                    Ok(primitive_nested::page_to_array::<i64>(&page, descriptor)?)
+                    Ok(primitive_nested::page_to_array::<i64>(page, descriptor)?)
                 }
                 _ => todo!(),
             },
             Some(_) => match physical_type {
                 PhysicalType::Int64 => Ok(primitive_nested::page_dict_to_array::<i64>(
-                    &page, descriptor,
+                    page, descriptor,
                 )?),
                 _ => todo!(),
             },
@@ -83,9 +83,10 @@ pub(crate) mod tests {
     use std::fs::File;
 
     use parquet::error::Result;
-    use parquet::read::{get_page_iterator, read_metadata, Decompressor, StreamingIterator};
+    use parquet::read::{get_page_iterator, read_metadata, Decompressor};
     use parquet::statistics::{BinaryStatistics, PrimitiveStatistics, Statistics};
     use parquet::types::int96_to_i64_ns;
+    use parquet::FallibleStreamingIterator;
 
     use super::*;
     use crate::tests::*;
@@ -100,14 +101,14 @@ pub(crate) mod tests {
         let column_meta = metadata.row_groups[row_group].column(column);
         let descriptor = column_meta.descriptor().clone();
 
-        let iterator = get_page_iterator(&column_meta, reader, None, vec![])?;
+        let iterator = get_page_iterator(column_meta, reader, None, vec![])?;
 
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
         let statistics = column_meta.statistics().transpose()?;
 
-        let page = iterator.next().unwrap().as_ref().unwrap();
+        let page = iterator.next()?.unwrap();
 
         let array = page_to_array(page, &descriptor)?;
 
@@ -201,7 +202,7 @@ pub(crate) mod tests {
         ];
 
         let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-        let (array, _) = get_column(&path, 10)?;
+        let (array, _) = get_column(path, 10)?;
         if let Array::Int96(array) = array {
             let a = array
                 .into_iter()

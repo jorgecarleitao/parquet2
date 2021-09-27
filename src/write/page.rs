@@ -25,7 +25,7 @@ pub struct PageWriteSpec {
 pub fn write_page<W: Write>(
     writer: &mut W,
     offset: u64,
-    compressed_page: CompressedPage,
+    compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
     let header = match &compressed_page {
         CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),
@@ -63,7 +63,7 @@ pub fn write_page<W: Write>(
 pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
     writer: &mut W,
     offset: u64,
-    compressed_page: CompressedPage,
+    compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
     let header = match &compressed_page {
         CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),

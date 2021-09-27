@@ -7,24 +7,19 @@ mod page_stream;
 #[cfg(feature = "stream")]
 mod stream;
 
-pub use streaming_iterator;
-pub use streaming_iterator::StreamingIterator;
-
-pub use compression::{decompress, Decompressor};
-
-pub use metadata::read_metadata;
-#[cfg(feature = "stream")]
-pub use stream::read_metadata as read_metadata_async;
-
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
-use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
-use crate::{error::Result, metadata::FileMetaData};
-
+pub use compression::{decompress, Decompressor};
+pub use metadata::read_metadata;
 pub use page_iterator::{PageFilter, PageIterator};
 #[cfg(feature = "stream")]
 pub use page_stream::get_page_stream;
+#[cfg(feature = "stream")]
+pub use stream::read_metadata as read_metadata_async;
+
+use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
+use crate::{error::Result, metadata::FileMetaData};
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true
@@ -66,6 +61,8 @@ pub fn get_page_iterator<'a, RR: Read + Seek>(
 #[cfg(test)]
 mod tests {
     use std::fs::File;
+
+    use fallible_streaming_iterator::FallibleStreamingIterator;
 
     use super::*;
 
@@ -130,9 +127,9 @@ mod tests {
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
-        iterator.next().unwrap().as_ref().unwrap();
+        iterator.next()?.unwrap();
 
-        assert!(iterator.next().is_none());
+        assert!(iterator.next()?.is_none());
         let (a, b) = iterator.into_buffers();
 
         assert_eq!(a.len(), 11);

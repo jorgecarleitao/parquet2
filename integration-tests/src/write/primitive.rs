@@ -1,11 +1,11 @@
 use parquet::{
     encoding::Encoding,
     metadata::ColumnDescriptor,
-    page::{CompressedDataPage, CompressedPage, DataPageHeader, DataPageHeaderV1},
+    page::{DataPage, DataPageHeader, DataPageHeaderV1, EncodedPage},
     statistics::{serialize_statistics, PrimitiveStatistics, Statistics},
     types::NativeType,
     write::WriteOptions,
-    {compression::create_codec, encoding::hybrid_rle::encode_bool, error::Result},
+    {encoding::hybrid_rle::encode_bool, error::Result},
 };
 
 fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)> {
@@ -44,22 +44,10 @@ pub fn array_to_page_v1<T: NativeType>(
     array: &[Option<T>],
     options: &WriteOptions,
     descriptor: &ColumnDescriptor,
-) -> Result<CompressedPage> {
+) -> Result<EncodedPage> {
     let (values, mut buffer) = unzip_option(array)?;
 
     buffer.extend_from_slice(&values);
-    let uncompressed_page_size = buffer.len();
-
-    let codec = create_codec(&options.compression)?;
-    let buffer = if let Some(mut codec) = codec {
-        // todo: remove this allocation by extending `buffer` directly.
-        // needs refactoring `compress`'s API.
-        let mut tmp = vec![];
-        codec.compress(&values, &mut tmp)?;
-        tmp
-    } else {
-        buffer
-    };
 
     let statistics = if options.write_statistics {
         let statistics = &PrimitiveStatistics {
@@ -82,11 +70,9 @@ pub fn array_to_page_v1<T: NativeType>(
         statistics,
     };
 
-    Ok(CompressedPage::Data(CompressedDataPage::new(
+    Ok(EncodedPage::Data(DataPage::new(
         DataPageHeader::V1(header),
         buffer,
-        options.compression,
-        uncompressed_page_size,
         None,
         descriptor.clone(),
     )))

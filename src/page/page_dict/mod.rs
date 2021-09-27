@@ -19,7 +19,20 @@ pub trait DictPage: std::fmt::Debug + Send + Sync {
     fn physical_type(&self) -> &PhysicalType;
 }
 
-/// A compressed dictionary page.
+/// A encoded and uncompressed dictionary page.
+#[derive(Debug)]
+pub struct EncodedDictPage {
+    pub(crate) buffer: Vec<u8>,
+    pub(crate) num_values: usize,
+}
+
+impl EncodedDictPage {
+    pub fn new(buffer: Vec<u8>, num_values: usize) -> Self {
+        Self { buffer, num_values }
+    }
+}
+
+/// An encoded and compressed dictionary page.
 #[derive(Debug)]
 pub struct CompressedDictPage {
     pub(crate) buffer: Vec<u8>,
@@ -33,8 +46,7 @@ impl CompressedDictPage {
 }
 
 pub fn read_dict_page(
-    buf: &[u8],
-    num_values: u32,
+    page: &EncodedDictPage,
     compression: (Compression, usize),
     is_sorted: bool,
     physical_type: &PhysicalType,
@@ -42,16 +54,16 @@ pub fn read_dict_page(
     let decompressor = create_codec(&compression.0)?;
     if let Some(mut decompressor) = decompressor {
         let mut decompressed = vec![0; compression.1];
-        decompressor.decompress(buf, &mut decompressed)?;
-        deserialize(&decompressed, num_values, is_sorted, physical_type)
+        decompressor.decompress(&page.buffer, &mut decompressed)?;
+        deserialize(&decompressed, page.num_values, is_sorted, physical_type)
     } else {
-        deserialize(buf, num_values, is_sorted, physical_type)
+        deserialize(&page.buffer, page.num_values, is_sorted, physical_type)
     }
 }
 
 fn deserialize(
     buf: &[u8],
-    num_values: u32,
+    num_values: usize,
     is_sorted: bool,
     physical_type: &PhysicalType,
 ) -> Result<Arc<dyn DictPage>> {

@@ -1,10 +1,11 @@
 use parquet_format_async_temp::DataPageHeaderV2;
 
 use crate::compression::{create_codec, Codec};
-use crate::error::Result;
-
-use super::{PageIterator, StreamingIterator};
+use crate::error::{ParquetError, Result};
 use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
+use crate::FallibleStreamingIterator;
+
+use super::PageIterator;
 
 fn decompress_v1(compressed: &[u8], decompressor: &mut dyn Codec, buffer: &mut [u8]) -> Result<()> {
     decompressor.decompress(compressed, buffer)
@@ -108,7 +109,7 @@ fn decompress_reuse<R: std::io::Read>(
 pub struct Decompressor<'a, R: std::io::Read> {
     iter: PageIterator<'a, R>,
     buffer: Vec<u8>,
-    current: Option<Result<DataPage>>,
+    current: Option<DataPage>,
     decompressions: usize,
 }
 
@@ -123,10 +124,7 @@ impl<'a, R: std::io::Read> Decompressor<'a, R> {
     }
 
     pub fn into_buffers(mut self) -> (Vec<u8>, Vec<u8>) {
-        let mut a = self
-            .current
-            .map(|x| x.map(|x| x.buffer).unwrap_or_else(|_| Vec::new()))
-            .unwrap_or(self.iter.buffer);
+        let mut a = self.current.map(|x| x.buffer).unwrap_or(self.iter.buffer);
 
         if self.decompressions % 2 == 0 {
             std::mem::swap(&mut a, &mut self.buffer)
@@ -135,25 +133,31 @@ impl<'a, R: std::io::Read> Decompressor<'a, R> {
     }
 }
 
-impl<'a, R: std::io::Read> StreamingIterator for Decompressor<'a, R> {
-    type Item = Result<DataPage>;
+impl<'a, R: std::io::Read> FallibleStreamingIterator for Decompressor<'a, R> {
+    type Item = DataPage;
+    type Error = ParquetError;
 
-    fn advance(&mut self) {
-        if let Some(Ok(page)) = self.current.as_mut() {
+    fn advance(&mut self) -> std::result::Result<(), Self::Error> {
+        if let Some(page) = self.current.as_mut() {
             self.buffer = std::mem::take(&mut page.buffer);
         }
 
-        let next = self.iter.next().map(|x| {
-            x.and_then(|x| {
-                decompress_reuse(
-                    x,
-                    &mut self.iter,
-                    &mut self.buffer,
-                    &mut self.decompressions,
-                )
+        let next = self
+            .iter
+            .next()
+            .map(|x| {
+                x.and_then(|x| {
+                    decompress_reuse(
+                        x,
+                        &mut self.iter,
+                        &mut self.buffer,
+                        &mut self.decompressions,
+                    )
+                })
             })
-        });
+            .transpose()?;
         self.current = next;
+        Ok(())
     }
 
     fn get(&self) -> Option<&Self::Item> {

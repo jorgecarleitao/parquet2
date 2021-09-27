@@ -53,7 +53,7 @@ fn read_plain(bytes: &[u8], length: usize) -> (Vec<u8>, Vec<i32>) {
     (values, offsets)
 }
 
-pub fn read(buf: &[u8], num_values: u32) -> Result<Arc<dyn DictPage>> {
-    let (values, offsets) = read_plain(buf, num_values as usize);
+pub fn read(buf: &[u8], num_values: usize) -> Result<Arc<dyn DictPage>> {
+    let (values, offsets) = read_plain(buf, num_values);
     Ok(Arc::new(BinaryPageDict::new(values, offsets)))
 }

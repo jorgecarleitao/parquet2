@@ -1,5 +1,5 @@
 use parquet::{
-    encoding::{bitpacking, hybrid_rle::HybridRleDecoder, plain_byte_array, uleb128, Encoding},
+    encoding::{hybrid_rle::HybridRleDecoder, plain_byte_array, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
     page::{split_buffer, BinaryPageDict, DataPage},

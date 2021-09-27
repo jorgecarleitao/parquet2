@@ -1,8 +1,6 @@
 pub(crate) mod primitive;
 
-use parquet::{
-    error::Result, metadata::ColumnDescriptor, page::CompressedPage, write::WriteOptions,
-};
+use parquet::{error::Result, metadata::ColumnDescriptor, page::EncodedPage, write::WriteOptions};
 
 use super::Array;
 
@@ -10,14 +8,14 @@ pub fn array_to_page(
     array: &Array,
     options: &WriteOptions,
     descriptor: &ColumnDescriptor,
-) -> Result<CompressedPage> {
+) -> Result<EncodedPage> {
     // using plain encoding format
     match array {
-        Array::Int32(array) => primitive::array_to_page_v1(&array, options, descriptor),
-        Array::Int64(array) => primitive::array_to_page_v1(&array, options, descriptor),
-        Array::Int96(array) => primitive::array_to_page_v1(&array, options, descriptor),
-        Array::Float32(array) => primitive::array_to_page_v1(&array, options, descriptor),
-        Array::Float64(array) => primitive::array_to_page_v1(&array, options, descriptor),
+        Array::Int32(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Int64(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Int96(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Float32(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Float64(array) => primitive::array_to_page_v1(array, options, descriptor),
         _ => todo!(),
     }
 }
@@ -33,7 +31,7 @@ mod tests {
     use parquet::error::Result;
     use parquet::metadata::SchemaDescriptor;
     use parquet::statistics::Statistics;
-    use parquet::write::{write_file, DynIter, Version};
+    use parquet::write::{write_file, Compressor, DynIter, DynStreamingIterator, Version};
 
     use super::*;
 
@@ -67,9 +65,13 @@ mod tests {
 
         let a = schema.columns();
 
-        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(DynIter::new(
-            std::iter::once(array_to_page(&array, &options, &a[0])),
-        ))))));
+        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(
+            DynStreamingIterator::new(Compressor::new_from_vec(
+                DynIter::new(std::iter::once(array_to_page(&array, &options, &a[0]))),
+                options.compression,
+                vec![],
+            )),
+        )))));
 
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;
@@ -140,7 +142,7 @@ mod tests2 {
         error::Result,
         metadata::SchemaDescriptor,
         read::read_metadata,
-        write::{write_file, DynIter, Version},
+        write::{write_file, Compressor, DynIter, DynStreamingIterator, Version},
     };
 
     #[test]
@@ -163,9 +165,17 @@ mod tests2 {
 
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
 
-        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(DynIter::new(
-            std::iter::once(array_to_page_v1(&array, &options, &schema.columns()[0])),
-        ))))));
+        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(
+            DynStreamingIterator::new(Compressor::new_from_vec(
+                DynIter::new(std::iter::once(array_to_page_v1(
+                    &array,
+                    &options,
+                    &schema.columns()[0],
+                ))),
+                options.compression,
+                vec![],
+            )),
+        )))));
 
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;

@@ -28,13 +28,6 @@ impl std::fmt::Display for ParquetError {
     }
 }
 
-impl ParquetError {
-    /// Wraps an external error in an `ParquetError`.
-    pub fn from_external_error(error: impl std::error::Error + Send + Sync + 'static) -> Self {
-        Self::External("".to_string(), Arc::new(error))
-    }
-}
-
 #[cfg(feature = "snappy")]
 impl From<snap::Error> for ParquetError {
     fn from(e: snap::Error) -> ParquetError {

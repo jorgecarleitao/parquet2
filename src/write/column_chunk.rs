@@ -1,6 +1,6 @@
+use std::collections::HashSet;
 use std::convert::TryInto;
 use std::io::Write;
-use std::{collections::HashSet, error::Error};
 
 use futures::AsyncWrite;
 use parquet_format_async_temp::thrift::protocol::{
@@ -9,6 +9,7 @@ use parquet_format_async_temp::thrift::protocol::{
 use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
 
 use crate::statistics::serialize_statistics;
+use crate::FallibleStreamingIterator;
 use crate::{
     compression::Compression,
     encoding::Encoding,
@@ -20,32 +21,30 @@ use crate::{
 
 use super::page::{write_page, write_page_async, PageWriteSpec};
 use super::statistics::reduce;
+use super::DynStreamingIterator;
 
-pub fn write_column_chunk<
-    W: Write,
-    I: Iterator<Item = std::result::Result<CompressedPage, E>>,
-    E: Error + Send + Sync + 'static,
->(
+pub fn write_column_chunk<'a, W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
     compression: Compression,
-    compressed_pages: I,
-) -> Result<(ColumnChunk, u64)> {
+    mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
+) -> Result<(ColumnChunk, u64)>
+where
+    W: Write,
+    ParquetError: From<E>,
+    E: std::error::Error,
+{
     // write every page
 
     let initial = offset;
-    let specs = compressed_pages
-        .map(|compressed_page| {
-            let spec = write_page(
-                writer,
-                offset,
-                compressed_page.map_err(ParquetError::from_external_error)?,
-            )?;
-            offset += spec.bytes_written;
-            Ok(spec)
-        })
-        .collect::<Result<Vec<_>>>()?;
+
+    let mut specs = vec![];
+    while let Some(compressed_page) = compressed_pages.next()? {
+        let spec = write_page(writer, offset, compressed_page)?;
+        offset += spec.bytes_written;
+        specs.push(spec);
+    }
     let mut bytes_written = offset - initial;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
@@ -58,27 +57,23 @@ pub fn write_column_chunk<
     Ok((column_chunk, bytes_written))
 }
 
-pub async fn write_column_chunk_async<
-    W: AsyncWrite + Unpin + Send,
-    I: Iterator<Item = std::result::Result<CompressedPage, E>>,
-    E: Error + Send + Sync + 'static,
->(
+pub async fn write_column_chunk_async<W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
     compression: Compression,
-    compressed_pages: I,
-) -> Result<(ColumnChunk, usize)> {
+    mut compressed_pages: DynStreamingIterator<'_, CompressedPage, E>,
+) -> Result<(ColumnChunk, usize)>
+where
+    W: AsyncWrite + Unpin + Send,
+    ParquetError: From<E>,
+    E: std::error::Error,
+{
     let initial = offset;
     // write every page
     let mut specs = vec![];
-    for compressed_page in compressed_pages {
-        let spec = write_page_async(
-            writer,
-            offset,
-            compressed_page.map_err(ParquetError::from_external_error)?,
-        )
-        .await?;
+    while let Some(compressed_page) = compressed_pages.next()? {
+        let spec = write_page_async(writer, offset, compressed_page).await?;
         offset += spec.bytes_written;
         specs.push(spec);
     }

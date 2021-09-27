@@ -39,10 +39,10 @@ fn read_plain<T: NativeType>(values: &[u8]) -> Vec<T> {
 
 pub fn read<T: NativeType>(
     buf: &[u8],
-    num_values: u32,
+    num_values: usize,
     _is_sorted: bool,
 ) -> Result<Arc<dyn DictPage>> {
-    let typed_size = num_values as usize * std::mem::size_of::<T>();
+    let typed_size = num_values * std::mem::size_of::<T>();
     let values = read_plain::<T>(&buf[..typed_size]);
     Ok(Arc::new(PrimitivePageDict::new(values)))
 }

@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use super::utils::ValuesDef;
 
 use parquet::{
-    encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
+    encoding::{hybrid_rle::HybridRleDecoder, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
     page::{split_buffer, DataPage, PrimitivePageDict},
