@@ -18,6 +18,7 @@ pub enum HybridEncoded<'a> {
 }
 
 enum State<'a> {
+    None,
     Bitpacked(bitpacking::Decoder<'a>),
     Rle(std::iter::Take<std::iter::Repeat<u32>>),
 }
@@ -29,7 +30,12 @@ pub struct HybridRleDecoder<'a> {
     remaining: usize,
 }
 
+#[inline]
 fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a> {
+    if decoder.num_bits() == 0 {
+        return State::None;
+    };
+
     let state = decoder.next().unwrap();
     match state {
         HybridEncoded::Bitpacked(packed) => {
@@ -71,6 +77,7 @@ impl<'a> Iterator for HybridRleDecoder<'a> {
         let result = match &mut self.state {
             State::Bitpacked(decoder) => decoder.next(),
             State::Rle(iter) => iter.next(),
+            State::None => Some(0),
         };
         if let Some(result) = result {
             self.remaining -= 1;
@@ -202,5 +209,18 @@ mod tests {
         let result = decoder.collect::<Vec<_>>();
 
         assert_eq!(result, &[2]);
+    }
+
+    #[test]
+    fn zero_bit_width() {
+        let data = vec![3];
+
+        let num_bits = 0;
+
+        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 2);
+
+        let result = decoder.collect::<Vec<_>>();
+
+        assert_eq!(result, &[0, 0]);
     }
 }
