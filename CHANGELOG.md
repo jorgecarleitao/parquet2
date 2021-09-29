@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.5.1](https://github.com/jorgecarleitao/parquet2/tree/v0.5.1) (2021-09-29)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.5.0...v0.5.1)
+
+**Fixed bugs:**
+
+- Fixed error in reading zero-width bit from hybrid RLE. [\#53](https://github.com/jorgecarleitao/parquet2/pull/53) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.5.0](https://github.com/jorgecarleitao/parquet2/tree/v0.5.0) (2021-09-18)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.4.0...v0.5.0)
