@@ -14,6 +14,7 @@ impl<'a> Decoder<'a> {
     }
 
     /// Returns the number of bits being used by this decoder.
+    #[inline]
     pub fn num_bits(&self) -> u32 {
         self.num_bits
     }
