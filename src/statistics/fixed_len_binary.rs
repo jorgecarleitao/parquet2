@@ -3,13 +3,11 @@ use std::sync::Arc;
 use parquet_format_async_temp::Statistics as ParquetStatistics;
 
 use super::Statistics;
-use crate::{
-    error::{ParquetError, Result},
-    schema::types::PhysicalType,
-};
+use crate::{error::{ParquetError, Result}, metadata::ColumnDescriptor, schema::types::PhysicalType};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct FixedLenStatistics {
+    pub descriptor: ColumnDescriptor,
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
     pub max_value: Option<Vec<u8>>,
@@ -31,7 +29,7 @@ impl Statistics for FixedLenStatistics {
     }
 }
 
-pub fn read(v: &ParquetStatistics, size: i32) -> Result<Arc<dyn Statistics>> {
+pub fn read(v: &ParquetStatistics, size: i32, descriptor: ColumnDescriptor) -> Result<Arc<dyn Statistics>> {
     if let Some(ref v) = v.max_value {
         if v.len() != size as usize {
             return Err(ParquetError::OutOfSpec(
@@ -48,6 +46,7 @@ pub fn read(v: &ParquetStatistics, size: i32) -> Result<Arc<dyn Statistics>> {
     };
 
     Ok(Arc::new(FixedLenStatistics {
+        descriptor,
         null_count: v.null_count,
         distinct_count: v.distinct_count,
         max_value: v.max_value.clone().map(|mut x| {
