@@ -53,6 +53,10 @@ pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn S
             let stats = stats.iter().map(|x| x.as_any().downcast_ref().unwrap());
             Some(Arc::new(reduce_binary(stats)))
         }
+        PhysicalType::FixedLenByteArray(_) => {
+            let stats = stats.iter().map(|x| x.as_any().downcast_ref().unwrap());
+            Some(Arc::new(reduce_fix_len_binary(stats)))
+        }
         _ => todo!(),
     })
 }
@@ -82,6 +86,33 @@ fn reduce_binary<'a, I: Iterator<Item = &'a BinaryStatistics>>(mut stats: I) -> 
         acc
     })
 }
+
+fn reduce_fix_len_binary<'a, I: Iterator<Item = &'a FixedLenStatistics>>(mut stats: I) -> FixedLenStatistics {
+    let initial = stats.next().unwrap().clone();
+    stats.fold(initial, |mut acc, new| {
+        acc.min_value = match (acc.min_value, &new.min_value) {
+            (None, None) => None,
+            (Some(x), None) => Some(x),
+            (None, Some(x)) => Some(x.clone()),
+            (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), false)),
+        };
+        acc.max_value = match (acc.max_value, &new.max_value) {
+            (None, None) => None,
+            (Some(x), None) => Some(x),
+            (None, Some(x)) => Some(x.clone()),
+            (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), true)),
+        };
+        acc.null_count = match (acc.null_count, &new.null_count) {
+            (None, None) => None,
+            (Some(x), None) => Some(x),
+            (None, Some(x)) => Some(*x),
+            (Some(x), Some(y)) => Some(x + *y),
+        };
+        acc.distinct_count = None;
+        acc
+    })
+}
+
 
 fn ord_binary(a: Vec<u8>, b: Vec<u8>, max: bool) -> Vec<u8> {
     for (v1, v2) in a.iter().zip(b.iter()) {
