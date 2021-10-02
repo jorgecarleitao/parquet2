@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["write_stream",""],["write_stream_stream","Given a stream of [`RowGroupIter`] and and an `async` writer, returns a future of writing a parquet file to the writer."]],"type":[["KeyValue",""]]});
