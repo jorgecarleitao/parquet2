@@ -34,23 +34,11 @@ impl<'a> Block<'a> {
         consumed_bytes += consumed;
         values = &values[consumed..];
 
-        let mut bitwidths = &values[..num_mini_blocks];
+        let bitwidths = &values[..num_mini_blocks];
         consumed_bytes += num_mini_blocks;
         values = &values[num_mini_blocks..];
 
-        // read first bitwidth
-        let num_bits = bitwidths[0];
-        bitwidths = &bitwidths[1..];
-
-        let current_miniblock = if num_bits > 0 {
-            let length = std::cmp::min(length, values_per_mini_block);
-            consumed_bytes += ceil8(values_per_mini_block * num_bits as usize);
-            Some(bitpacking::Decoder::new(values, num_bits, length))
-        } else {
-            None
-        };
-
-        Self {
+        let mut block = Block {
             min_delta,
             num_mini_blocks,
             values_per_mini_block,
@@ -58,9 +46,34 @@ impl<'a> Block<'a> {
             remaining: length,
             values,
             current_index: 0,
-            current_miniblock,
+            current_miniblock: None,
             consumed_bytes,
-        }
+        };
+
+        // Set up first mini-block
+        block.advance_miniblock();
+
+        block
+    }
+
+    fn advance_miniblock(&mut self) {
+        let num_bits = self.bitwidths[0];
+        self.bitwidths = &self.bitwidths[1..];
+
+        self.current_miniblock = if num_bits > 0 {
+            let length = std::cmp::min(self.remaining, self.values_per_mini_block);
+
+            let miniblock_length = ceil8(self.values_per_mini_block * num_bits as usize);
+            let (miniblock, remainder) = self.values.split_at(miniblock_length);
+
+            self.values = remainder;
+            self.consumed_bytes += miniblock_length;
+
+            Some(bitpacking::Decoder::new(miniblock, num_bits, length))
+        } else {
+            None
+        };
+        self.current_index = 0;
     }
 }
 
@@ -81,16 +94,7 @@ impl<'a> Iterator for Block<'a> {
         self.remaining -= 1;
 
         if self.remaining > 0 && self.current_index == self.values_per_mini_block {
-            let num_bits = self.bitwidths[0];
-            self.bitwidths = &self.bitwidths[1..];
-            self.current_miniblock = if num_bits > 0 {
-                let length = std::cmp::min(self.remaining, self.values_per_mini_block);
-                self.consumed_bytes += ceil8(self.values_per_mini_block * num_bits as usize);
-                Some(bitpacking::Decoder::new(self.values, num_bits, length))
-            } else {
-                None
-            };
-            self.current_index = 0;
+            self.advance_miniblock();
         }
 
         Some(result as u32)
@@ -246,6 +250,52 @@ mod tests {
         let r = decoder.by_ref().collect::<Vec<_>>();
 
         assert_eq!(expected, r);
+        assert_eq!(decoder.consumed_bytes(), data.len() - 3);
+    }
+
+    #[test]
+    fn multiple_miniblocks() {
+        #[rustfmt::skip]
+        let data = &[
+            // Header: [128, 1, 4, 65, 100]
+            128, 1, // block size <=u> 128
+            4,      // number of mini-blocks <=u> 4
+            65,     // number of elements <=u> 65
+            100,    // first_value <=z> 50
+
+            // Block 1 header: [7, 3, 4, 0, 0]
+            7,          // min_delta <=z> -4
+            3, 4, 0, 0, // bit_widths [3, 4, 0, 0]
+
+            // 32 3-bit values of 0 for mini-block 1 (12 bytes)
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+
+            // 32 4-bit values of 8 for mini-block 2 (16 bytes)
+            0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88, 0x88,
+            0x88, 0x88,
+
+            // these should not be consumed
+            1, 2, 3,
+        ];
+
+        #[rustfmt::skip]
+        let expected = [
+            // First value
+            50,
+
+            // Mini-block 1: 32 deltas of -4
+            46, 42, 38, 34, 30, 26, 22, 18, 14, 10, 6, 2, -2, -6, -10, -14, -18, -22, -26, -30, -34,
+            -38, -42, -46, -50, -54, -58, -62, -66, -70, -74, -78,
+
+            // Mini-block 2: 32 deltas of 4
+            -74, -70, -66, -62, -58, -54, -50, -46, -42, -38, -34, -30, -26, -22, -18, -14, -10, -6,
+            -2, 2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50,
+        ];
+
+        let mut decoder = Decoder::new(data);
+        let r = decoder.by_ref().collect::<Vec<_>>();
+
+        assert_eq!(&expected[..], &r[..]);
         assert_eq!(decoder.consumed_bytes(), data.len() - 3);
     }
 }
