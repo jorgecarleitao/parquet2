@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.5.2](https://github.com/jorgecarleitao/parquet2/tree/v0.5.2) (2021-10-06)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.5.1...v0.5.2)
+
+**Fixed bugs:**
+
+- Fixed delta-bitpacked mini-block decoding [\#56](https://github.com/jorgecarleitao/parquet2/pull/56) ([kornholi](https://github.com/kornholi))
+- Add descriptor to `FixedLenStatistics` [\#54](https://github.com/jorgecarleitao/parquet2/pull/54) ([potter420](https://github.com/potter420))
+
+**Enhancements:**
+
+- Added writing reduced statistics for `FixedLenByteArray` [\#55](https://github.com/jorgecarleitao/parquet2/pull/55) ([potter420](https://github.com/potter420))
+
 ## [v0.5.1](https://github.com/jorgecarleitao/parquet2/tree/v0.5.1) (2021-09-29)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.5.0...v0.5.1)

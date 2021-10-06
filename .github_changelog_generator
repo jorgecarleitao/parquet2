@@ -1,5 +1,5 @@
-since-tag=v0.5.0
-future-release=v0.5.1
+since-tag=v0.5.1
+future-release=v0.5.2
 pr-wo-labels=false
 add-sections={"features":{"prefix":"**Enhancements:**","labels":["enhancement"]}, "documentation":{"prefix":"**Documentation updates:**","labels":["documentation"]}, "testing":{"prefix":"**Testing updates:**","labels":["testing"]}}
 enhancement-label=**New features:**
