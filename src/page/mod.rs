@@ -138,6 +138,12 @@ impl DataPage {
         &self.buffer
     }
 
+    /// Returns a mutable reference to the internal buffer.
+    /// Useful to recover the buffer after the page has been decoded.
+    pub fn buffer_mut(&mut self) -> &mut Vec<u8> {
+        &mut self.buffer
+    }
+
     pub fn num_values(&self) -> usize {
         self.header.num_values()
     }
