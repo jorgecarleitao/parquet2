@@ -1,0 +1,1 @@
+initSidebarItems({"mod":[["compression",""],["encoding",""],["error","Unofficial implementation of parquet IO in Rust."],["metadata",""],["page",""],["read",""],["schema",""],["statistics",""],["types",""],["write",""]]});
