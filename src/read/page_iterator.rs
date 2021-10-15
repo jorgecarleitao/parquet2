@@ -12,7 +12,7 @@ use crate::page::{
 };
 
 /// Type declaration for a page filter
-pub type PageFilter = Arc<dyn Fn(&ColumnDescriptor, &DataPageHeader) -> bool>;
+pub type PageFilter = Arc<dyn Fn(&ColumnDescriptor, &DataPageHeader) -> bool + Send + Sync>;
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
