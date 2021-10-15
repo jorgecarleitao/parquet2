@@ -1,8 +1,10 @@
 use parquet_format_async_temp::DataPageHeaderV2;
+use streaming_decompression;
 
 use crate::compression::{create_codec, Codec};
 use crate::error::{ParquetError, Result};
 use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
+use crate::parquet_bridge::Compression;
 use crate::FallibleStreamingIterator;
 
 use super::PageIterator;
@@ -137,7 +139,7 @@ impl<'a, R: std::io::Read> FallibleStreamingIterator for Decompressor<'a, R> {
     type Item = DataPage;
     type Error = ParquetError;
 
-    fn advance(&mut self) -> std::result::Result<(), Self::Error> {
+    fn advance(&mut self) -> Result<()> {
         if let Some(page) = self.current.as_mut() {
             self.buffer = std::mem::take(&mut page.buffer);
         }
@@ -162,5 +164,69 @@ impl<'a, R: std::io::Read> FallibleStreamingIterator for Decompressor<'a, R> {
 
     fn get(&self) -> Option<&Self::Item> {
         self.current.as_ref()
+    }
+}
+
+type _Decompressor<I> = streaming_decompression::Decompressor<
+    CompressedDataPage,
+    DataPage,
+    fn(CompressedDataPage, &mut Vec<u8>) -> Result<DataPage>,
+    ParquetError,
+    I,
+>;
+
+impl streaming_decompression::Compressed for CompressedDataPage {
+    #[inline]
+    fn is_compressed(&self) -> bool {
+        self.compression() != Compression::Uncompressed
+    }
+}
+
+impl streaming_decompression::Decompressed for DataPage {
+    #[inline]
+    fn buffer_mut(&mut self) -> &mut Vec<u8> {
+        self.buffer_mut()
+    }
+}
+
+/// A [`FallibleStreamingIterator`] that decompresses [`CompressedDataPage`] into [`DataPage`].
+/// # Implementation
+/// This decompressor uses an internal [`Vec<u8>`] to perform decompressions which
+/// is re-used across pages, so that a single allocation is required.
+/// If the pages are not compressed, the internal buffer is not used.
+pub struct BasicDecompressor<I: Iterator<Item = Result<CompressedDataPage>>> {
+    iter: _Decompressor<I>,
+}
+
+impl<I> BasicDecompressor<I>
+where
+    I: Iterator<Item = Result<CompressedDataPage>>,
+{
+    /// Returns a new [`BasicDecompressor`].
+    pub fn new(iter: I, buffer: Vec<u8>) -> Self {
+        Self {
+            iter: _Decompressor::new(iter, buffer, decompress),
+        }
+    }
+
+    /// Returns its internal buffer, consuming itself.
+    pub fn into_inner(self) -> Vec<u8> {
+        self.iter.into_inner()
+    }
+}
+
+impl<I> FallibleStreamingIterator for BasicDecompressor<I>
+where
+    I: Iterator<Item = Result<CompressedDataPage>>,
+{
+    type Item = DataPage;
+    type Error = ParquetError;
+
+    fn advance(&mut self) -> Result<()> {
+        self.iter.advance()
+    }
+
+    fn get(&self) -> Option<&Self::Item> {
+        self.iter.get()
     }
 }

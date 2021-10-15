@@ -10,7 +10,7 @@ mod stream;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
-pub use compression::{decompress, Decompressor};
+pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::read_metadata;
 pub use page_iterator::{PageFilter, PageIterator};
 #[cfg(feature = "stream")]
@@ -62,7 +62,7 @@ pub fn get_page_iterator<'a, RR: Read + Seek>(
 mod tests {
     use std::fs::File;
 
-    use fallible_streaming_iterator::FallibleStreamingIterator;
+    use crate::FallibleStreamingIterator;
 
     use super::*;
 
