@@ -71,6 +71,10 @@ impl<'a, R: Read> PageIterator<'a, R> {
     pub fn reuse_buffer(&mut self, buffer: Vec<u8>) {
         self.buffer = buffer;
     }
+
+    pub fn into_buffer(self) -> Vec<u8> {
+        self.buffer
+    }
 }
 
 impl<'a, R: Read> Iterator for PageIterator<'a, R> {
@@ -129,6 +133,7 @@ fn build_page<R: Read>(
 
     let read_size = page_header.compressed_page_size as usize;
     if read_size > 0 {
+        buffer.clear();
         buffer.resize(read_size, 0);
         reader.reader.read_exact(buffer)?;
     }

@@ -40,9 +40,9 @@ fn decompress_v2(
     Ok(())
 }
 
-/// decompresses a page.
-/// If `page.buffer.len() == 0`, there was no decompression and the buffer was moved.
-/// Else, decompression took place.
+/// decompresses a [`CompressedDataPage`] into `buffer`.
+/// If the page is un-compressed, `buffer` is swapped instead.
+/// Returns whether the page was decompressed.
 pub fn decompress_buffer(
     compressed_page: &mut CompressedDataPage,
     buffer: &mut Vec<u8>,
@@ -50,8 +50,10 @@ pub fn decompress_buffer(
     let codec = create_codec(&compressed_page.compression())?;
 
     if let Some(mut codec) = codec {
-        // the buffer must be decompressed; do it so now, writing the decompressed data into `buffer`
         let compressed_buffer = &compressed_page.buffer;
+
+        // prepare the compression buffer
+        buffer.clear();
         buffer.resize(compressed_page.uncompressed_size(), 0);
         match compressed_page.header() {
             DataPageHeader::V1(_) => decompress_v1(compressed_buffer, codec.as_mut(), buffer)?,
@@ -88,8 +90,7 @@ fn decompress_reuse<R: std::io::Read>(
     mut compressed_page: CompressedDataPage,
     iterator: &mut PageIterator<R>,
     buffer: &mut Vec<u8>,
-    decompressions: &mut usize,
-) -> Result<DataPage> {
+) -> Result<(DataPage, bool)> {
     let was_decompressed = decompress_buffer(&mut compressed_page, buffer)?;
 
     let new_page = DataPage::new(
@@ -100,38 +101,60 @@ fn decompress_reuse<R: std::io::Read>(
     );
 
     if was_decompressed {
-        *decompressions += 1;
-    } else {
         iterator.reuse_buffer(compressed_page.buffer)
-    }
-    Ok(new_page)
+    };
+    Ok((new_page, was_decompressed))
 }
 
-/// Decompressor that allows re-using the page buffer of [`PageIterator`]
+/// Decompressor that allows re-using the page buffer of [`PageIterator`].
+/// # Implementation
+/// The implementation depends on whether a page is compressed or not.
+/// > `PageIterator(a)`, `CompressedPage(b)`, `Decompressor(c)`, `DecompressedPage(d)`
+/// ### un-compressed pages:
+/// > page iter: `a` is swapped with `b`
+/// > decompress iter: `b` is swapped with `d`, `b` is swapped with `a`
+/// therefore:
+/// * `PageIterator` has its buffer back
+/// * `Decompressor`'s buffer is un-used
+/// * `DecompressedPage` has the same data as `CompressedPage` had
+/// ### compressed pages:
+/// > page iter: `a` is swapped with `b`
+/// > decompress iter:
+/// > * `b` is decompressed into `c`
+/// > * `b` is swapped with `a`
+/// > * `c` is moved to `d`
+/// > * (next iteration): `d` is moved to `c`
+/// therefore, while the page is available:
+/// * `PageIterator` has its buffer back
+/// * `Decompressor`'s buffer empty
+/// * `DecompressedPage` has the decompressed buffer
+/// after the page is used:
+/// * `PageIterator` has its buffer back
+/// * `Decompressor` has its buffer back
+/// * `DecompressedPage` has an empty buffer
 pub struct Decompressor<'a, R: std::io::Read> {
     iter: PageIterator<'a, R>,
     buffer: Vec<u8>,
     current: Option<DataPage>,
-    decompressions: usize,
+    was_decompressed: bool,
 }
 
 impl<'a, R: std::io::Read> Decompressor<'a, R> {
+    /// Creates a new [`Decompressor`].
     pub fn new(iter: PageIterator<'a, R>, buffer: Vec<u8>) -> Self {
         Self {
             iter,
             buffer,
             current: None,
-            decompressions: 0,
+            was_decompressed: false,
         }
     }
 
-    pub fn into_buffers(mut self) -> (Vec<u8>, Vec<u8>) {
-        let mut a = self.current.map(|x| x.buffer).unwrap_or(self.iter.buffer);
-
-        if self.decompressions % 2 == 0 {
-            std::mem::swap(&mut a, &mut self.buffer)
-        };
-        (a, self.buffer)
+    /// Returns two buffers: the first buffer corresponds to the page buffer,
+    /// the second to the decompression buffer.
+    pub fn into_buffers(self) -> (Vec<u8>, Vec<u8>) {
+        let page_buffer = self.iter.into_buffer();
+        (page_buffer, self.buffer)
     }
 }
 
@@ -141,7 +164,11 @@ impl<'a, R: std::io::Read> FallibleStreamingIterator for Decompressor<'a, R> {
 
     fn advance(&mut self) -> Result<()> {
         if let Some(page) = self.current.as_mut() {
-            self.buffer = std::mem::take(&mut page.buffer);
+            if self.was_decompressed {
+                self.buffer = std::mem::take(&mut page.buffer);
+            } else {
+                self.iter.reuse_buffer(std::mem::take(&mut page.buffer));
+            }
         }
 
         let next = self
@@ -149,12 +176,10 @@ impl<'a, R: std::io::Read> FallibleStreamingIterator for Decompressor<'a, R> {
             .next()
             .map(|x| {
                 x.and_then(|x| {
-                    decompress_reuse(
-                        x,
-                        &mut self.iter,
-                        &mut self.buffer,
-                        &mut self.decompressions,
-                    )
+                    let (page, was_decompressed) =
+                        decompress_reuse(x, &mut self.iter, &mut self.buffer)?;
+                    self.was_decompressed = was_decompressed;
+                    Ok(page)
                 })
             })
             .transpose()?;

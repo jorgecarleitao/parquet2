@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn reuse_buffer() -> Result<()> {
         let mut testdata = get_path();
-        testdata.push("alltypes_plain.parquet");
+        testdata.push("alltypes_plain.snappy.parquet");
         let mut file = File::open(testdata).unwrap();
 
         let metadata = read_metadata(&mut file)?;
@@ -99,13 +99,17 @@ mod tests {
         let column = 0;
         let column_metadata = metadata.row_groups[row_group].column(column);
         let buffer = vec![0];
-        let mut iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
+        let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
-        let page = iterator.next().unwrap().unwrap();
-        iterator.reuse_buffer(page.buffer);
+        let buffer = vec![];
+        let mut iterator = Decompressor::new(iterator, buffer);
 
-        assert!(iterator.next().is_none());
-        assert!(!iterator.buffer.is_empty());
+        let _ = iterator.next()?.unwrap();
+
+        assert!(iterator.next()?.is_none());
+        let (a, b) = iterator.into_buffers();
+        assert_eq!(a.len(), 11); // note: compressed is higher in this example.
+        assert_eq!(b.len(), 9);
 
         Ok(())
     }
