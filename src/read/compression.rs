@@ -1,22 +1,21 @@
 use parquet_format_async_temp::DataPageHeaderV2;
 use streaming_decompression;
 
-use crate::compression::{create_codec, Codec};
+use crate::compression::{self, Compression};
 use crate::error::{ParquetError, Result};
 use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
-use crate::parquet_bridge::Compression;
 use crate::FallibleStreamingIterator;
 
 use super::PageIterator;
 
-fn decompress_v1(compressed: &[u8], decompressor: &mut dyn Codec, buffer: &mut [u8]) -> Result<()> {
-    decompressor.decompress(compressed, buffer)
+fn decompress_v1(compressed: &[u8], compression: Compression, buffer: &mut [u8]) -> Result<()> {
+    compression::decompress(compression, compressed, buffer)
 }
 
 fn decompress_v2(
     compressed: &[u8],
     page_header: &DataPageHeaderV2,
-    decompressor: &mut dyn Codec,
+    compression: Compression,
     buffer: &mut [u8],
 ) -> Result<()> {
     // When processing data page v2, depending on enabled compression for the
@@ -33,7 +32,7 @@ fn decompress_v2(
     if can_decompress {
         (&mut buffer[..offset]).copy_from_slice(&compressed[..offset]);
 
-        decompressor.decompress(&compressed[offset..], &mut buffer[offset..])?;
+        compression::decompress(compression, &compressed[offset..], &mut buffer[offset..])?;
     } else {
         buffer.copy_from_slice(compressed);
     }
@@ -47,19 +46,22 @@ pub fn decompress_buffer(
     compressed_page: &mut CompressedDataPage,
     buffer: &mut Vec<u8>,
 ) -> Result<bool> {
-    let codec = create_codec(&compressed_page.compression())?;
-
-    if let Some(mut codec) = codec {
+    if compressed_page.compression() != Compression::Uncompressed {
         let compressed_buffer = &compressed_page.buffer;
 
         // prepare the compression buffer
         buffer.clear();
         buffer.resize(compressed_page.uncompressed_size(), 0);
         match compressed_page.header() {
-            DataPageHeader::V1(_) => decompress_v1(compressed_buffer, codec.as_mut(), buffer)?,
-            DataPageHeader::V2(header) => {
-                decompress_v2(compressed_buffer, header, codec.as_mut(), buffer)?
+            DataPageHeader::V1(_) => {
+                decompress_v1(compressed_buffer, compressed_page.compression(), buffer)?
             }
+            DataPageHeader::V2(header) => decompress_v2(
+                compressed_buffer,
+                header,
+                compressed_page.compression(),
+                buffer,
+            )?,
         }
         Ok(true)
     } else {

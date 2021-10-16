@@ -8,7 +8,7 @@ pub use primitive::PrimitivePageDict;
 
 use std::{any::Any, sync::Arc};
 
-use crate::compression::{create_codec, Compression};
+use crate::compression::{decompress, Compression};
 use crate::error::{ParquetError, Result};
 use crate::schema::types::PhysicalType;
 
@@ -51,10 +51,9 @@ pub fn read_dict_page(
     is_sorted: bool,
     physical_type: &PhysicalType,
 ) -> Result<Arc<dyn DictPage>> {
-    let decompressor = create_codec(&compression.0)?;
-    if let Some(mut decompressor) = decompressor {
+    if compression.0 != Compression::Uncompressed {
         let mut decompressed = vec![0; compression.1];
-        decompressor.decompress(&page.buffer, &mut decompressed)?;
+        decompress(compression.0, &page.buffer, &mut decompressed)?;
         deserialize(&decompressed, page.num_values, is_sorted, physical_type)
     } else {
         deserialize(&page.buffer, page.num_values, is_sorted, physical_type)
