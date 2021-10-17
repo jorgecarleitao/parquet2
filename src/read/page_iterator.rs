@@ -8,7 +8,8 @@ use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
 
 use crate::page::{
-    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, PageType, ParquetPageHeader,
+    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
+    ParquetPageHeader,
 };
 
 /// Type declaration for a page filter
@@ -70,6 +71,10 @@ impl<'a, R: Read> PageIterator<'a, R> {
     pub fn reuse_buffer(&mut self, buffer: Vec<u8>) {
         self.buffer = buffer;
     }
+
+    pub fn into_buffer(self) -> Vec<u8> {
+        self.buffer
+    }
 }
 
 impl<'a, R: Read> Iterator for PageIterator<'a, R> {
@@ -128,6 +133,7 @@ fn build_page<R: Read>(
 
     let read_size = page_header.compressed_page_size as usize;
     if read_size > 0 {
+        buffer.clear();
         buffer.resize(read_size, 0);
         reader.reader.read_exact(buffer)?;
     }
@@ -169,13 +175,18 @@ pub(super) fn finish_page(
             let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
+            // move the buffer to `dict_page`
+            let mut dict_page =
+                EncodedDictPage::new(std::mem::take(buffer), dict_header.num_values as usize);
+
             let page = read_dict_page(
-                buffer,
-                dict_header.num_values as u32,
+                &dict_page,
                 (compression, page_header.uncompressed_page_size as usize),
                 is_sorted,
                 descriptor.physical_type(),
             )?;
+            // take the buffer out of the `dict_page` to re-use it
+            std::mem::swap(&mut dict_page.buffer, buffer);
 
             Ok(FinishedPage::Dict(page))
         }

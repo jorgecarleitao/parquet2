@@ -1,4 +1,4 @@
-use std::{error::Error, io::Write};
+use std::io::Write;
 
 use futures::{pin_mut, stream::Stream, AsyncWrite, AsyncWriteExt, StreamExt};
 
@@ -54,7 +54,8 @@ pub async fn write_stream_stream<'a, W, S, E>(
 where
     W: AsyncWrite + Unpin + Send,
     S: Stream<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
-    E: Error + Send + Sync + 'static,
+    ParquetError: From<E>,
+    E: std::error::Error,
 {
     let mut offset = start_file(writer).await?;
 
@@ -67,7 +68,7 @@ where
             offset,
             schema.columns(),
             options.compression,
-            row_group.map_err(ParquetError::from_external_error)?,
+            row_group?,
         )
         .await?;
         offset += size;

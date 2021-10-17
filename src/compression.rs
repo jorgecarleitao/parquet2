@@ -274,33 +274,25 @@ mod tests {
 
     fn test_roundtrip(c: Compression, data: &[u8]) {
         let mut c1 = create_codec(&c).unwrap().unwrap();
-        let mut c2 = create_codec(&c).unwrap().unwrap();
 
-        // Compress with c1
-        let mut compressed = Vec::new();
+        let offset = 2;
+
+        // Compress to a buffer that already has data is possible
+        let mut compressed = vec![2; offset];
         c1.compress(data, &mut compressed)
             .expect("Error when compressing");
 
-        // Decompress with c2
+        // data is compressed...
+        assert!(compressed.len() - 2 < data.len());
+
         let mut decompressed = vec![0; data.len()];
-        c2.decompress(compressed.as_slice(), &mut decompressed)
-            .expect("Error when decompressing");
-        assert_eq!(data, decompressed.as_slice());
-
-        compressed.clear();
-
-        // Compress with c2
-        c2.compress(data, &mut compressed)
-            .expect("Error when compressing");
-
-        // Decompress with c1
-        c1.decompress(compressed.as_slice(), &mut decompressed)
+        c1.decompress(&compressed[offset..], &mut decompressed)
             .expect("Error when decompressing");
         assert_eq!(data, decompressed.as_slice());
     }
 
     fn test_codec(c: Compression) {
-        let sizes = vec![100, 10000, 100000];
+        let sizes = vec![10000, 100000];
         for size in sizes {
             let data = (0..size).map(|x| (x % 255) as u8).collect::<Vec<_>>();
             test_roundtrip(c, &data);

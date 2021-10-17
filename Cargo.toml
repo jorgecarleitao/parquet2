@@ -14,7 +14,7 @@ bench = false
 [dependencies]
 parquet-format-async-temp = "0.2.0"
 bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
-streaming-iterator = "0.1.5"
+streaming-decompression = "0.1"
 
 async-stream = { version = "0.3.2", optional = true }
 futures = { version = "0.3", optional = true }

@@ -1,4 +1,4 @@
-use std::{error::Error, io::Write};
+use std::io::Write;
 
 use futures::AsyncWrite;
 use parquet_format_async_temp::RowGroup;
@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     column_chunk::{write_column_chunk, write_column_chunk_async},
-    DynIter,
+    DynIter, DynStreamingIterator,
 };
 
 fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
@@ -28,6 +28,7 @@ fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
 }
 
 pub fn write_row_group<
+    'a,
     W,
     E, // external error any of the iterators may emit
 >(
@@ -35,24 +36,20 @@ pub fn write_row_group<
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
     compression: Compression,
-    columns: DynIter<std::result::Result<DynIter<std::result::Result<CompressedPage, E>>, E>>,
+    columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
 ) -> Result<(RowGroup, u64)>
 where
     W: Write,
-    E: Error + Send + Sync + 'static,
+    ParquetError: From<E>,
+    E: std::error::Error,
 {
     let column_iter = descriptors.iter().zip(columns);
 
     let initial = offset;
     let columns = column_iter
         .map(|(descriptor, page_iter)| {
-            let (column, size) = write_column_chunk(
-                writer,
-                offset,
-                descriptor,
-                compression,
-                page_iter.map_err(ParquetError::from_external_error)?,
-            )?;
+            let (column, size) =
+                write_column_chunk(writer, offset, descriptor, compression, page_iter?)?;
             offset += size;
             Ok(column)
         })
@@ -98,28 +95,20 @@ pub async fn write_row_group_async<
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
     compression: Compression,
-    columns: DynIter<
-        'a,
-        std::result::Result<DynIter<'a, std::result::Result<CompressedPage, E>>, E>,
-    >,
+    columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
 ) -> Result<(RowGroup, u64)>
 where
     W: AsyncWrite + Unpin + Send,
-    E: Error + Send + Sync + 'static,
+    ParquetError: From<E>,
+    E: std::error::Error,
 {
     let column_iter = descriptors.iter().zip(columns);
 
     let initial = offset;
     let mut columns = vec![];
     for (descriptor, page_iter) in column_iter {
-        let (spec, size) = write_column_chunk_async(
-            writer,
-            offset,
-            descriptor,
-            compression,
-            page_iter.map_err(ParquetError::from_external_error)?,
-        )
-        .await?;
+        let (spec, size) =
+            write_column_chunk_async(writer, offset, descriptor, compression, page_iter?).await?;
         offset += size as u64;
         columns.push(spec);
     }

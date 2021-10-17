@@ -1,4 +1,4 @@
-use std::{error::Error, io::Write};
+use std::io::Write;
 
 use parquet_format_async_temp::FileMetaData;
 
@@ -48,7 +48,8 @@ pub fn write_file<'a, W, I, E>(
 where
     W: Write,
     I: Iterator<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
-    E: Error + Send + Sync + 'static,
+    ParquetError: From<E>,
+    E: std::error::Error,
 {
     let mut offset = start_file(writer)? as u64;
 
@@ -59,7 +60,7 @@ where
                 offset,
                 schema.columns(),
                 options.compression,
-                row_group.map_err(ParquetError::from_external_error)?,
+                row_group?,
             )?;
             offset += size;
             Ok(group)

@@ -14,6 +14,9 @@ pub mod statistics;
 pub mod types;
 pub mod write;
 
+pub use streaming_decompression::fallible_streaming_iterator;
+pub use streaming_decompression::FallibleStreamingIterator;
+
 const FOOTER_SIZE: u64 = 8;
 const PARQUET_MAGIC: [u8; 4] = [b'P', b'A', b'R', b'1'];
 
