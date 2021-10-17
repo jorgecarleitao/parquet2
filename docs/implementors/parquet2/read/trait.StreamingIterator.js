@@ -1,3 +1,0 @@
-(function() {var implementors = {};
-implementors["parquet2"] = [{"text":"impl&lt;'a, R:&nbsp;<a class=\"trait\" href=\"https://doc.rust-lang.org/1.55.0/std/io/trait.Read.html\" title=\"trait std::io::Read\">Read</a>&gt; <a class=\"trait\" href=\"parquet2/read/trait.StreamingIterator.html\" title=\"trait parquet2::read::StreamingIterator\">StreamingIterator</a> for <a class=\"struct\" href=\"parquet2/read/struct.Decompressor.html\" title=\"struct parquet2::read::Decompressor\">Decompressor</a>&lt;'a, R&gt;","synthetic":false,"types":["parquet2::read::compression::Decompressor"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
