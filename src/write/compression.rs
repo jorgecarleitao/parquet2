@@ -3,7 +3,7 @@ use crate::page::{CompressedDictPage, CompressedPage, DataPageHeader, EncodedDic
 use crate::parquet_bridge::Compression;
 use crate::FallibleStreamingIterator;
 use crate::{
-    compression::create_codec,
+    compression,
     page::{CompressedDataPage, DataPage, EncodedPage},
 };
 
@@ -20,18 +20,21 @@ fn compress_data(
         descriptor,
     } = page;
     let uncompressed_page_size = buffer.len();
-    let codec = create_codec(&compression)?;
-    if let Some(mut codec) = codec {
+    if compression != Compression::Uncompressed {
         match &header {
             DataPageHeader::V1(_) => {
-                codec.compress(&buffer, &mut compressed_buffer)?;
+                compression::compress(compression, &buffer, &mut compressed_buffer)?;
             }
             DataPageHeader::V2(header) => {
                 let levels_byte_length = (header.repetition_levels_byte_length
                     + header.definition_levels_byte_length)
                     as usize;
                 compressed_buffer.extend_from_slice(&buffer[..levels_byte_length]);
-                codec.compress(&buffer[levels_byte_length..], &mut compressed_buffer)?;
+                compression::compress(
+                    compression,
+                    &buffer[levels_byte_length..],
+                    &mut compressed_buffer,
+                )?;
             }
         };
     } else {
@@ -56,9 +59,8 @@ fn compress_dict(
         mut buffer,
         num_values,
     } = page;
-    let codec = create_codec(&compression)?;
-    if let Some(mut codec) = codec {
-        codec.compress(&buffer, &mut compressed_buffer)?;
+    if compression != Compression::Uncompressed {
+        compression::compress(compression, &buffer, &mut compressed_buffer)?;
     } else {
         std::mem::swap(&mut buffer, &mut compressed_buffer);
     }
