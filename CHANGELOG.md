@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.6.0](https://github.com/jorgecarleitao/parquet2/tree/v0.6.0) (2021-10-18)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.5.0...v0.6.0)
+
+**Breaking changes:**
+
+- Improved performance of codec initialization [\#63](https://github.com/jorgecarleitao/parquet2/pull/63) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Made `PageFilter` `Send` [\#62](https://github.com/jorgecarleitao/parquet2/pull/62) ([dantengsky](https://github.com/dantengsky))
+- Alowed reusing compression buffer [\#60](https://github.com/jorgecarleitao/parquet2/pull/60) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fixed delta-bitpacked mini-block decoding [\#56](https://github.com/jorgecarleitao/parquet2/pull/56) ([kornholi](https://github.com/kornholi))
+- Add descriptor to `FixedLenStatistics` [\#54](https://github.com/jorgecarleitao/parquet2/pull/54) ([potter420](https://github.com/potter420))
+- Fixed error in reading zero-width bit from hybrid RLE. [\#53](https://github.com/jorgecarleitao/parquet2/pull/53) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Added writing reduced statistics for `FixedLenByteArray` [\#55](https://github.com/jorgecarleitao/parquet2/pull/55) ([potter420](https://github.com/potter420))
+
 ## [v0.5.2](https://github.com/jorgecarleitao/parquet2/tree/v0.5.2) (2021-10-06)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.5.1...v0.5.2)
