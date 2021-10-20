@@ -278,26 +278,20 @@ pub(crate) mod tests {
 
         let (array, statistics) = get_column(&path, column)?;
 
-        let expected = if file == "basic" {
-            if required {
-                pyarrow_required(column)
-            } else {
-                pyarrow_optional(column)
-            }
-        } else {
-            pyarrow_nested_optional(column)
+        let expected = match (file, required) {
+            ("basic", true) => pyarrow_required(column),
+            ("basic", false) => pyarrow_optional(column),
+            ("nested", false) => pyarrow_nested_optional(column),
+            _ => todo!(),
         };
 
         assert_eq!(expected, array);
 
-        let expected_stats = if file == "basic" {
-            if required {
-                pyarrow_required_stats(column)
-            } else {
-                pyarrow_optional_stats(column)
-            }
-        } else {
-            (Some(1), Value::Int64(Some(0)), Value::Int64(Some(10)))
+        let expected_stats = match (file, required) {
+            ("basic", true) => pyarrow_required_stats(column),
+            ("basic", false) => pyarrow_optional_stats(column),
+            ("nested", false) => (Some(1), Value::Int64(Some(0)), Value::Int64(Some(10))),
+            _ => todo!(),
         };
 
         assert_eq_stats(expected_stats, statistics.unwrap().as_ref());
@@ -378,5 +372,10 @@ pub(crate) mod tests {
     #[test]
     fn pyarrow_v1_non_dict_list_optional() -> Result<()> {
         test_pyarrow_integration("nested", 0, 1, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_struct_optional() -> Result<()> {
+        test_pyarrow_integration("struct", 0, 1, false, false, false)
     }
 }

@@ -16,6 +16,7 @@ pub enum Array {
     Boolean(Vec<Option<bool>>),
     Binary(Vec<Option<Vec<u8>>>),
     List(Vec<Option<Array>>),
+    Struct(Vec<Array>, Vec<bool>),
 }
 
 // The dynamic representation of values in native Rust. This is not exaustive.
