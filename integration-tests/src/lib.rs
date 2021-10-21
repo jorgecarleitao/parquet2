@@ -409,4 +409,26 @@ mod tests {
             _ => unreachable!(),
         }
     }
+
+    // these values match the values in `integration`
+    pub fn pyarrow_struct_optional(column: usize) -> Array {
+        //    [[0, 1], None, [2, None, 3], [4, 5, 6], [], [7, 8, 9], None, [10]]
+        // def: 3, 3,  0,     3, 2,    3,   3, 3, 3,  1    3  3  3   0      3
+        // rep: 0, 1,  0,     0, 1,    1,   0, 1, 1,  0,   0, 1, 1,  0,     0
+        let data = vec![
+            Some(Array::Int64(vec![Some(0), Some(1)])),
+            None,
+            Some(Array::Int64(vec![Some(2), None, Some(3)])),
+            Some(Array::Int64(vec![Some(4), Some(5), Some(6)])),
+            Some(Array::Int64(vec![])),
+            Some(Array::Int64(vec![Some(7), Some(8), Some(9)])),
+            None,
+            Some(Array::Int64(vec![Some(10)])),
+        ];
+
+        match column {
+            0 => Array::List(data),
+            _ => unreachable!(),
+        }
+    }
 }

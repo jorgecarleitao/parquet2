@@ -1,7 +1,6 @@
 import pyarrow as pa
 import pyarrow.parquet
 import os
-import shutil
 
 PYARROW_PATH = "fixtures/pyarrow3"
 
@@ -81,6 +80,33 @@ def case_nested(size):
     )
 
 
+def case_struct(size):
+    string = ["Hello", None, "aa", "", None, "abc", None, None, "def", "aaa"]
+    boolean = [True, None, False, False, None, True, None, None, True, True]
+    struct_fields = [
+        ("f1", pa.utf8()),
+        ("f2", pa.bool_()),
+    ]
+    fields = [
+        pa.field(
+            "struct",
+            pa.struct(struct_fields),
+        )
+    ]
+    schema = pa.schema(fields)
+    return (
+        {
+            "struct": pa.StructArray.from_arrays(
+                [pa.array(string * size), pa.array(boolean * size)],
+                fields=struct_fields,
+                mask=pa.array([False, True, True, True, True, True, True, True, True, True] * size)
+            ),
+        },
+        schema,
+        f"struct_nullable_{size*10}.parquet",
+    )
+
+
 def write_pyarrow(
     case, size=1, page_version=1, use_dictionary=False, use_compression=False
 ):
@@ -106,7 +132,7 @@ def write_pyarrow(
     )
 
 
-for case in [case_basic_nullable, case_basic_required, case_nested]:
+for case in [case_basic_nullable, case_basic_required, case_nested, case_struct]:
     for version in [1, 2]:
         for use_dict in [False, True]:
             for compression in [False, True]:

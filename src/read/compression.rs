@@ -134,16 +134,16 @@ fn decompress_reuse<R: std::io::Read>(
 /// * `PageIterator` has its buffer back
 /// * `Decompressor` has its buffer back
 /// * `DecompressedPage` has an empty buffer
-pub struct Decompressor<'a, R: std::io::Read> {
-    iter: PageIterator<'a, R>,
+pub struct Decompressor<R: std::io::Read> {
+    iter: PageIterator<R>,
     buffer: Vec<u8>,
     current: Option<DataPage>,
     was_decompressed: bool,
 }
 
-impl<'a, R: std::io::Read> Decompressor<'a, R> {
+impl<R: std::io::Read> Decompressor<R> {
     /// Creates a new [`Decompressor`].
-    pub fn new(iter: PageIterator<'a, R>, buffer: Vec<u8>) -> Self {
+    pub fn new(iter: PageIterator<R>, buffer: Vec<u8>) -> Self {
         Self {
             iter,
             buffer,
@@ -160,7 +160,7 @@ impl<'a, R: std::io::Read> Decompressor<'a, R> {
     }
 }
 
-impl<'a, R: std::io::Read> FallibleStreamingIterator for Decompressor<'a, R> {
+impl<R: std::io::Read> FallibleStreamingIterator for Decompressor<R> {
     type Item = DataPage;
     type Error = ParquetError;
 

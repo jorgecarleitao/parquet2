@@ -18,6 +18,7 @@ pub use page_stream::get_page_stream;
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
+use crate::error::ParquetError;
 use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::{error::Result, metadata::FileMetaData};
 
@@ -38,24 +39,86 @@ pub fn filter_row_groups(
     metadata
 }
 
-pub fn get_page_iterator<'a, RR: Read + Seek>(
-    column_metadata: &ColumnChunkMetaData,
-    reader: &'a mut RR,
+/// Returns a new [`PageIterator`] by seeking `reader` to the begining of `column_chunk`.
+pub fn get_page_iterator<RR: Read + Seek>(
+    column_chunk: &ColumnChunkMetaData,
+    mut reader: RR,
     pages_filter: Option<PageFilter>,
     buffer: Vec<u8>,
-) -> Result<PageIterator<'a, RR>> {
+) -> Result<PageIterator<RR>> {
     let pages_filter = pages_filter.unwrap_or_else(|| Arc::new(|_, _| true));
 
-    let (col_start, _) = column_metadata.byte_range();
+    let (col_start, _) = column_chunk.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
     Ok(PageIterator::new(
         reader,
-        column_metadata.num_values(),
-        column_metadata.compression(),
-        column_metadata.descriptor().clone(),
+        column_chunk.num_values(),
+        column_chunk.compression(),
+        column_chunk.descriptor().clone(),
         pages_filter,
         buffer,
     ))
+}
+
+pub trait MutStreamingIterator: Sized {
+    type Item;
+    type Error;
+
+    fn advance(self) -> std::result::Result<Option<Self>, Self::Error>;
+    fn get(&mut self) -> Option<&mut Self::Item>;
+}
+
+pub struct ColumnIterator<R: Read + Seek> {
+    reader: Option<R>,
+    columns: Vec<ColumnChunkMetaData>,
+    filters: Vec<Option<PageFilter>>,
+    current: Option<PageIterator<R>>,
+}
+
+impl<R: Read + Seek> ColumnIterator<R> {
+    pub fn new(
+        reader: R,
+        mut columns: Vec<ColumnChunkMetaData>,
+        mut filters: Vec<Option<PageFilter>>,
+    ) -> Self {
+        columns.reverse();
+        filters.reverse();
+        Self {
+            reader: Some(reader),
+            columns,
+            filters,
+            current: None,
+        }
+    }
+}
+
+impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
+    type Item = PageIterator<R>;
+    type Error = ParquetError;
+
+    fn advance(mut self) -> Result<Option<Self>> {
+        let (reader, buffer) = if let Some(current) = self.current {
+            current.into_inner()
+        } else {
+            (self.reader.unwrap(), vec![])
+        };
+        if self.columns.is_empty() {
+            return Ok(None);
+        };
+        let column = self.columns.pop().unwrap();
+        let filter = self.filters.pop().unwrap();
+        let current = Some(get_page_iterator(&column, reader, filter, buffer)?);
+        Ok(Some(Self {
+            reader: None,
+            columns: self.columns,
+            filters: self.filters,
+            current,
+        }))
+    }
+
+    fn get(&mut self) -> Option<&mut Self::Item> {
+        self.current.as_mut()
+    }
 }
 
 #[cfg(test)]
@@ -139,6 +202,31 @@ mod tests {
         assert_eq!(a.len(), 11);
         assert_eq!(b.len(), 0); // the decompressed buffer is never used because it is always swapped with the other buffer.
 
+        Ok(())
+    }
+
+    #[test]
+    fn basics_column_iterator() -> Result<()> {
+        let mut testdata = get_path();
+        testdata.push("alltypes_plain.parquet");
+        let mut file = File::open(testdata).unwrap();
+
+        let metadata = read_metadata(&mut file)?;
+
+        let mut iter = ColumnIterator::new(
+            file,
+            metadata.row_groups[0].columns().to_vec(),
+            vec![None; metadata.row_groups[0].columns().len()],
+        );
+
+        while let Some(mut new_iter) = iter.advance()? {
+            if let Some(pages) = new_iter.get() {
+                for maybe_page in pages {
+                    let _page = maybe_page?;
+                }
+            }
+            iter = new_iter;
+        }
         Ok(())
     }
 }

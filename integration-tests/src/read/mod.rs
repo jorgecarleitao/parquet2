@@ -5,11 +5,16 @@ mod binary;
 mod boolean;
 mod primitive;
 mod primitive_nested;
+mod struct_;
 mod utils;
 
+use parquet::error::ParquetError;
 use parquet::error::Result;
 use parquet::metadata::ColumnDescriptor;
+use parquet::page::CompressedDataPage;
 use parquet::page::DataPage;
+use parquet::read::MutStreamingIterator;
+use parquet::read::PageIterator;
 use parquet::schema::types::ParquetType;
 use parquet::schema::types::PhysicalType;
 
@@ -78,6 +83,14 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
     }
 }
 
+fn columns_to_array<II, I>(columns: I) -> Result<Array>
+where
+    II: Iterator<Item = Result<CompressedDataPage>>,
+    I: MutStreamingIterator<Item = II, Error = ParquetError>,
+{
+    todo!()
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::fs::File;
@@ -99,7 +112,7 @@ pub(crate) mod tests {
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
         let column_meta = metadata.row_groups[row_group].column(column);
-        let descriptor = column_meta.descriptor().clone();
+        let descriptor = column_meta.descriptor();
 
         let iterator = get_page_iterator(column_meta, reader, None, vec![])?;
 
@@ -110,7 +123,7 @@ pub(crate) mod tests {
 
         let page = iterator.next()?.unwrap();
 
-        let array = page_to_array(page, &descriptor)?;
+        let array = page_to_array(page, descriptor)?;
 
         Ok((array, statistics))
     }
