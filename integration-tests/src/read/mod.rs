@@ -10,6 +10,7 @@ mod utils;
 
 use parquet::error::ParquetError;
 use parquet::error::Result;
+use parquet::metadata::ColumnChunkMetaData;
 use parquet::metadata::ColumnDescriptor;
 use parquet::page::CompressedDataPage;
 use parquet::page::DataPage;
@@ -90,20 +91,20 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
 pub fn columns_to_array<II, I>(mut columns: I, field: &ParquetType) -> Result<Array>
 where
     II: Iterator<Item = Result<CompressedDataPage>>,
-    I: MutStreamingIterator<Item = (II, ColumnDescriptor), Error = ParquetError>,
+    I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = ParquetError>,
 {
     let mut validity = vec![];
     let mut has_filled = false;
     let mut arrays = vec![];
     while let Some(mut new_iter) = columns.advance()? {
-        if let Some((pages, descriptor)) = new_iter.get() {
+        if let Some((pages, column)) = new_iter.get() {
             let mut iterator = BasicDecompressor::new(pages, vec![]);
             while let Some(page) = iterator.next()? {
                 if !has_filled {
-                    struct_::extend_validity(&mut validity, page, descriptor);
+                    struct_::extend_validity(&mut validity, page, column.descriptor());
                 }
                 // todo: this is wrong: multiple pages -> array
-                arrays.push(page_to_array(page, descriptor)?)
+                arrays.push(page_to_array(page, column.descriptor())?)
             }
         }
         has_filled = true;

@@ -19,7 +19,7 @@ pub use page_stream::get_page_stream;
 pub use stream::read_metadata as read_metadata_async;
 
 use crate::error::ParquetError;
-use crate::metadata::{ColumnChunkMetaData, ColumnDescriptor, RowGroupMetaData};
+use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::{error::Result, metadata::FileMetaData};
 
 /// Filters row group metadata to only those row groups,
@@ -72,7 +72,7 @@ pub struct ColumnIterator<R: Read + Seek> {
     reader: Option<R>,
     columns: Vec<ColumnChunkMetaData>,
     filters: Vec<Option<PageFilter>>,
-    current: Option<(PageIterator<R>, ColumnDescriptor)>,
+    current: Option<(PageIterator<R>, ColumnChunkMetaData)>,
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
@@ -93,7 +93,7 @@ impl<R: Read + Seek> ColumnIterator<R> {
 }
 
 impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
-    type Item = (PageIterator<R>, ColumnDescriptor);
+    type Item = (PageIterator<R>, ColumnChunkMetaData);
     type Error = ParquetError;
 
     fn advance(mut self) -> Result<Option<Self>> {
@@ -109,7 +109,7 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
         let filter = self.filters.pop().unwrap();
 
         let iter = get_page_iterator(&column, reader, filter, buffer)?;
-        let current = Some((iter, column.descriptor().clone()));
+        let current = Some((iter, column));
         Ok(Some(Self {
             reader: None,
             columns: self.columns,
