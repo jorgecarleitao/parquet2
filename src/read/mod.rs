@@ -88,43 +88,54 @@ pub fn get_column_iterator<R: Read + Seek>(
     metadata: &FileMetaData,
     row_group: usize,
     field: usize,
-    filters: Option<Vec<Option<PageFilter>>>,
+    filter: Option<PageFilter>,
+    page_buffer: Vec<u8>,
 ) -> ColumnIterator<R> {
     let columns = get_field_columns(metadata, row_group, field)
         .cloned()
         .collect::<Vec<_>>();
 
-    let filters = filters.unwrap_or_else(|| vec![None; columns.len()]);
-    ColumnIterator::new(reader, columns, filters)
+    ColumnIterator::new(reader, columns, filter, page_buffer)
+}
+
+/// State of [`MutStreamingIterator`].
+#[derive(Debug)]
+pub enum State<T> {
+    /// Iterator still has elements
+    Some(T),
+    /// Iterator finished
+    Finished(Vec<u8>),
 }
 
 pub trait MutStreamingIterator: Sized {
     type Item;
     type Error;
 
-    fn advance(self) -> std::result::Result<Option<Self>, Self::Error>;
+    fn advance(self) -> std::result::Result<State<Self>, Self::Error>;
     fn get(&mut self) -> Option<&mut Self::Item>;
 }
 
 pub struct ColumnIterator<R: Read + Seek> {
     reader: Option<R>,
     columns: Vec<ColumnChunkMetaData>,
-    filters: Vec<Option<PageFilter>>,
+    page_filter: Option<PageFilter>,
     current: Option<(PageIterator<R>, ColumnChunkMetaData)>,
+    page_buffer: Vec<u8>,
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
     pub fn new(
         reader: R,
         mut columns: Vec<ColumnChunkMetaData>,
-        mut filters: Vec<Option<PageFilter>>,
+        page_filter: Option<PageFilter>,
+        page_buffer: Vec<u8>,
     ) -> Self {
         columns.reverse();
-        filters.reverse();
         Self {
             reader: Some(reader),
+            page_buffer,
             columns,
-            filters,
+            page_filter,
             current: None,
         }
     }
@@ -134,25 +145,25 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
     type Item = (PageIterator<R>, ColumnChunkMetaData);
     type Error = ParquetError;
 
-    fn advance(mut self) -> Result<Option<Self>> {
+    fn advance(mut self) -> Result<State<Self>> {
         let (reader, buffer) = if let Some((iter, _)) = self.current {
             iter.into_inner()
         } else {
-            (self.reader.unwrap(), vec![])
+            (self.reader.unwrap(), self.page_buffer)
         };
         if self.columns.is_empty() {
-            return Ok(None);
+            return Ok(State::Finished(buffer));
         };
         let column = self.columns.pop().unwrap();
-        let filter = self.filters.pop().unwrap();
 
-        let iter = get_page_iterator(&column, reader, filter, buffer)?;
+        let iter = get_page_iterator(&column, reader, self.page_filter.clone(), buffer)?;
         let current = Some((iter, column));
-        Ok(Some(Self {
+        Ok(State::Some(Self {
             reader: None,
             columns: self.columns,
-            filters: self.filters,
+            page_filter: self.page_filter,
             current,
+            page_buffer: vec![],
         }))
     }
 
@@ -256,17 +267,27 @@ mod tests {
         let mut iter = ColumnIterator::new(
             file,
             metadata.row_groups[0].columns().to_vec(),
-            vec![None; metadata.row_groups[0].columns().len()],
+            None,
+            vec![],
         );
 
-        while let Some(mut new_iter) = iter.advance()? {
-            if let Some((pages, _descriptor)) = new_iter.get() {
-                let mut iterator = BasicDecompressor::new(pages, vec![]);
-                while let Some(_page) = iterator.next()? {
-                    // do something with it
+        loop {
+            match iter.advance()? {
+                State::Some(mut new_iter) => {
+                    if let Some((pages, _descriptor)) = new_iter.get() {
+                        let mut iterator = BasicDecompressor::new(pages, vec![]);
+                        while let Some(_page) = iterator.next()? {
+                            // do something with it
+                        }
+                        let _internal_buffer = iterator.into_inner();
+                    }
+                    iter = new_iter;
+                }
+                State::Finished(_buffer) => {
+                    assert!(_buffer.is_empty()); // data is uncompressed => buffer is always moved
+                    break;
                 }
             }
-            iter = new_iter;
         }
         Ok(())
     }

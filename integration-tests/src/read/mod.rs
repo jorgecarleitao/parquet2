@@ -15,7 +15,7 @@ use parquet::metadata::ColumnDescriptor;
 use parquet::page::CompressedDataPage;
 use parquet::page::DataPage;
 use parquet::read::BasicDecompressor;
-use parquet::read::MutStreamingIterator;
+use parquet::read::{MutStreamingIterator, State};
 use parquet::schema::types::GroupConvertedType;
 use parquet::schema::types::ParquetType;
 use parquet::schema::types::PhysicalType;
@@ -96,7 +96,7 @@ where
     let mut validity = vec![];
     let mut has_filled = false;
     let mut arrays = vec![];
-    while let Some(mut new_iter) = columns.advance()? {
+    while let State::Some(mut new_iter) = columns.advance()? {
         if let Some((pages, column)) = new_iter.get() {
             let mut iterator = BasicDecompressor::new(pages, vec![]);
             while let Some(page) = iterator.next()? {
@@ -148,7 +148,7 @@ pub(crate) mod tests {
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
 
-        let columns = get_column_iterator(reader, &metadata, row_group, field, None);
+        let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
 
         let mut statistics = get_field_columns(&metadata, row_group, field)
             .map(|column_meta| column_meta.statistics().transpose())
