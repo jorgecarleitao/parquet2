@@ -445,4 +445,19 @@ pub(crate) mod tests {
     fn pyarrow_v1_struct_optional() -> Result<()> {
         test_pyarrow_integration("struct", 0, 1, false, false, false)
     }
+
+    #[test]
+    fn pyarrow_v2_struct_optional() -> Result<()> {
+        test_pyarrow_integration("struct", 0, 2, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_struct_required() -> Result<()> {
+        test_pyarrow_integration("struct", 1, 1, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v2_struct_required() -> Result<()> {
+        test_pyarrow_integration("struct", 1, 2, false, false, false)
+    }
 }

@@ -409,8 +409,10 @@ mod tests {
 
     // these values match the values in `integration`
     pub fn pyarrow_struct_optional(column: usize) -> Array {
+        let validity = vec![false, true, true, true, true, true, true, true, true, true];
+
         let string = vec![
-            None,
+            Some("Hello".to_string()),
             None,
             Some("aa".to_string()),
             Some("".to_string()),
@@ -423,9 +425,9 @@ mod tests {
         ]
         .into_iter()
         .map(|s| s.map(|s| s.as_bytes().to_vec()))
-        .collect();
+        .collect::<Vec<_>>();
         let boolean = vec![
-            None,
+            Some(true),
             None,
             Some(false),
             Some(false),
@@ -436,12 +438,27 @@ mod tests {
             Some(true),
             Some(true),
         ];
-        let validity = vec![false, true, true, true, true, true, true, true, true, true];
 
         match column {
-            0 => Array::Struct(
+            0 => {
+                let string = string
+                    .iter()
+                    .zip(validity.iter())
+                    .map(|(item, valid)| if *valid { item.clone() } else { None })
+                    .collect();
+                let boolean = boolean
+                    .iter()
+                    .zip(validity.iter())
+                    .map(|(item, valid)| if *valid { *item } else { None })
+                    .collect();
+                Array::Struct(
+                    vec![Array::Binary(string), Array::Boolean(boolean)],
+                    validity,
+                )
+            }
+            1 => Array::Struct(
                 vec![Array::Binary(string), Array::Boolean(boolean)],
-                validity,
+                vec![true; validity.len()],
             ),
             _ => unreachable!(),
         }

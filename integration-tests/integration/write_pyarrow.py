@@ -90,17 +90,25 @@ def case_struct(size):
     ]
     fields = [
         pa.field(
-            "struct",
+            "struct_nullable",
             pa.struct(struct_fields),
-        )
+        ),
+        pa.field(
+            "struct_required",
+            pa.struct(struct_fields),
+        ),
     ]
     schema = pa.schema(fields)
     return (
         {
-            "struct": pa.StructArray.from_arrays(
+            "struct_nullable": pa.StructArray.from_arrays(
                 [pa.array(string * size), pa.array(boolean * size)],
                 fields=struct_fields,
                 mask=pa.array(validity * size),
+            ),
+            "struct_required": pa.StructArray.from_arrays(
+                [pa.array(string * size), pa.array(boolean * size)],
+                fields=struct_fields,
             ),
         },
         schema,
