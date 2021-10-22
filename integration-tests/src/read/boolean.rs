@@ -1,7 +1,11 @@
+use parquet::encoding::hybrid_rle::HybridRleDecoder;
 use parquet::encoding::Encoding;
 use parquet::error::Result;
 use parquet::metadata::ColumnDescriptor;
-use parquet::page::{DataPage, DataPageHeader};
+use parquet::page::{split_buffer, DataPage, DataPageHeader};
+use parquet::read::levels::get_bit_width;
+
+use super::utils::ValuesDef;
 
 const BIT_MASK: [u8; 8] = [1, 2, 4, 8, 16, 32, 64, 128];
 
@@ -21,22 +25,66 @@ pub fn get_bit(data: &[u8], i: usize) -> bool {
     is_set(data[data.len() - 1 - i / 8], i % 8)
 }
 
-fn read_bitmap(values: &[u8], length: usize) -> Vec<Option<bool>> {
-    (0..length).map(|i| Some(get_bit(values, i))).collect()
+fn read_buffer_impl<I: Iterator<Item = u32>>(
+    def_levels: I,
+    values: &[u8],
+    length: usize,
+    max_def_level: u32,
+) -> Vec<Option<bool>> {
+    let decoded_values = (0..length).map(|i| get_bit(values, i));
+
+    ValuesDef::new(decoded_values, def_levels, max_def_level).collect()
 }
 
-pub fn page_to_vec(page: &DataPage, _: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
+fn read_buffer(
+    def_levels: &[u8],
+    values: &[u8],
+    length: usize,
+    def_level_encoding: (&Encoding, i16),
+) -> Vec<Option<bool>> {
+    let max_def_level = def_level_encoding.1 as u32;
+    match (def_level_encoding.0, max_def_level == 0) {
+        (Encoding::Rle, true) | (Encoding::BitPacked, true) => read_buffer_impl(
+            std::iter::repeat(0).take(length),
+            values,
+            length,
+            max_def_level,
+        ),
+        (Encoding::Rle, false) => {
+            let num_bits = get_bit_width(def_level_encoding.1);
+            let def_levels = HybridRleDecoder::new(def_levels, num_bits, length);
+            read_buffer_impl(def_levels, values, length, max_def_level)
+        }
+        _ => todo!(),
+    }
+}
+
+pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
+    let (_, def_levels, values) = split_buffer(page, descriptor);
+
     match page.header() {
         DataPageHeader::V1(_) => match page.encoding() {
-            Encoding::Plain | Encoding::PlainDictionary => {
-                Ok(read_bitmap(page.buffer(), page.num_values()))
-            }
+            Encoding::Plain | Encoding::PlainDictionary => Ok(read_buffer(
+                def_levels,
+                values,
+                page.num_values(),
+                (
+                    &page.definition_level_encoding(),
+                    descriptor.max_def_level(),
+                ),
+            )),
             _ => todo!(),
         },
         DataPageHeader::V2(_) => match page.encoding() {
-            Encoding::Plain | Encoding::PlainDictionary => {
-                Ok(read_bitmap(page.buffer(), page.num_values()))
-            }
+            Encoding::Plain | Encoding::PlainDictionary => Ok(read_buffer(
+                def_levels,
+                values,
+                page.num_values(),
+                (
+                    &page.definition_level_encoding(),
+                    descriptor.max_def_level(),
+                ),
+            )),
             _ => todo!(),
         },
     }

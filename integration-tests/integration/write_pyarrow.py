@@ -83,6 +83,7 @@ def case_nested(size):
 def case_struct(size):
     string = ["Hello", None, "aa", "", None, "abc", None, None, "def", "aaa"]
     boolean = [True, None, False, False, None, True, None, None, True, True]
+    validity = [True, False, False, False, False, False, False, False, False, False]
     struct_fields = [
         ("f1", pa.utf8()),
         ("f2", pa.bool_()),
@@ -99,7 +100,7 @@ def case_struct(size):
             "struct": pa.StructArray.from_arrays(
                 [pa.array(string * size), pa.array(boolean * size)],
                 fields=struct_fields,
-                mask=pa.array([False, True, True, True, True, True, True, True, True, True] * size)
+                mask=pa.array(validity * size),
             ),
         },
         schema,

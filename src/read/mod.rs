@@ -19,7 +19,7 @@ pub use page_stream::get_page_stream;
 pub use stream::read_metadata as read_metadata_async;
 
 use crate::error::ParquetError;
-use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
+use crate::metadata::{ColumnChunkMetaData, ColumnDescriptor, RowGroupMetaData};
 use crate::{error::Result, metadata::FileMetaData};
 
 /// Filters row group metadata to only those row groups,
@@ -72,7 +72,7 @@ pub struct ColumnIterator<R: Read + Seek> {
     reader: Option<R>,
     columns: Vec<ColumnChunkMetaData>,
     filters: Vec<Option<PageFilter>>,
-    current: Option<PageIterator<R>>,
+    current: Option<(PageIterator<R>, ColumnDescriptor)>,
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
@@ -93,12 +93,12 @@ impl<R: Read + Seek> ColumnIterator<R> {
 }
 
 impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
-    type Item = PageIterator<R>;
+    type Item = (PageIterator<R>, ColumnDescriptor);
     type Error = ParquetError;
 
     fn advance(mut self) -> Result<Option<Self>> {
-        let (reader, buffer) = if let Some(current) = self.current {
-            current.into_inner()
+        let (reader, buffer) = if let Some((iter, _)) = self.current {
+            iter.into_inner()
         } else {
             (self.reader.unwrap(), vec![])
         };
@@ -107,7 +107,9 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
         };
         let column = self.columns.pop().unwrap();
         let filter = self.filters.pop().unwrap();
-        let current = Some(get_page_iterator(&column, reader, filter, buffer)?);
+
+        let iter = get_page_iterator(&column, reader, filter, buffer)?;
+        let current = Some((iter, column.descriptor().clone()));
         Ok(Some(Self {
             reader: None,
             columns: self.columns,
@@ -220,9 +222,10 @@ mod tests {
         );
 
         while let Some(mut new_iter) = iter.advance()? {
-            if let Some(pages) = new_iter.get() {
-                for maybe_page in pages {
-                    let _page = maybe_page?;
+            if let Some((pages, _descriptor)) = new_iter.get() {
+                let mut iterator = BasicDecompressor::new(pages, vec![]);
+                while let Some(_page) = iterator.next()? {
+                    // do something with it
                 }
             }
             iter = new_iter;

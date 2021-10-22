@@ -47,9 +47,6 @@ mod tests {
 
     pub fn get_path() -> PathBuf {
         let dir = env!("CARGO_MANIFEST_DIR");
-
-        println!("{}", dir);
-
         PathBuf::from(dir).join("../testing/parquet-testing/data")
     }
 
@@ -412,22 +409,40 @@ mod tests {
 
     // these values match the values in `integration`
     pub fn pyarrow_struct_optional(column: usize) -> Array {
-        //    [[0, 1], None, [2, None, 3], [4, 5, 6], [], [7, 8, 9], None, [10]]
-        // def: 3, 3,  0,     3, 2,    3,   3, 3, 3,  1    3  3  3   0      3
-        // rep: 0, 1,  0,     0, 1,    1,   0, 1, 1,  0,   0, 1, 1,  0,     0
-        let data = vec![
-            Some(Array::Int64(vec![Some(0), Some(1)])),
+        let string = vec![
             None,
-            Some(Array::Int64(vec![Some(2), None, Some(3)])),
-            Some(Array::Int64(vec![Some(4), Some(5), Some(6)])),
-            Some(Array::Int64(vec![])),
-            Some(Array::Int64(vec![Some(7), Some(8), Some(9)])),
             None,
-            Some(Array::Int64(vec![Some(10)])),
+            Some("aa".to_string()),
+            Some("".to_string()),
+            None,
+            Some("abc".to_string()),
+            None,
+            None,
+            Some("def".to_string()),
+            Some("aaa".to_string()),
+        ]
+        .into_iter()
+        .map(|s| s.map(|s| s.as_bytes().to_vec()))
+        .collect();
+        let boolean = vec![
+            None,
+            None,
+            Some(false),
+            Some(false),
+            None,
+            Some(true),
+            None,
+            None,
+            Some(true),
+            Some(true),
         ];
+        let validity = vec![false, true, true, true, true, true, true, true, true, true];
 
         match column {
-            0 => Array::List(data),
+            0 => Array::Struct(
+                vec![Array::Binary(string), Array::Boolean(boolean)],
+                validity,
+            ),
             _ => unreachable!(),
         }
     }

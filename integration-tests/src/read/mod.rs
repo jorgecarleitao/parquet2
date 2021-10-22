@@ -13,10 +13,12 @@ use parquet::error::Result;
 use parquet::metadata::ColumnDescriptor;
 use parquet::page::CompressedDataPage;
 use parquet::page::DataPage;
+use parquet::read::BasicDecompressor;
 use parquet::read::MutStreamingIterator;
-use parquet::read::PageIterator;
+use parquet::schema::types::GroupConvertedType;
 use parquet::schema::types::ParquetType;
 use parquet::schema::types::PhysicalType;
+use parquet::FallibleStreamingIterator;
 
 use crate::Array;
 
@@ -83,12 +85,44 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
     }
 }
 
-fn columns_to_array<II, I>(columns: I) -> Result<Array>
+/// Reads columns into an [`Array`].
+/// This is CPU-intensive: decompress, decode and de-serialize.
+pub fn columns_to_array<II, I>(mut columns: I, field: &ParquetType) -> Result<Array>
 where
     II: Iterator<Item = Result<CompressedDataPage>>,
-    I: MutStreamingIterator<Item = II, Error = ParquetError>,
+    I: MutStreamingIterator<Item = (II, ColumnDescriptor), Error = ParquetError>,
 {
-    todo!()
+    let mut validity = vec![];
+    let mut has_filled = false;
+    let mut arrays = vec![];
+    while let Some(mut new_iter) = columns.advance()? {
+        if let Some((pages, descriptor)) = new_iter.get() {
+            let mut iterator = BasicDecompressor::new(pages, vec![]);
+            while let Some(page) = iterator.next()? {
+                if !has_filled {
+                    struct_::extend_validity(&mut validity, page, descriptor);
+                }
+                // todo: this is wrong: multiple pages -> array
+                arrays.push(page_to_array(page, descriptor)?)
+            }
+        }
+        has_filled = true;
+        columns = new_iter;
+    }
+
+    match field {
+        ParquetType::PrimitiveType { .. } => Ok(arrays.pop().unwrap()),
+        ParquetType::GroupType { converted_type, .. } => {
+            if let Some(converted_type) = converted_type {
+                match converted_type {
+                    GroupConvertedType::List => Ok(arrays.pop().unwrap()),
+                    _ => todo!(),
+                }
+            } else {
+                Ok(Array::Struct(arrays, validity))
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -96,10 +130,11 @@ pub(crate) mod tests {
     use std::fs::File;
 
     use parquet::error::Result;
-    use parquet::read::{get_page_iterator, read_metadata, Decompressor};
-    use parquet::statistics::{BinaryStatistics, PrimitiveStatistics, Statistics};
+    use parquet::read::{read_metadata, ColumnIterator};
+    use parquet::statistics::{
+        BinaryStatistics, BooleanStatistics, PrimitiveStatistics, Statistics,
+    };
     use parquet::types::int96_to_i64_ns;
-    use parquet::FallibleStreamingIterator;
 
     use super::*;
     use crate::tests::*;
@@ -111,21 +146,28 @@ pub(crate) mod tests {
         column: usize,
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
-        let column_meta = metadata.row_groups[row_group].column(column);
-        let descriptor = column_meta.descriptor();
 
-        let iterator = get_page_iterator(column_meta, reader, None, vec![])?;
+        let field = &metadata.schema().fields()[column];
+        let columns = metadata
+            .schema()
+            .columns()
+            .iter()
+            .enumerate()
+            .filter(|x| x.1.path_in_schema()[0] == field.name())
+            .map(|x| metadata.row_groups[row_group].column(x.0).clone())
+            .collect::<Vec<_>>();
 
-        let buffer = vec![];
-        let mut iterator = Decompressor::new(iterator, buffer);
+        let mut statistics = columns
+            .iter()
+            .map(|column_meta| column_meta.statistics().transpose())
+            .collect::<Result<Vec<_>>>()?;
 
-        let statistics = column_meta.statistics().transpose()?;
+        let filters = vec![None; columns.len()];
+        let columns = ColumnIterator::new(reader, columns, filters);
 
-        let page = iterator.next()?.unwrap();
+        let array = columns_to_array(columns, field)?;
 
-        let array = page_to_array(page, descriptor)?;
-
-        Ok((array, statistics))
+        Ok((array, statistics.pop().unwrap()))
     }
 
     fn get_column(
@@ -263,6 +305,12 @@ pub(crate) mod tests {
                 assert_eq!(s.min_value, min);
                 assert_eq!(s.max_value, max);
             }
+            (Value::Boolean(min), Value::Boolean(max)) => {
+                let s = stats.as_any().downcast_ref::<BooleanStatistics>().unwrap();
+
+                assert_eq!(s.min_value, min);
+                assert_eq!(s.max_value, max);
+            }
 
             _ => todo!(),
         }
@@ -287,7 +335,6 @@ pub(crate) mod tests {
             "fixtures/pyarrow3/v{}/{}{}/{}_{}_10.parquet",
             version, use_dictionary_s, compression, file, required_s
         );
-        println!("{:?}", path);
 
         let (array, statistics) = get_column(&path, column)?;
 
@@ -295,6 +342,7 @@ pub(crate) mod tests {
             ("basic", true) => pyarrow_required(column),
             ("basic", false) => pyarrow_optional(column),
             ("nested", false) => pyarrow_nested_optional(column),
+            ("struct", false) => pyarrow_struct_optional(column),
             _ => todo!(),
         };
 
@@ -304,6 +352,12 @@ pub(crate) mod tests {
             ("basic", true) => pyarrow_required_stats(column),
             ("basic", false) => pyarrow_optional_stats(column),
             ("nested", false) => (Some(1), Value::Int64(Some(0)), Value::Int64(Some(10))),
+            // incorrect: it is only picking the first stats
+            ("struct", false) => (
+                Some(4),
+                Value::Boolean(Some(false)),
+                Value::Boolean(Some(true)),
+            ),
             _ => todo!(),
         };
 
