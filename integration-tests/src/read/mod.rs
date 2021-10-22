@@ -131,7 +131,7 @@ pub(crate) mod tests {
     use std::fs::File;
 
     use parquet::error::Result;
-    use parquet::read::{read_metadata, ColumnIterator};
+    use parquet::read::{get_column_iterator, get_field_columns, read_metadata};
     use parquet::statistics::{
         BinaryStatistics, BooleanStatistics, PrimitiveStatistics, Statistics,
     };
@@ -144,28 +144,17 @@ pub(crate) mod tests {
     pub fn read_column<R: std::io::Read + std::io::Seek>(
         reader: &mut R,
         row_group: usize,
-        column: usize,
+        field: usize,
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
 
-        let field = &metadata.schema().fields()[column];
-        let columns = metadata
-            .schema()
-            .columns()
-            .iter()
-            .enumerate()
-            .filter(|x| x.1.path_in_schema()[0] == field.name())
-            .map(|x| metadata.row_groups[row_group].column(x.0).clone())
-            .collect::<Vec<_>>();
+        let columns = get_column_iterator(reader, &metadata, row_group, field, None);
 
-        let mut statistics = columns
-            .iter()
+        let mut statistics = get_field_columns(&metadata, row_group, field)
             .map(|column_meta| column_meta.statistics().transpose())
             .collect::<Result<Vec<_>>>()?;
 
-        let filters = vec![None; columns.len()];
-        let columns = ColumnIterator::new(reader, columns, filters);
-
+        let field = &metadata.schema().fields()[field];
         let array = columns_to_array(columns, field)?;
 
         Ok((array, statistics.pop().unwrap()))

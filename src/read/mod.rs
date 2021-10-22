@@ -40,12 +40,12 @@ pub fn filter_row_groups(
 }
 
 /// Returns a new [`PageIterator`] by seeking `reader` to the begining of `column_chunk`.
-pub fn get_page_iterator<RR: Read + Seek>(
+pub fn get_page_iterator<R: Read + Seek>(
     column_chunk: &ColumnChunkMetaData,
-    mut reader: RR,
+    mut reader: R,
     pages_filter: Option<PageFilter>,
     buffer: Vec<u8>,
-) -> Result<PageIterator<RR>> {
+) -> Result<PageIterator<R>> {
     let pages_filter = pages_filter.unwrap_or_else(|| Arc::new(|_, _| true));
 
     let (col_start, _) = column_chunk.byte_range();
@@ -58,6 +58,44 @@ pub fn get_page_iterator<RR: Read + Seek>(
         pages_filter,
         buffer,
     ))
+}
+
+/// Returns an [`Iterator`] of [`ColumnChunkMetaData`] corresponding to the columns
+/// from `field` at `row_group`.
+/// For primitive fields (e.g. `i64`), the iterator has exactly one item.
+pub fn get_field_columns(
+    metadata: &FileMetaData,
+    row_group: usize,
+    field: usize,
+) -> impl Iterator<Item = &ColumnChunkMetaData> {
+    let field = &metadata.schema().fields()[field];
+    metadata
+        .schema()
+        .columns()
+        .iter()
+        .enumerate()
+        .filter(move |x| x.1.path_in_schema()[0] == field.name())
+        .map(move |x| metadata.row_groups[row_group].column(x.0))
+}
+
+/// Returns a [`ColumnIterator`] of column chunks corresponding to `field`.
+/// Contrarily to [`get_page_iterator`] that returns a single iterator of pages, this iterator
+/// returns multiple iterators, one per physical column of the `field`.
+/// For primitive fields (e.g. `i64`), [`ColumnIterator`] yields exactly one column.
+/// For complex fields, it yields multiple columns.
+pub fn get_column_iterator<R: Read + Seek>(
+    reader: R,
+    metadata: &FileMetaData,
+    row_group: usize,
+    field: usize,
+    filters: Option<Vec<Option<PageFilter>>>,
+) -> ColumnIterator<R> {
+    let columns = get_field_columns(metadata, row_group, field)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let filters = filters.unwrap_or_else(|| vec![None; columns.len()]);
+    ColumnIterator::new(reader, columns, filters)
 }
 
 pub trait MutStreamingIterator: Sized {
