@@ -149,12 +149,12 @@ pub(crate) mod tests {
         let metadata = read_metadata(reader)?;
 
         let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
+        let field = &metadata.schema().fields()[field];
 
         let mut statistics = get_field_columns(&metadata, row_group, field)
             .map(|column_meta| column_meta.statistics().transpose())
             .collect::<Result<Vec<_>>>()?;
 
-        let field = &metadata.schema().fields()[field];
         let array = columns_to_array(columns, field)?;
 
         Ok((array, statistics.pop().unwrap()))
