@@ -5,13 +5,21 @@ mod binary;
 mod boolean;
 mod primitive;
 mod primitive_nested;
+mod struct_;
 mod utils;
 
+use parquet::error::ParquetError;
 use parquet::error::Result;
+use parquet::metadata::ColumnChunkMetaData;
 use parquet::metadata::ColumnDescriptor;
+use parquet::page::CompressedDataPage;
 use parquet::page::DataPage;
+use parquet::read::BasicDecompressor;
+use parquet::read::{MutStreamingIterator, State};
+use parquet::schema::types::GroupConvertedType;
 use parquet::schema::types::ParquetType;
 use parquet::schema::types::PhysicalType;
+use parquet::FallibleStreamingIterator;
 
 use crate::Array;
 
@@ -78,15 +86,56 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
     }
 }
 
+/// Reads columns into an [`Array`].
+/// This is CPU-intensive: decompress, decode and de-serialize.
+pub fn columns_to_array<II, I>(mut columns: I, field: &ParquetType) -> Result<Array>
+where
+    II: Iterator<Item = Result<CompressedDataPage>>,
+    I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = ParquetError>,
+{
+    let mut validity = vec![];
+    let mut has_filled = false;
+    let mut arrays = vec![];
+    while let State::Some(mut new_iter) = columns.advance()? {
+        if let Some((pages, column)) = new_iter.get() {
+            let mut iterator = BasicDecompressor::new(pages, vec![]);
+            while let Some(page) = iterator.next()? {
+                if !has_filled {
+                    struct_::extend_validity(&mut validity, page, column.descriptor());
+                }
+                // todo: this is wrong: multiple pages -> array
+                arrays.push(page_to_array(page, column.descriptor())?)
+            }
+        }
+        has_filled = true;
+        columns = new_iter;
+    }
+
+    match field {
+        ParquetType::PrimitiveType { .. } => Ok(arrays.pop().unwrap()),
+        ParquetType::GroupType { converted_type, .. } => {
+            if let Some(converted_type) = converted_type {
+                match converted_type {
+                    GroupConvertedType::List => Ok(arrays.pop().unwrap()),
+                    _ => todo!(),
+                }
+            } else {
+                Ok(Array::Struct(arrays, validity))
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use std::fs::File;
 
     use parquet::error::Result;
-    use parquet::read::{get_page_iterator, read_metadata, Decompressor};
-    use parquet::statistics::{BinaryStatistics, PrimitiveStatistics, Statistics};
+    use parquet::read::{get_column_iterator, get_field_columns, read_metadata};
+    use parquet::statistics::{
+        BinaryStatistics, BooleanStatistics, PrimitiveStatistics, Statistics,
+    };
     use parquet::types::int96_to_i64_ns;
-    use parquet::FallibleStreamingIterator;
 
     use super::*;
     use crate::tests::*;
@@ -95,24 +144,20 @@ pub(crate) mod tests {
     pub fn read_column<R: std::io::Read + std::io::Seek>(
         reader: &mut R,
         row_group: usize,
-        column: usize,
+        field: usize,
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
-        let column_meta = metadata.row_groups[row_group].column(column);
-        let descriptor = column_meta.descriptor().clone();
 
-        let iterator = get_page_iterator(column_meta, reader, None, vec![])?;
+        let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
+        let field = &metadata.schema().fields()[field];
 
-        let buffer = vec![];
-        let mut iterator = Decompressor::new(iterator, buffer);
+        let mut statistics = get_field_columns(&metadata, row_group, field)
+            .map(|column_meta| column_meta.statistics().transpose())
+            .collect::<Result<Vec<_>>>()?;
 
-        let statistics = column_meta.statistics().transpose()?;
+        let array = columns_to_array(columns, field)?;
 
-        let page = iterator.next()?.unwrap();
-
-        let array = page_to_array(page, &descriptor)?;
-
-        Ok((array, statistics))
+        Ok((array, statistics.pop().unwrap()))
     }
 
     fn get_column(
@@ -250,6 +295,12 @@ pub(crate) mod tests {
                 assert_eq!(s.min_value, min);
                 assert_eq!(s.max_value, max);
             }
+            (Value::Boolean(min), Value::Boolean(max)) => {
+                let s = stats.as_any().downcast_ref::<BooleanStatistics>().unwrap();
+
+                assert_eq!(s.min_value, min);
+                assert_eq!(s.max_value, max);
+            }
 
             _ => todo!(),
         }
@@ -274,30 +325,30 @@ pub(crate) mod tests {
             "fixtures/pyarrow3/v{}/{}{}/{}_{}_10.parquet",
             version, use_dictionary_s, compression, file, required_s
         );
-        println!("{:?}", path);
 
         let (array, statistics) = get_column(&path, column)?;
 
-        let expected = if file == "basic" {
-            if required {
-                pyarrow_required(column)
-            } else {
-                pyarrow_optional(column)
-            }
-        } else {
-            pyarrow_nested_optional(column)
+        let expected = match (file, required) {
+            ("basic", true) => pyarrow_required(column),
+            ("basic", false) => pyarrow_optional(column),
+            ("nested", false) => pyarrow_nested_optional(column),
+            ("struct", false) => pyarrow_struct_optional(column),
+            _ => todo!(),
         };
 
         assert_eq!(expected, array);
 
-        let expected_stats = if file == "basic" {
-            if required {
-                pyarrow_required_stats(column)
-            } else {
-                pyarrow_optional_stats(column)
-            }
-        } else {
-            (Some(1), Value::Int64(Some(0)), Value::Int64(Some(10)))
+        let expected_stats = match (file, required) {
+            ("basic", true) => pyarrow_required_stats(column),
+            ("basic", false) => pyarrow_optional_stats(column),
+            ("nested", false) => (Some(1), Value::Int64(Some(0)), Value::Int64(Some(10))),
+            // incorrect: it is only picking the first stats
+            ("struct", false) => (
+                Some(4),
+                Value::Boolean(Some(false)),
+                Value::Boolean(Some(true)),
+            ),
+            _ => todo!(),
         };
 
         assert_eq_stats(expected_stats, statistics.unwrap().as_ref());
@@ -378,5 +429,25 @@ pub(crate) mod tests {
     #[test]
     fn pyarrow_v1_non_dict_list_optional() -> Result<()> {
         test_pyarrow_integration("nested", 0, 1, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_struct_optional() -> Result<()> {
+        test_pyarrow_integration("struct", 0, 1, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v2_struct_optional() -> Result<()> {
+        test_pyarrow_integration("struct", 0, 2, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v1_struct_required() -> Result<()> {
+        test_pyarrow_integration("struct", 1, 1, false, false, false)
+    }
+
+    #[test]
+    fn pyarrow_v2_struct_required() -> Result<()> {
+        test_pyarrow_integration("struct", 1, 2, false, false, false)
     }
 }

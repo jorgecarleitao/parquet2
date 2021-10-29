@@ -17,9 +17,9 @@ pub type PageFilter = Arc<dyn Fn(&ColumnDescriptor, &DataPageHeader) -> bool + S
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
-pub struct PageIterator<'a, R: Read> {
+pub struct PageIterator<R: Read> {
     // The source
-    reader: &'a mut R,
+    reader: R,
 
     compression: Compression,
 
@@ -40,9 +40,9 @@ pub struct PageIterator<'a, R: Read> {
     pub(crate) buffer: Vec<u8>,
 }
 
-impl<'a, R: Read> PageIterator<'a, R> {
+impl<R: Read> PageIterator<R> {
     pub fn new(
-        reader: &'a mut R,
+        reader: R,
         total_num_values: i64,
         compression: Compression,
         descriptor: ColumnDescriptor,
@@ -75,9 +75,13 @@ impl<'a, R: Read> PageIterator<'a, R> {
     pub fn into_buffer(self) -> Vec<u8> {
         self.buffer
     }
+
+    pub fn into_inner(self) -> (R, Vec<u8>) {
+        (self.reader, self.buffer)
+    }
 }
 
-impl<'a, R: Read> Iterator for PageIterator<'a, R> {
+impl<R: Read> Iterator for PageIterator<R> {
     type Item = Result<CompressedDataPage>;
 
     fn next(&mut self) -> Option<Self::Item> {

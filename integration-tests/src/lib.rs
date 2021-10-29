@@ -16,6 +16,7 @@ pub enum Array {
     Boolean(Vec<Option<bool>>),
     Binary(Vec<Option<Vec<u8>>>),
     List(Vec<Option<Array>>),
+    Struct(Vec<Array>, Vec<bool>),
 }
 
 // The dynamic representation of values in native Rust. This is not exaustive.
@@ -46,9 +47,6 @@ mod tests {
 
     pub fn get_path() -> PathBuf {
         let dir = env!("CARGO_MANIFEST_DIR");
-
-        println!("{}", dir);
-
         PathBuf::from(dir).join("../testing/parquet-testing/data")
     }
 
@@ -405,6 +403,63 @@ mod tests {
 
         match column {
             0 => Array::List(data),
+            _ => unreachable!(),
+        }
+    }
+
+    // these values match the values in `integration`
+    pub fn pyarrow_struct_optional(column: usize) -> Array {
+        let validity = vec![false, true, true, true, true, true, true, true, true, true];
+
+        let string = vec![
+            Some("Hello".to_string()),
+            None,
+            Some("aa".to_string()),
+            Some("".to_string()),
+            None,
+            Some("abc".to_string()),
+            None,
+            None,
+            Some("def".to_string()),
+            Some("aaa".to_string()),
+        ]
+        .into_iter()
+        .map(|s| s.map(|s| s.as_bytes().to_vec()))
+        .collect::<Vec<_>>();
+        let boolean = vec![
+            Some(true),
+            None,
+            Some(false),
+            Some(false),
+            None,
+            Some(true),
+            None,
+            None,
+            Some(true),
+            Some(true),
+        ];
+
+        match column {
+            0 => {
+                let string = string
+                    .iter()
+                    .zip(validity.iter())
+                    .map(|(item, valid)| if *valid { item.clone() } else { None })
+                    .collect();
+                let boolean = boolean
+                    .iter()
+                    .zip(validity.iter())
+                    .map(|(item, valid)| if *valid { *item } else { None })
+                    .collect();
+                Array::Struct(
+                    vec![Array::Binary(string), Array::Boolean(boolean)],
+                    validity,
+                )
+            }
+            1 => Array::Struct(
+                vec![Array::Binary(string), Array::Boolean(boolean)],
+                vec![true; validity.len()],
+            ),
             _ => unreachable!(),
         }
     }

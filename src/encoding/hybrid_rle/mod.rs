@@ -17,6 +17,7 @@ pub enum HybridEncoded<'a> {
     Rle(&'a [u8], usize),
 }
 
+#[derive(Debug, Clone)]
 enum State<'a> {
     None,
     Bitpacked(bitpacking::Decoder<'a>),
@@ -24,6 +25,7 @@ enum State<'a> {
 }
 
 // Decoder of Hybrid-RLE encoded values.
+#[derive(Debug, Clone)]
 pub struct HybridRleDecoder<'a> {
     decoder: Decoder<'a>,
     state: State<'a>,

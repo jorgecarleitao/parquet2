@@ -45,7 +45,7 @@ pub fn encode_pack(decompressed: [u32; BLOCK_LEN], num_bits: u8, compressed: &mu
     BitPacker1x::new().compress(&decompressed, compressed, num_bits)
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Decoder<'a> {
     compressed_chunks: std::slice::Chunks<'a, u8>,
     num_bits: u8,
