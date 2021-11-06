@@ -78,7 +78,7 @@ impl<'a> Block<'a> {
 }
 
 impl<'a> Iterator for Block<'a> {
-    type Item = u32;
+    type Item = i64;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -97,11 +97,11 @@ impl<'a> Iterator for Block<'a> {
             self.advance_miniblock();
         }
 
-        Some(result as u32)
+        Some(result)
     }
 }
 
-/// Decoder of parquets' `DELTA_BINARY_PACKED`. Implements `Iterator<Item = i32>`.
+/// Decoder of parquets' `DELTA_BINARY_PACKED`. Implements `Iterator<Item = i64>`.
 /// # Implementation
 /// This struct does not allocate on the heap.
 #[derive(Debug)]
@@ -170,14 +170,14 @@ impl<'a> Decoder<'a> {
 }
 
 impl<'a> Iterator for Decoder<'a> {
-    type Item = i32;
+    type Item = i64;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.values_remaining == 0 {
             return None;
         }
 
-        let result = Some(self.next_value as i32);
+        let result = Some(self.next_value);
 
         self.values_remaining -= 1;
         if self.values_remaining == 0 {
@@ -187,7 +187,7 @@ impl<'a> Iterator for Decoder<'a> {
         // At this point we must have at least one block and value available
         let current_block = self.current_block.as_mut().unwrap();
         let delta = if let Some(x) = current_block.next() {
-            x as i64
+            x
         } else {
             // load next block
             self.values = &self.values[current_block.consumed_bytes..];
@@ -200,7 +200,7 @@ impl<'a> Iterator for Decoder<'a> {
                 self.values_remaining,
             );
 
-            let delta = next_block.next().unwrap() as i64;
+            let delta = next_block.next().unwrap();
             self.current_block = Some(next_block);
 
             delta
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn test_from_spec() {
-        let expected = (1i32..=5).collect::<Vec<_>>();
+        let expected = (1..=5).collect::<Vec<_>>();
         // VALIDATED FROM SPARK==3.1.1
         // header: [128, 1, 4, 5, 2]
         // block size: 128, 1
@@ -261,7 +261,7 @@ mod tests {
 
     #[test]
     fn case2() {
-        let expected = vec![1i32, 2, 3, 4, 5, 1];
+        let expected = vec![1, 2, 3, 4, 5, 1];
         // VALIDATED FROM SPARK==3.1.1
         // header: [128, 1, 4, 6, 2]
         // block size: 128, 1 <=u> 128

@@ -9,7 +9,7 @@ use super::super::zigzag_leb128;
 /// # Implementation
 /// * This function does not allocate on the heap.
 /// * The number of mini-blocks is always 1. This may change in the future.
-pub fn encode<I: Iterator<Item = i32>>(mut iterator: I, buffer: &mut Vec<u8>) {
+pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
     let block_size = 128;
     let mini_blocks = 1;
 
@@ -86,7 +86,7 @@ mod tests {
         // block1: [2, 0, 0, 0, 0]
         //  min_delta: 1        <=z> 2
         //  bitwidth: 0
-        let data = 1i32..=5;
+        let data = 1..=5;
         let expected = vec![128u8, 1, 1, 5, 2, 2, 0];
 
         let mut buffer = vec![];
@@ -97,7 +97,7 @@ mod tests {
     #[test]
     fn negative_min_delta() {
         // max - min = 1 - -4 = 5
-        let data = vec![1i32, 2, 3, 4, 5, 1];
+        let data = vec![1, 2, 3, 4, 5, 1];
         // header: [128, 1, 4, 6, 2]
         //  block size: 128    <=u> 128, 1
         //  mini-blocks: 1     <=u> 1

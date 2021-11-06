@@ -61,6 +61,6 @@ impl<'a> Iterator for Decoder<'a> {
         if let Some(result) = result {
             self.total_length += result as u32
         }
-        result
+        result.map(|x| x as i32)
     }
 }
