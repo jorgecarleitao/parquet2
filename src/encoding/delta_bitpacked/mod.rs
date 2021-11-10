@@ -10,7 +10,7 @@ mod tests {
 
     #[test]
     fn basic() {
-        let data = vec![1i32, 3, 1, 2, 3];
+        let data = vec![1, 3, 1, 2, 3];
 
         let mut buffer = vec![];
         encode(data.clone().into_iter(), &mut buffer);
@@ -22,7 +22,7 @@ mod tests {
 
     #[test]
     fn negative_value() {
-        let data = vec![1i32, 3, -1, 2, 3];
+        let data = vec![1, 3, -1, 2, 3];
 
         let mut buffer = vec![];
         encode(data.clone().into_iter(), &mut buffer);
@@ -34,7 +34,7 @@ mod tests {
 
     #[test]
     fn more_than_one_block() {
-        let mut data = vec![1i32, 3, -1, 2, 3, 10, 1];
+        let mut data = vec![1, 3, -1, 2, 3, 10, 1];
         for x in 0..128 {
             data.push(x - 10)
         }

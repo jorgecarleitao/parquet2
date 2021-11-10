@@ -10,7 +10,7 @@ pub fn encode<A: AsRef<[u8]>, I: Iterator<Item = A> + Clone>(iterator: I, buffer
         iterator.clone().map(|x| {
             let len = x.as_ref().len();
             total_length += len;
-            len as i32
+            len as i64
         }),
         buffer,
     );
