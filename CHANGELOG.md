@@ -1,5 +1,21 @@
 # Changelog
 
+## [v0.7.0](https://github.com/jorgecarleitao/parquet2/tree/v0.7.0) (2021-11-13)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.6.0...v0.7.0)
+
+**Breaking changes:**
+
+- Use `i64`s for delta-bitpacked's interface [\#67](https://github.com/jorgecarleitao/parquet2/pull/67) ([kornholi](https://github.com/kornholi))
+
+**New features:**
+
+- Added basic support to read nested types [\#64](https://github.com/jorgecarleitao/parquet2/pull/64) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fix off-by-one error in delta-bitpacked decoder [\#66](https://github.com/jorgecarleitao/parquet2/pull/66) ([kornholi](https://github.com/kornholi))
+
 ## [v0.6.0](https://github.com/jorgecarleitao/parquet2/tree/v0.6.0) (2021-10-18)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.5.0...v0.6.0)
