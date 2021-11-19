@@ -221,6 +221,9 @@ impl MutStreamingIterator for ReadColumnIterator {
     type Error = ParquetError;
 
     fn advance(mut self) -> Result<State<Self>> {
+        if self.chunks.is_empty() {
+            return Ok(State::Finished(vec![]));
+        }
         self.current = self
             .chunks
             .pop()
@@ -324,6 +327,45 @@ mod tests {
         assert_eq!(a.len(), 11);
         assert_eq!(b.len(), 0); // the decompressed buffer is never used because it is always swapped with the other buffer.
 
+        Ok(())
+    }
+
+    #[test]
+    fn column_iter() -> Result<()> {
+        let mut testdata = get_path();
+        testdata.push("alltypes_plain.parquet");
+        let mut file = File::open(testdata).unwrap();
+
+        let metadata = read_metadata(&mut file)?;
+
+        let row_group = 0;
+        let column = 0;
+        let column_metadata = metadata.row_groups[row_group].column(column);
+        let buffer = vec![];
+        let mut iter: Vec<_> =
+            get_page_iterator(column_metadata, &mut file, None, buffer)?.collect();
+
+        let field = metadata.schema().fields()[0].clone();
+        let mut iter = ReadColumnIterator::new(field, vec![(iter, column_metadata.clone())]);
+
+        loop {
+            match iter.advance()? {
+                State::Some(mut new_iter) => {
+                    if let Some((pages, _descriptor)) = new_iter.get() {
+                        let mut iterator = BasicDecompressor::new(pages, vec![]);
+                        while let Some(_page) = iterator.next()? {
+                            // do something with it
+                        }
+                        let _internal_buffer = iterator.into_inner();
+                    }
+                    iter = new_iter;
+                }
+                State::Finished(_buffer) => {
+                    assert!(_buffer.is_empty()); // data is uncompressed => buffer is always moved
+                    break;
+                }
+            }
+        }
         Ok(())
     }
 
