@@ -1,5 +1,3 @@
-use std::io::{Read, Write};
-
 pub use super::parquet_bridge::Compression;
 
 use crate::error::{ParquetError, Result};
@@ -16,6 +14,7 @@ pub fn compress(
     match compression {
         #[cfg(feature = "brotli")]
         Compression::Brotli => {
+            use std::io::Write;
             const BROTLI_DEFAULT_BUFFER_SIZE: usize = 4096;
             const BROTLI_DEFAULT_COMPRESSION_QUALITY: u32 = 1; // supported levels 0-9
             const BROTLI_DEFAULT_LG_WINDOW_SIZE: u32 = 22; // recommended between 20-22
@@ -29,12 +28,23 @@ pub fn compress(
             encoder.write_all(input_buf)?;
             encoder.flush().map_err(|e| e.into())
         }
+        #[cfg(not(feature = "brotli"))]
+        Compression::Brotli => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Brotli,
+            "compress to brotli".to_string(),
+        )),
         #[cfg(feature = "gzip")]
         Compression::Gzip => {
+            use std::io::Write;
             let mut encoder = flate2::write::GzEncoder::new(output_buf, Default::default());
             encoder.write_all(input_buf)?;
             encoder.try_finish().map_err(|e| e.into())
         }
+        #[cfg(not(feature = "gzip"))]
+        Compression::Gzip => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Gzip,
+            "compress to gzip".to_string(),
+        )),
         #[cfg(feature = "snappy")]
         Compression::Snappy => {
             use snap::raw::{max_compress_len, Encoder};
@@ -46,8 +56,14 @@ pub fn compress(
             output_buf.truncate(output_buf_len + n);
             Ok(())
         }
+        #[cfg(not(feature = "snappy"))]
+        Compression::Snappy => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Snappy,
+            "compress to snappy".to_string(),
+        )),
         #[cfg(feature = "lz4")]
         Compression::Lz4 => {
+            use std::io::Write;
             const LZ4_BUFFER_SIZE: usize = 4096;
             let mut encoder = lz4::EncoderBuilder::new().build(output_buf)?;
             let mut from = 0;
@@ -61,8 +77,14 @@ pub fn compress(
             }
             encoder.finish().1.map_err(|e| e.into())
         }
+        #[cfg(not(feature = "lz4"))]
+        Compression::Lz4 => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Lz4,
+            "compress to lz4".to_string(),
+        )),
         #[cfg(feature = "zstd")]
         Compression::Zstd => {
+            use std::io::Write;
             /// Compression level (1-21) for ZSTD. Choose 1 here for better compression speed.
             const ZSTD_COMPRESSION_LEVEL: i32 = 1;
 
@@ -73,11 +95,16 @@ pub fn compress(
                 Err(e) => Err(e.into()),
             }
         }
+        #[cfg(not(feature = "zstd"))]
+        Compression::Zstd => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Zstd,
+            "compress to zstd".to_string(),
+        )),
         Compression::Uncompressed => {
             Err(general_err!("Compressing without compression is not valid"))
         }
         _ => Err(general_err!(
-            "Compression {:?} is not installed",
+            "Compression {:?} is not supported",
             compression
         )),
     }
@@ -89,16 +116,28 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
     match compression {
         #[cfg(feature = "brotli")]
         Compression::Brotli => {
+            use std::io::Read;
             const BROTLI_DEFAULT_BUFFER_SIZE: usize = 4096;
             brotli::Decompressor::new(input_buf, BROTLI_DEFAULT_BUFFER_SIZE)
                 .read_exact(output_buf)
                 .map_err(|e| e.into())
         }
+        #[cfg(not(feature = "brotli"))]
+        Compression::Brotli => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Brotli,
+            "decompress with brotli".to_string(),
+        )),
         #[cfg(feature = "gzip")]
         Compression::Gzip => {
+            use std::io::Read;
             let mut decoder = flate2::read::GzDecoder::new(input_buf);
             decoder.read_exact(output_buf).map_err(|e| e.into())
         }
+        #[cfg(not(feature = "gzip"))]
+        Compression::Gzip => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Gzip,
+            "decompress with gzip".to_string(),
+        )),
         #[cfg(feature = "snappy")]
         Compression::Snappy => {
             use snap::raw::{decompress_len, Decoder};
@@ -110,21 +149,38 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
                 .map_err(|e| e.into())
                 .map(|_| ())
         }
+        #[cfg(not(feature = "snappy"))]
+        Compression::Snappy => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Snappy,
+            "decompress with snappy".to_string(),
+        )),
         #[cfg(feature = "lz4")]
         Compression::Lz4 => {
+            use std::io::Read;
             let mut decoder = lz4::Decoder::new(input_buf)?;
             decoder.read_exact(output_buf).map_err(|e| e.into())
         }
+        #[cfg(not(feature = "lz4"))]
+        Compression::Lz4 => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Lz4,
+            "decompress with lz4".to_string(),
+        )),
         #[cfg(feature = "zstd")]
         Compression::Zstd => {
+            use std::io::Read;
             let mut decoder = zstd::Decoder::new(input_buf)?;
             decoder.read_exact(output_buf).map_err(|e| e.into())
         }
+        #[cfg(not(feature = "zstd"))]
+        Compression::Zstd => Err(ParquetError::FeatureNotActive(
+            crate::error::Feature::Zstd,
+            "decompress with zstd".to_string(),
+        )),
         Compression::Uncompressed => {
             Err(general_err!("Compressing without compression is not valid"))
         }
         _ => Err(general_err!(
-            "Compression {:?} is not installed",
+            "Compression {:?} is not yet supported",
             compression
         )),
     }
