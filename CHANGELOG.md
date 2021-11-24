@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.8.0](https://github.com/jorgecarleitao/parquet2/tree/v0.8.0) (2021-11-24)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.7.0...v0.8.0)
+
+**Breaking changes:**
+
+- Improved error message when a feature is not active [\#69](https://github.com/jorgecarleitao/parquet2/pull/69) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fixed error in finishing iterator. [\#68](https://github.com/jorgecarleitao/parquet2/pull/68) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.7.0](https://github.com/jorgecarleitao/parquet2/tree/v0.7.0) (2021-11-13)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.6.0...v0.7.0)
