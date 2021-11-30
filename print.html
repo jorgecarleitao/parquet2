@@ -155,8 +155,13 @@ metadata (at the end of the file).
 To do so, we offer two functions for <code>sync</code> and <code>async</code>:</p>
 <h4 id="sync"><a class="header" href="#sync">Sync</a></h4>
 <p><code>parquet2::read::read_metadata</code> for <code>sync</code> reads:</p>
-<pre><code class="language-rust no_run noplayground">    use parquet2::read::read_metadata;
-    let mut reader = std::fs::File::open(&quot;path&quot;)?;
+<pre><code class="language-rust no_run noplayground">    use std::env;
+    let args: Vec&lt;String&gt; = env::args().collect();
+
+    let path = &amp;args[1];
+
+    use parquet2::read::read_metadata;
+    let mut reader = std::fs::File::open(path)?;
     let metadata = read_metadata(&amp;mut reader)?;
 
     println!(&quot;{:#?}&quot;, metadata);
