@@ -41,8 +41,13 @@ fn deserialize(page: &DataPage, descriptor: &ColumnDescriptor) {
 
 fn main() -> Result<()> {
     // ANCHOR: metadata
+    use std::env;
+    let args: Vec<String> = env::args().collect();
+
+    let path = &args[1];
+
     use parquet2::read::read_metadata;
-    let mut reader = std::fs::File::open("path")?;
+    let mut reader = std::fs::File::open(path)?;
     let metadata = read_metadata(&mut reader)?;
 
     println!("{:#?}", metadata);
