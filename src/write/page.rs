@@ -127,7 +127,7 @@ fn assemble_data_page_header(compressed_page: &CompressedDataPage) -> ParquetPag
 fn assemble_dict_page_header(page: &CompressedDictPage) -> ParquetPageHeader {
     ParquetPageHeader {
         type_: PageType::DICTIONARY_PAGE,
-        uncompressed_page_size: page.buffer.len() as i32,
+        uncompressed_page_size: page.uncompressed_page_size as i32,
         compressed_page_size: page.buffer.len() as i32,
         crc: None,
         data_page_header: None,
