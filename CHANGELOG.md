@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.8.1](https://github.com/jorgecarleitao/parquet2/tree/v0.8.1) (2021-12-09)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.8.0...v0.8.1)
+
+**Fixed bugs:**
+
+- Fixed error in declaring size of compressed dict page. [\#72](https://github.com/jorgecarleitao/parquet2/pull/72) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.8.0](https://github.com/jorgecarleitao/parquet2/tree/v0.8.0) (2021-11-24)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.7.0...v0.8.0)
