@@ -59,12 +59,17 @@ fn compress_dict(
         mut buffer,
         num_values,
     } = page;
+    let uncompressed_page_size = buffer.len();
     if compression != Compression::Uncompressed {
         compression::compress(compression, &buffer, &mut compressed_buffer)?;
     } else {
         std::mem::swap(&mut buffer, &mut compressed_buffer);
     }
-    Ok(CompressedDictPage::new(compressed_buffer, num_values))
+    Ok(CompressedDictPage::new(
+        compressed_buffer,
+        uncompressed_page_size,
+        num_values,
+    ))
 }
 
 pub fn compress(
