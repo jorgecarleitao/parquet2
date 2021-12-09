@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["decode",""],["int96_to_i64_ns",""]],"trait":[["NativeType","A physical native representation of a Parquet fixed-sized type."]]});
