@@ -13,6 +13,7 @@ pub use crate::parquet_bridge::Encoding;
 
 /// # Panics
 /// This function panics iff `values.len() < 4`.
+#[inline]
 pub fn get_length(values: &[u8]) -> u32 {
     u32::from_le_bytes(values[0..4].try_into().unwrap())
 }

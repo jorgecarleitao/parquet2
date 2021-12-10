@@ -137,8 +137,12 @@ fn build_page<R: Read>(
 
     let read_size = page_header.compressed_page_size as usize;
     if read_size > 0 {
-        buffer.clear();
-        buffer.resize(read_size, 0);
+        if read_size > buffer.len() {
+            // dealloc and ignore region, replacing it by a new region
+            *buffer = vec![0; read_size]
+        } else {
+            buffer.truncate(read_size);
+        }
         reader.reader.read_exact(buffer)?;
     }
 
