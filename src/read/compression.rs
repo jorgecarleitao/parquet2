@@ -50,8 +50,13 @@ pub fn decompress_buffer(
         let compressed_buffer = &compressed_page.buffer;
 
         // prepare the compression buffer
-        buffer.clear();
-        buffer.resize(compressed_page.uncompressed_size(), 0);
+        let read_size = compressed_page.uncompressed_size();
+        if read_size > buffer.len() {
+            // dealloc and ignore region, replacing it by a new region
+            *buffer = vec![0; read_size]
+        } else {
+            buffer.truncate(read_size);
+        }
         match compressed_page.header() {
             DataPageHeader::V1(_) => {
                 decompress_v1(compressed_buffer, compressed_page.compression(), buffer)?
