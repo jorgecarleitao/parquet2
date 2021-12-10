@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use futures::{pin_mut, stream::Stream, AsyncWrite, AsyncWriteExt, StreamExt};
+use futures::{pin_mut, stream::Stream, AsyncWrite, AsyncWriteExt, Future, StreamExt};
 
 use parquet_format_async_temp::{
     thrift::protocol::{TCompactOutputStreamProtocol, TOutputStreamProtocol},
@@ -43,7 +43,7 @@ async fn end_file<W: AsyncWrite + Unpin + Send>(
 
 /// Given a stream of [`RowGroupIter`] and and an `async` writer, returns a future
 /// of writing a parquet file to the writer.
-pub async fn write_stream_stream<'a, W, S, E>(
+pub async fn write_stream_stream<'a, W, S, E, F>(
     writer: &mut W,
     row_groups: S,
     schema: SchemaDescriptor,
@@ -53,7 +53,8 @@ pub async fn write_stream_stream<'a, W, S, E>(
 ) -> Result<u64>
 where
     W: AsyncWrite + Unpin + Send,
-    S: Stream<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
+    F: Future<Output = std::result::Result<RowGroupIter<'a, E>, E>>,
+    S: Stream<Item = F>,
     ParquetError: From<E>,
     E: std::error::Error,
 {
@@ -68,7 +69,7 @@ where
             offset,
             schema.columns(),
             options.compression,
-            row_group?,
+            row_group.await?,
         )
         .await?;
         offset += size;
