@@ -20,6 +20,14 @@ pub struct ColumnChunkMetaData {
 
 /// Represents common operations for a column chunk.
 impl ColumnChunkMetaData {
+    /// Create a new [`ColumnChunkMetaData`]
+    pub fn new(column_chunk: ColumnChunk, column_descr: ColumnDescriptor) -> Self {
+        Self {
+            column_chunk,
+            column_descr,
+        }
+    }
+
     /// File where the column chunk is stored.
     ///
     /// If not set, assumed to belong to the same file as the metadata.

@@ -12,6 +12,19 @@ pub struct RowGroupMetaData {
 }
 
 impl RowGroupMetaData {
+    /// Create a new [`RowGroupMetaData`]
+    pub fn new(
+        columns: Vec<ColumnChunkMetaData>,
+        num_rows: i64,
+        total_byte_size: i64,
+    ) -> RowGroupMetaData {
+        Self {
+            columns,
+            num_rows,
+            total_byte_size,
+        }
+    }
+
     /// Number of columns in this row group.
     pub fn num_columns(&self) -> usize {
         self.columns.len()
