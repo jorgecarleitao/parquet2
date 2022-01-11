@@ -10,6 +10,7 @@
 
 **Enhancements:**
 
+- bitpacking: use stack-allocated temporary buffer [\#76](https://github.com/jorgecarleitao/parquet2/pull/76) ([danburkert](https://github.com/danburkert))
 - Added constructor to `RowGroupMetaData` and `ColumnChunkMetaData` [\#74](https://github.com/jorgecarleitao/parquet2/pull/74) ([yjshen](https://github.com/yjshen))
 - Improved performance of reading multiple pages [\#73](https://github.com/jorgecarleitao/parquet2/pull/73) ([jorgecarleitao](https://github.com/jorgecarleitao))
 
