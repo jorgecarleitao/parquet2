@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.9.0](https://github.com/jorgecarleitao/parquet2/tree/v0.9.0) (2022-01-11)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.8.0...v0.9.0)
+
+**Breaking changes:**
+
+- Changed stream of groups to stream of futures of groups [\#71](https://github.com/jorgecarleitao/parquet2/pull/71) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Added constructor to `RowGroupMetaData` and `ColumnChunkMetaData` [\#74](https://github.com/jorgecarleitao/parquet2/pull/74) ([yjshen](https://github.com/yjshen))
+- Improved performance of reading multiple pages [\#73](https://github.com/jorgecarleitao/parquet2/pull/73) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fixed error in declaring size of compressed dict page. [\#72](https://github.com/jorgecarleitao/parquet2/pull/72) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.8.1](https://github.com/jorgecarleitao/parquet2/tree/v0.8.1) (2021-12-09)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.8.0...v0.8.1)
