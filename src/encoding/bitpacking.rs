@@ -1,4 +1,5 @@
 use std::convert::TryInto;
+use std::mem;
 
 /// Usual bitpacking
 use bitpacking::BitPacker;
@@ -59,10 +60,9 @@ fn decode_pack(compressed: &[u8], num_bits: u8, pack: &mut [u32; BitPacker1x::BL
     let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
 
     if compressed.len() < compressed_block_size {
-        let mut last_compressed_chunk = compressed.to_vec();
-        last_compressed_chunk
-            .extend(std::iter::repeat(0).take(compressed_block_size - compressed.len()));
-        BitPacker1x::new().decompress(&last_compressed_chunk, pack, num_bits);
+        let mut buf = [0u8; BitPacker1x::BLOCK_LEN * mem::size_of::<u32>()];
+        buf[..compressed.len()].copy_from_slice(compressed);
+        BitPacker1x::new().decompress(&buf, pack, num_bits);
     } else {
         BitPacker1x::new().decompress(compressed, pack, num_bits);
     }
