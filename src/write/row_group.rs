@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use futures::AsyncWrite;
-use parquet_format_async_temp::RowGroup;
+use parquet_format_async_temp::{RowGroup, ColumnMetaData};
 
 use crate::{
     compression::Compression,
@@ -25,6 +25,10 @@ fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
     } else {
         None
     }
+}
+
+fn calc_column_file_offset(metadata: &ColumnMetaData) -> i64 {
+    metadata.dictionary_page_offset.filter(|x| x > &0_i64).unwrap_or_else(|| metadata.data_page_offset)
 }
 
 pub fn write_row_group<
@@ -67,6 +71,11 @@ where
         Some(Some(v)) => v
     };
 
+    let file_offest: Option<i64> = match num_rows {
+        0 => None,
+        _ => Some(calc_column_file_offset(columns[0].meta_data.as_ref().unwrap()))
+    };
+
     let total_byte_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
@@ -78,7 +87,7 @@ where
             total_byte_size,
             num_rows,
             sorting_columns: None,
-            file_offset: None,
+            file_offset: file_offest,
             total_compressed_size: None,
             ordinal: None,
         },
