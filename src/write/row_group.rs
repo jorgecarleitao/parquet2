@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use futures::AsyncWrite;
-use parquet_format_async_temp::RowGroup;
+use parquet_format_async_temp::{RowGroup, ColumnMetaData};
 
 use crate::{
     compression::Compression,
@@ -14,6 +14,10 @@ use super::{
     column_chunk::{write_column_chunk, write_column_chunk_async},
     DynIter, DynStreamingIterator,
 };
+
+fn calc_column_file_offset(metadata: &ColumnMetaData) -> i64 {
+    metadata.dictionary_page_offset.filter(|x| x > &0_i64).unwrap_or_else(|| metadata.data_page_offset)
+}
 
 pub fn write_row_group<
     'a,
@@ -46,6 +50,11 @@ where
     let bytes_written = offset - initial;
 
     // compute row group stats
+    let file_offest: Option<i64> = match num_rows {
+        0 => None,
+        _ => Some(calc_column_file_offset(columns[0].meta_data.as_ref().unwrap()))
+    };
+
     let total_byte_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
@@ -57,7 +66,7 @@ where
             total_byte_size,
             num_rows: num_rows as i64,
             sorting_columns: None,
-            file_offset: None,
+            file_offset: file_offest,
             total_compressed_size: None,
             ordinal: None,
         },
