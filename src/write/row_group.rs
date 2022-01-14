@@ -1,7 +1,8 @@
 use std::io::Write;
 
+use brotli::enc::threading::OwnedRetriever;
 use futures::AsyncWrite;
-use parquet_format_async_temp::{RowGroup, ColumnMetaData};
+use parquet_format_async_temp::{RowGroup, ColumnMetaData, ColumnChunk};
 
 use crate::{
     compression::Compression,
@@ -104,6 +105,22 @@ where
     let bytes_written = offset - initial;
 
     // compute row group stats
+<<<<<<< HEAD
+=======
+    let num_rows = columns
+        .iter()
+        .map(|c| c.meta_data.as_ref().unwrap().num_values)
+        .collect::<Vec<_>>();
+    let num_rows = match same_elements(&num_rows) {
+        None => return Err(general_err!("Every column chunk in a row group MUST have the same number of rows. The columns have rows: {:?}", num_rows)),
+        Some(None) => 0,
+        Some(Some(v)) => v
+    };
+
+    // compute row group file offset
+    let file_offest = calc_row_group_file_offset(&columns);
+
+>>>>>>> use row group columns num instead of num_rows
     let total_byte_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
@@ -115,7 +132,7 @@ where
             total_byte_size,
             num_rows: num_rows as i64,
             sorting_columns: None,
-            file_offset: None,
+            file_offset: file_offest,
             total_compressed_size: None,
             ordinal: None,
         },
