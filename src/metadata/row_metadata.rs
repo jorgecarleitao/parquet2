@@ -1,7 +1,7 @@
 use parquet_format_async_temp::RowGroup;
 
 use super::{column_chunk_metadata::ColumnChunkMetaData, schema_descriptor::SchemaDescriptor};
-use crate::error::Result;
+use crate::{error::Result, write::ColumnOffsetsMetadata};
 
 /// Metadata for a row group.
 #[derive(Debug, Clone)]
@@ -77,12 +77,20 @@ impl RowGroupMetaData {
 
     /// Method to convert to Thrift.
     pub fn into_thrift(self) -> RowGroup {
+        let file_offset = self
+            .columns
+            .iter()
+            .map(|c| {
+                ColumnOffsetsMetadata::from_column_chunk_metadata(&c).calc_row_group_file_offset()
+            })
+            .next()
+            .unwrap_or(None);
         RowGroup {
             columns: self.columns.into_iter().map(|v| v.into_thrift()).collect(),
             total_byte_size: self.total_byte_size,
             num_rows: self.num_rows,
             sorting_columns: None,
-            file_offset: None,
+            file_offset: file_offset,
             total_compressed_size: None,
             ordinal: None,
         }
