@@ -81,7 +81,7 @@ impl RowGroupMetaData {
             .columns
             .iter()
             .map(|c| {
-                ColumnOffsetsMetadata::from_column_chunk_metadata(&c).calc_row_group_file_offset()
+                ColumnOffsetsMetadata::from_column_chunk_metadata(c).calc_row_group_file_offset()
             })
             .next()
             .unwrap_or(None);
