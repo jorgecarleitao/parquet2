@@ -1,7 +1,8 @@
 use std::io::Write;
 
+use brotli::enc::threading::OwnedRetriever;
 use futures::AsyncWrite;
-use parquet_format_async_temp::{RowGroup, ColumnMetaData};
+use parquet_format_async_temp::{RowGroup, ColumnMetaData, ColumnChunk};
 
 use crate::{
     compression::Compression,
@@ -27,8 +28,16 @@ fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
     }
 }
 
-fn calc_column_file_offset(metadata: &ColumnMetaData) -> i64 {
-    metadata.dictionary_page_offset.filter(|x| x > &0_i64).unwrap_or_else(|| metadata.data_page_offset)
+fn calc_row_group_file_offset(columns: &Vec<ColumnChunk>) -> Option<i64> {
+    match columns.len() {
+        0 => None,
+        _ => {
+            let metadata: &ColumnMetaData = columns[0].meta_data.as_ref().unwrap();
+            Some(metadata.dictionary_page_offset
+                .filter(|x| *x > 0_i64)
+                .unwrap_or(metadata.data_page_offset))
+        }
+    }
 }
 
 pub fn write_row_group<
@@ -71,10 +80,7 @@ where
         Some(Some(v)) => v
     };
 
-    let file_offest: Option<i64> = match num_rows {
-        0 => None,
-        _ => Some(calc_column_file_offset(columns[0].meta_data.as_ref().unwrap()))
-    };
+    let file_offest = calc_row_group_file_offset(&columns);
 
     let total_byte_size = columns
         .iter()
@@ -134,6 +140,9 @@ where
         Some(Some(v)) => v
     };
 
+    // compute row group file offset
+    let file_offest = calc_row_group_file_offset(&columns);
+
     let total_byte_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
@@ -145,7 +154,7 @@ where
             total_byte_size,
             num_rows,
             sorting_columns: None,
-            file_offset: None,
+            file_offset: file_offest,
             total_compressed_size: None,
             ordinal: None,
         },
