@@ -1,6 +1,5 @@
 use std::io::Write;
 
-use brotli::enc::threading::OwnedRetriever;
 use futures::AsyncWrite;
 use parquet_format_async_temp::{RowGroup, ColumnMetaData, ColumnChunk};
 
