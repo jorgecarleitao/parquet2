@@ -4,6 +4,7 @@ use parquet_format_async_temp::FileMetaData;
 
 use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::RowGroup;
 
 pub use crate::metadata::KeyValue;
 use crate::{
@@ -37,6 +38,8 @@ pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: FileMetaData) -> 
     Ok(metadata_len as u64 + FOOTER_SIZE)
 }
 
+/// Writes a Parquet file to a synchronous interface.
+/// Use [`FileWriter`] for extra control over when row groups are written.
 pub fn write_file<'a, W, I, E>(
     writer: &mut W,
     row_groups: I,
@@ -51,39 +54,91 @@ where
     ParquetError: From<E>,
     E: std::error::Error,
 {
-    let mut offset = start_file(writer)? as u64;
+    let mut writer = FileWriter::new(writer, schema, options, created_by);
+    writer.start()?;
 
-    let row_groups = row_groups
-        .map(|row_group| {
-            let (group, size) = write_row_group(
-                writer,
-                offset,
-                schema.columns(),
-                options.compression,
-                row_group?,
-            )?;
-            offset += size;
-            Ok(group)
-        })
-        .collect::<Result<Vec<_>>>()?;
+    for row_group in row_groups {
+        let row_group = row_group?;
+        writer.write(row_group)?;
+    }
+    writer.end(key_value_metadata)
+}
 
-    // compute file stats
-    let num_rows = row_groups.iter().map(|group| group.num_rows).sum();
+/// An interface to write a parquet file.
+/// Use `start` to write the header, `write` to write a row group,
+/// and `end` to write the footer.
+struct FileWriter<W: Write> {
+    writer: W,
+    schema: SchemaDescriptor,
+    options: WriteOptions,
+    created_by: Option<String>,
 
-    let metadata = FileMetaData::new(
-        options.version.into(),
-        schema.into_thrift()?,
-        num_rows,
-        row_groups,
-        key_value_metadata,
-        created_by,
-        None,
-        None,
-        None,
-    );
+    offset: u64,
+    row_groups: Vec<RowGroup>,
+}
 
-    let len = end_file(writer, metadata)?;
-    Ok(offset + len)
+impl<W: Write> FileWriter<W> {
+    /// Returns a new [`FileWriter`].
+    pub fn new(
+        writer: W,
+        schema: SchemaDescriptor,
+        options: WriteOptions,
+        created_by: Option<String>,
+    ) -> Self {
+        Self {
+            writer,
+            schema,
+            options,
+            created_by,
+            offset: 0,
+            row_groups: vec![],
+        }
+    }
+
+    /// Writes the header of the file
+    pub fn start(&mut self) -> Result<()> {
+        self.offset = start_file(&mut self.writer)? as u64;
+        Ok(())
+    }
+
+    /// Writes a row group to the file.
+    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>) -> Result<()>
+    where
+        ParquetError: From<E>,
+        E: std::error::Error,
+    {
+        let (group, size) = write_row_group(
+            &mut self.writer,
+            self.offset,
+            self.schema.columns(),
+            self.options.compression,
+            row_group,
+        )?;
+        self.offset += size;
+        self.row_groups.push(group);
+        Ok(())
+    }
+
+    /// Writes the footer of the parquet file. Returns the total size of the file.
+    pub fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
+        // compute file stats
+        let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
+
+        let metadata = FileMetaData::new(
+            self.options.version.into(),
+            self.schema.into_thrift()?,
+            num_rows,
+            self.row_groups,
+            key_value_metadata,
+            self.created_by,
+            None,
+            None,
+            None,
+        );
+
+        let len = end_file(&mut self.writer, metadata)?;
+        Ok(self.offset + len)
+    }
 }
 
 #[cfg(test)]
