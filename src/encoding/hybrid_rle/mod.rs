@@ -38,15 +38,14 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
         return State::None;
     };
 
-    let state = decoder.next().unwrap();
-    match state {
-        HybridEncoded::Bitpacked(packed) => {
+    match decoder.next() {
+        Some(HybridEncoded::Bitpacked(packed)) => {
             let num_bits = decoder.num_bits();
             let length = std::cmp::min(packed.len() * 8 / num_bits as usize, remaining);
             let decoder = bitpacking::Decoder::new(packed, num_bits as u8, length);
             State::Bitpacked(decoder)
         }
-        HybridEncoded::Rle(pack, additional) => {
+        Some(HybridEncoded::Rle(pack, additional)) => {
             let mut bytes = [0u8; std::mem::size_of::<u32>()];
             pack.iter()
                 .enumerate()
@@ -54,6 +53,7 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
             let value = u32::from_le_bytes(bytes);
             State::Rle(std::iter::repeat(value).take(additional))
         }
+        None => State::None,
     }
 }
 
@@ -224,5 +224,18 @@ mod tests {
         let result = decoder.collect::<Vec<_>>();
 
         assert_eq!(result, &[0, 0]);
+    }
+
+    #[test]
+    fn empty_values() {
+        let data = [];
+
+        let num_bits = 1;
+
+        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 100);
+
+        let result = decoder.collect::<Vec<_>>();
+
+        assert_eq!(result, vec![0; 100]);
     }
 }
