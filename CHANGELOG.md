@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.9.1](https://github.com/jorgecarleitao/parquet2/tree/v0.9.1) (2022-01-25)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.9.0...v0.9.1)
+
+**Fixed bugs:**
+
+- Fixed panic in reading empty values in hybrid-RLE [\#80](https://github.com/jorgecarleitao/parquet2/pull/80) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.9.0](https://github.com/jorgecarleitao/parquet2/tree/v0.9.0) (2022-01-11)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.8.0...v0.9.0)
