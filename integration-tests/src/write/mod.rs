@@ -65,13 +65,14 @@ mod tests {
 
         let a = schema.columns();
 
-        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(
-            DynStreamingIterator::new(Compressor::new_from_vec(
-                DynIter::new(std::iter::once(array_to_page(&array, &options, &a[0]))),
-                options.compression,
-                vec![],
-            )),
-        )))));
+        let num_rows = array.len();
+        let pages = DynStreamingIterator::new(Compressor::new_from_vec(
+            DynIter::new(std::iter::once(array_to_page(&array, &options, &a[0]))),
+            options.compression,
+            vec![],
+        ));
+        let columns = std::iter::once(Ok(pages));
+        let row_groups = std::iter::once(Ok((DynIter::new(columns), num_rows)));
 
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;
@@ -165,17 +166,17 @@ mod tests2 {
 
         let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
 
-        let row_groups = std::iter::once(Ok(DynIter::new(std::iter::once(Ok(
-            DynStreamingIterator::new(Compressor::new_from_vec(
-                DynIter::new(std::iter::once(array_to_page_v1(
-                    &array,
-                    &options,
-                    &schema.columns()[0],
-                ))),
-                options.compression,
-                vec![],
-            )),
-        )))));
+        let pages = DynStreamingIterator::new(Compressor::new_from_vec(
+            DynIter::new(std::iter::once(array_to_page_v1(
+                &array,
+                &options,
+                &schema.columns()[0],
+            ))),
+            options.compression,
+            vec![],
+        ));
+        let columns = std::iter::once(Ok(pages));
+        let row_groups = std::iter::once(Ok((DynIter::new(columns), 7)));
 
         let mut writer = Cursor::new(vec![]);
         write_file(&mut writer, row_groups, schema, options, None, None)?;

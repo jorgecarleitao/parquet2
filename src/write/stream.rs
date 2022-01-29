@@ -79,7 +79,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
     }
 
     /// Writes a row group to the file.
-    pub async fn write<E>(&mut self, row_group: RowGroupIter<'_, E>) -> Result<()>
+    pub async fn write<E>(&mut self, row_group: RowGroupIter<'_, E>, num_rows: usize) -> Result<()>
     where
         ParquetError: From<E>,
         E: std::error::Error,
@@ -90,6 +90,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             self.schema.columns(),
             self.options.compression,
             row_group,
+            num_rows,
         )
         .await?;
         self.offset += size;

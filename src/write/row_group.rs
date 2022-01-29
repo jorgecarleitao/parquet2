@@ -15,18 +15,6 @@ use super::{
     DynIter, DynStreamingIterator,
 };
 
-fn same_elements<T: PartialEq + Copy>(arr: &[T]) -> Option<Option<T>> {
-    if arr.is_empty() {
-        return Some(None);
-    }
-    let first = &arr[0];
-    if arr.iter().all(|item| item == first) {
-        Some(Some(*first))
-    } else {
-        None
-    }
-}
-
 pub fn write_row_group<
     'a,
     W,
@@ -37,6 +25,7 @@ pub fn write_row_group<
     descriptors: &[ColumnDescriptor],
     compression: Compression,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
+    num_rows: usize,
 ) -> Result<(RowGroup, u64)>
 where
     W: Write,
@@ -57,16 +46,6 @@ where
     let bytes_written = offset - initial;
 
     // compute row group stats
-    let num_rows = columns
-        .iter()
-        .map(|c| c.meta_data.as_ref().unwrap().num_values)
-        .collect::<Vec<_>>();
-    let num_rows = match same_elements(&num_rows) {
-        None => return Err(general_err!("Every column chunk in a row group MUST have the same number of rows. The columns have rows: {:?}", num_rows)),
-        Some(None) => 0,
-        Some(Some(v)) => v
-    };
-
     let total_byte_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
@@ -76,7 +55,7 @@ where
         RowGroup {
             columns,
             total_byte_size,
-            num_rows,
+            num_rows: num_rows as i64,
             sorting_columns: None,
             file_offset: None,
             total_compressed_size: None,
@@ -96,6 +75,7 @@ pub async fn write_row_group_async<
     descriptors: &[ColumnDescriptor],
     compression: Compression,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
+    num_rows: usize,
 ) -> Result<(RowGroup, u64)>
 where
     W: AsyncWrite + Unpin + Send,
@@ -115,16 +95,6 @@ where
     let bytes_written = offset - initial;
 
     // compute row group stats
-    let num_rows = columns
-        .iter()
-        .map(|c| c.meta_data.as_ref().unwrap().num_values)
-        .collect::<Vec<_>>();
-    let num_rows = match same_elements(&num_rows) {
-        None => return Err(general_err!("Every column chunk in a row group MUST have the same number of rows. The columns have rows: {:?}", num_rows)),
-        Some(None) => 0,
-        Some(Some(v)) => v
-    };
-
     let total_byte_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
@@ -134,7 +104,7 @@ where
         RowGroup {
             columns,
             total_byte_size,
-            num_rows,
+            num_rows: num_rows as i64,
             sorting_columns: None,
             file_offset: None,
             total_compressed_size: None,

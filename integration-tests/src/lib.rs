@@ -19,6 +19,23 @@ pub enum Array {
     Struct(Vec<Array>, Vec<bool>),
 }
 
+impl Array {
+    pub fn len(&self) -> usize {
+        match self {
+            Array::UInt32(a) => a.len(),
+            Array::Int32(a) => a.len(),
+            Array::Int64(a) => a.len(),
+            Array::Int96(a) => a.len(),
+            Array::Float32(a) => a.len(),
+            Array::Float64(a) => a.len(),
+            Array::Boolean(a) => a.len(),
+            Array::Binary(a) => a.len(),
+            Array::List(a) => a.len(),
+            Array::Struct(a, _) => a[0].len(),
+        }
+    }
+}
+
 // The dynamic representation of values in native Rust. This is not exaustive.
 // todo: maybe refactor this into serde/json?
 #[derive(Debug, PartialEq)]

@@ -50,7 +50,7 @@ pub fn write_file<'a, W, I, E>(
 ) -> Result<u64>
 where
     W: Write,
-    I: Iterator<Item = std::result::Result<RowGroupIter<'a, E>, E>>,
+    I: Iterator<Item = std::result::Result<(RowGroupIter<'a, E>, usize), E>>,
     ParquetError: From<E>,
     E: std::error::Error,
 {
@@ -58,8 +58,8 @@ where
     writer.start()?;
 
     for row_group in row_groups {
-        let row_group = row_group?;
-        writer.write(row_group)?;
+        let (row_group, num_rows) = row_group?;
+        writer.write(row_group, num_rows)?;
     }
     writer.end(key_value_metadata)
 }
@@ -102,7 +102,7 @@ impl<W: Write> FileWriter<W> {
     }
 
     /// Writes a row group to the file.
-    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>) -> Result<()>
+    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>, num_rows: usize) -> Result<()>
     where
         ParquetError: From<E>,
         E: std::error::Error,
@@ -113,6 +113,7 @@ impl<W: Write> FileWriter<W> {
             self.schema.columns(),
             self.options.compression,
             row_group,
+            num_rows,
         )?;
         self.offset += size;
         self.row_groups.push(group);
