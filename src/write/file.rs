@@ -67,7 +67,7 @@ where
 /// An interface to write a parquet file.
 /// Use `start` to write the header, `write` to write a row group,
 /// and `end` to write the footer.
-struct FileWriter<W: Write> {
+pub struct FileWriter<W: Write> {
     writer: W,
     schema: SchemaDescriptor,
     options: WriteOptions,

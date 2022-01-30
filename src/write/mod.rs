@@ -16,6 +16,7 @@ pub use dyn_iter::{DynIter, DynStreamingIterator};
 pub use compression::{compress, Compressor};
 
 pub use file::write_file;
+pub use file::FileWriter;
 
 use crate::compression::Compression;
 use crate::page::CompressedPage;
