@@ -38,32 +38,6 @@ pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: FileMetaData) -> 
     Ok(metadata_len as u64 + FOOTER_SIZE)
 }
 
-/// Writes a Parquet file to a synchronous interface.
-/// Use [`FileWriter`] for extra control over when row groups are written.
-pub fn write_file<'a, W, I, E>(
-    writer: &mut W,
-    row_groups: I,
-    schema: SchemaDescriptor,
-    options: WriteOptions,
-    created_by: Option<String>,
-    key_value_metadata: Option<Vec<KeyValue>>,
-) -> Result<u64>
-where
-    W: Write,
-    I: Iterator<Item = std::result::Result<(RowGroupIter<'a, E>, usize), E>>,
-    ParquetError: From<E>,
-    E: std::error::Error,
-{
-    let mut writer = FileWriter::new(writer, schema, options, created_by);
-    writer.start()?;
-
-    for row_group in row_groups {
-        let (row_group, num_rows) = row_group?;
-        writer.write(row_group, num_rows)?;
-    }
-    writer.end(key_value_metadata)
-}
-
 /// An interface to write a parquet file.
 /// Use `start` to write the header, `write` to write a row group,
 /// and `end` to write the footer.
@@ -75,6 +49,19 @@ pub struct FileWriter<W: Write> {
 
     offset: u64,
     row_groups: Vec<RowGroup>,
+}
+
+// Accessors
+impl<W: Write> FileWriter<W> {
+    /// The options assigned to the file
+    pub fn options(&self) -> &WriteOptions {
+        &self.options
+    }
+
+    /// The [`SchemaDescriptor`] assigned to this file
+    pub fn schema(&self) -> &SchemaDescriptor {
+        &self.schema
+    }
 }
 
 impl<W: Write> FileWriter<W> {
@@ -121,7 +108,7 @@ impl<W: Write> FileWriter<W> {
     }
 
     /// Writes the footer of the parquet file. Returns the total size of the file.
-    pub fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
+    pub fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
@@ -138,7 +125,7 @@ impl<W: Write> FileWriter<W> {
         );
 
         let len = end_file(&mut self.writer, metadata)?;
-        Ok(self.offset + len)
+        Ok((self.offset + len, self.writer))
     }
 }
 

@@ -54,6 +54,19 @@ pub struct FileStreamer<W: AsyncWrite + Unpin + Send> {
     row_groups: Vec<RowGroup>,
 }
 
+// Accessors
+impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
+    /// The options assigned to the file
+    pub fn options(&self) -> &WriteOptions {
+        &self.options
+    }
+
+    /// The [`SchemaDescriptor`] assigned to this file
+    pub fn schema(&self) -> &SchemaDescriptor {
+        &self.schema
+    }
+}
+
 impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
     /// Returns a new [`FileStreamer`].
     pub fn new(
@@ -98,8 +111,8 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         Ok(())
     }
 
-    /// Writes the footer of the parquet file. Returns the total size of the file.
-    pub async fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
+    /// Writes the footer of the parquet file. Returns the total size of the file and the writer.
+    pub async fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
@@ -116,6 +129,6 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         );
 
         let len = end_file(&mut self.writer, metadata).await?;
-        Ok(self.offset + len)
+        Ok((self.offset + len, self.writer))
     }
 }
