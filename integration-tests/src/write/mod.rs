@@ -31,7 +31,7 @@ mod tests {
     use parquet::error::Result;
     use parquet::metadata::SchemaDescriptor;
     use parquet::statistics::Statistics;
-    use parquet::write::{write_file, Compressor, DynIter, DynStreamingIterator, Version};
+    use parquet::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
 
     use super::*;
 
@@ -72,10 +72,13 @@ mod tests {
             vec![],
         ));
         let columns = std::iter::once(Ok(pages));
-        let row_groups = std::iter::once(Ok((DynIter::new(columns), num_rows)));
 
-        let mut writer = Cursor::new(vec![]);
-        write_file(&mut writer, row_groups, schema, options, None, None)?;
+        let writer = Cursor::new(vec![]);
+        let mut writer = FileWriter::new(writer, schema, options, None);
+
+        writer.start()?;
+        writer.write(DynIter::new(columns), num_rows)?;
+        let writer = writer.end(None)?.1;
 
         let data = writer.into_inner();
 
@@ -143,7 +146,7 @@ mod tests2 {
         error::Result,
         metadata::SchemaDescriptor,
         read::read_metadata,
-        write::{write_file, Compressor, DynIter, DynStreamingIterator, Version},
+        write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version},
     };
 
     #[test]
@@ -176,10 +179,13 @@ mod tests2 {
             vec![],
         ));
         let columns = std::iter::once(Ok(pages));
-        let row_groups = std::iter::once(Ok((DynIter::new(columns), 7)));
 
-        let mut writer = Cursor::new(vec![]);
-        write_file(&mut writer, row_groups, schema, options, None, None)?;
+        let writer = Cursor::new(vec![]);
+        let mut writer = FileWriter::new(writer, schema, options, None);
+
+        writer.start()?;
+        writer.write(DynIter::new(columns), 7)?;
+        let writer = writer.end(None)?.1;
 
         let data = writer.into_inner();
         let mut reader = Cursor::new(data);

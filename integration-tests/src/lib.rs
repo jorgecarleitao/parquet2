@@ -34,6 +34,10 @@ impl Array {
             Array::Struct(a, _) => a[0].len(),
         }
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 // The dynamic representation of values in native Rust. This is not exaustive.
