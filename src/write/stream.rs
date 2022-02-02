@@ -97,6 +97,11 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         ParquetError: From<E>,
         E: std::error::Error,
     {
+        if self.offset == 0 {
+            return Err(ParquetError::General(
+                "You must call `start` before writing the first row group".to_string(),
+            ));
+        }
         let (group, size) = write_row_group_async(
             &mut self.writer,
             self.offset,
@@ -111,7 +116,8 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         Ok(())
     }
 
-    /// Writes the footer of the parquet file. Returns the total size of the file and the writer.
+    /// Writes the footer of the parquet file. Returns the total size of the file and the
+    /// underlying writer.
     pub async fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
