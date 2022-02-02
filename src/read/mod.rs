@@ -342,8 +342,7 @@ mod tests {
         let column = 0;
         let column_metadata = metadata.row_groups[row_group].column(column);
         let buffer = vec![];
-        let mut iter: Vec<_> =
-            get_page_iterator(column_metadata, &mut file, None, buffer)?.collect();
+        let iter: Vec<_> = get_page_iterator(column_metadata, &mut file, None, buffer)?.collect();
 
         let field = metadata.schema().fields()[0].clone();
         let mut iter = ReadColumnIterator::new(field, vec![(iter, column_metadata.clone())]);
