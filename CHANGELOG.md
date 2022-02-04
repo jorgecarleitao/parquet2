@@ -1,5 +1,25 @@
 # Changelog
 
+## [v0.10.0](https://github.com/jorgecarleitao/parquet2/tree/v0.10.0) (2022-02-02)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.9.2...v0.10.0)
+
+**Breaking changes:**
+
+- Simplified API to write files [\#78](https://github.com/jorgecarleitao/parquet2/pull/78) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fixed panic in reading empty values in hybrid-RLE [\#80](https://github.com/jorgecarleitao/parquet2/pull/80) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+## [v0.9.2](https://github.com/jorgecarleitao/parquet2/tree/v0.9.2) (2022-01-25)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.9.0...v0.9.2)
+
+**Fixed bugs:**
+
+- Fixed panic in reading empty values in hybrid-RLE [\#80](https://github.com/jorgecarleitao/parquet2/pull/80) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.9.0](https://github.com/jorgecarleitao/parquet2/tree/v0.9.0) (2022-01-11)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.8.0...v0.9.0)
