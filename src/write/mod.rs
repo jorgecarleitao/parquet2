@@ -17,6 +17,8 @@ pub use compression::{compress, Compressor};
 
 pub use file::FileWriter;
 
+pub use row_group::ColumnOffsetsMetadata;
+
 use crate::compression::Compression;
 use crate::page::CompressedPage;
 
