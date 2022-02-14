@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.10.2](https://github.com/jorgecarleitao/parquet2/tree/v0.10.2) (2022-02-14)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.10.1...v0.10.2)
+
+**Fixed bugs:**
+
+- Raise error when writing a page that is too large [\#84](https://github.com/jorgecarleitao/parquet2/pull/84) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Testing updates:**
+
+- fix fmt and typo [\#83](https://github.com/jorgecarleitao/parquet2/pull/83) ([youngsofun](https://github.com/youngsofun))
+
 ## [v0.10.1](https://github.com/jorgecarleitao/parquet2/tree/v0.10.1) (2022-02-12)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.10.0...v0.10.1)
