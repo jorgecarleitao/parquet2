@@ -108,7 +108,9 @@ pub fn deserialize_statistics(
         PhysicalType::Float => primitive::read::<f32>(statistics, descriptor),
         PhysicalType::Double => primitive::read::<f64>(statistics, descriptor),
         PhysicalType::ByteArray => binary::read(statistics, descriptor),
-        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(statistics, *size, descriptor),
+        PhysicalType::FixedLenByteArray(size) => {
+            fixed_len_binary::read(statistics, *size, descriptor)
+        }
     }
 }
 

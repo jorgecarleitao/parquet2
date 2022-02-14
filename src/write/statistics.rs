@@ -87,7 +87,9 @@ fn reduce_binary<'a, I: Iterator<Item = &'a BinaryStatistics>>(mut stats: I) -> 
     })
 }
 
-fn reduce_fix_len_binary<'a, I: Iterator<Item = &'a FixedLenStatistics>>(mut stats: I) -> FixedLenStatistics {
+fn reduce_fix_len_binary<'a, I: Iterator<Item = &'a FixedLenStatistics>>(
+    mut stats: I,
+) -> FixedLenStatistics {
     let initial = stats.next().unwrap().clone();
     stats.fold(initial, |mut acc, new| {
         acc.min_value = match (acc.min_value, &new.min_value) {
@@ -112,7 +114,6 @@ fn reduce_fix_len_binary<'a, I: Iterator<Item = &'a FixedLenStatistics>>(mut sta
         acc
     })
 }
-
 
 fn ord_binary(a: Vec<u8>, b: Vec<u8>, max: bool) -> Vec<u8> {
     for (v1, v2) in a.iter().zip(b.iter()) {
