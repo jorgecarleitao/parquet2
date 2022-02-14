@@ -82,7 +82,7 @@ where
     let bytes_written = offset - initial;
 
     // compute row group stats
-    let file_offest = columns
+    let file_offset = columns
         .iter()
         .next()
         .map(|column_chunk| {
@@ -101,7 +101,7 @@ where
             total_byte_size,
             num_rows: num_rows as i64,
             sorting_columns: None,
-            file_offset: file_offest,
+            file_offset,
             total_compressed_size: None,
             ordinal: None,
         },
