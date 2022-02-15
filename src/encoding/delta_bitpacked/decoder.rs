@@ -106,7 +106,6 @@ impl<'a> Iterator for Block<'a> {
 /// This struct does not allocate on the heap.
 #[derive(Debug)]
 pub struct Decoder<'a> {
-    block_size: u64,
     num_mini_blocks: usize,
     values_per_mini_block: usize,
     values_remaining: usize,
@@ -152,7 +151,6 @@ impl<'a> Decoder<'a> {
         };
 
         Self {
-            block_size,
             num_mini_blocks,
             values_per_mini_block,
             values_remaining: total_count,

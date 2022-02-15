@@ -1,9 +1,11 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
+
+use bytemuck::Pod;
 
 use crate::schema::types::PhysicalType;
 
 /// A physical native representation of a Parquet fixed-sized type.
-pub trait NativeType: Sized + Copy + std::fmt::Debug + Send + Sync + 'static {
+pub trait NativeType: std::fmt::Debug + Send + Sync + Pod {
     type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = std::array::TryFromSliceError>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
@@ -99,6 +101,7 @@ impl NativeType for [u32; 3] {
     }
 }
 
+#[inline]
 pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
     const JULIAN_DAY_OF_EPOCH: i64 = 2_440_588;
     const SECONDS_PER_DAY: i64 = 86_400;
@@ -112,10 +115,6 @@ pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
 }
 
 #[inline]
-pub fn decode<T: NativeType>(chunk: &[u8]) -> T {
-    let chunk: <T as NativeType>::Bytes = match chunk.try_into() {
-        Ok(v) => v,
-        Err(_) => panic!(),
-    };
-    T::from_le_bytes(chunk)
+pub fn decode<T: NativeType>(chunk: &[u8]) -> &[T] {
+    bytemuck::cast_slice(chunk)
 }
