@@ -12,6 +12,8 @@ name = "parquet2"
 bench = false
 
 [dependencies]
+bytemuck = { version = "1", features = ["derive"] }
+
 parquet-format-async-temp = "0.2.0"
 bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
 streaming-decompression = "0.1"

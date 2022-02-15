@@ -56,8 +56,8 @@ pub fn read<T: types::NativeType>(
         descriptor,
         null_count: v.null_count,
         distinct_count: v.distinct_count,
-        max_value: v.max_value.as_ref().map(|x| types::decode(x)),
-        min_value: v.min_value.as_ref().map(|x| types::decode(x)),
+        max_value: v.max_value.as_ref().map(|x| types::decode(x)[0]),
+        min_value: v.min_value.as_ref().map(|x| types::decode(x)[0]),
     }))
 }
 

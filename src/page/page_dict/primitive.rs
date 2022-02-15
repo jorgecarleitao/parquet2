@@ -32,9 +32,8 @@ impl<T: NativeType> DictPage for PrimitivePageDict<T> {
 
 fn read_plain<T: NativeType>(values: &[u8]) -> Vec<T> {
     // read in plain
-    let chunks = values.chunks_exact(std::mem::size_of::<T>());
-    assert_eq!(chunks.remainder().len(), 0);
-    chunks.map(|chunk| types::decode(chunk)).collect()
+    assert_eq!(values.len() % std::mem::size_of::<T>(), 0);
+    types::decode(values).to_vec()
 }
 
 pub fn read<T: NativeType>(
