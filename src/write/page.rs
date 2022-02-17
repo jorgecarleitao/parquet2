@@ -3,9 +3,6 @@ use std::io::Write;
 use std::sync::Arc;
 
 use futures::{AsyncWrite, AsyncWriteExt};
-use parquet_format_async_temp::thrift::protocol::{
-    TCompactOutputProtocol, TCompactOutputStreamProtocol,
-};
 use parquet_format_async_temp::{DictionaryPageHeader, Encoding, PageType};
 
 use crate::error::{ParquetError, Result};
@@ -13,6 +10,7 @@ use crate::page::{
     CompressedDataPage, CompressedDictPage, CompressedPage, DataPageHeader, ParquetPageHeader,
 };
 use crate::statistics::Statistics;
+use crate::thrift_io_wrapper::ThriftWriter;
 
 fn maybe_bytes(uncompressed: usize, compressed: usize) -> Result<(i32, i32)> {
     let uncompressed_page_size: i32 = uncompressed.try_into().map_err(|_| {
@@ -51,8 +49,8 @@ pub fn write_page<W: Write>(
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
     }?;
 
-    let header_size = write_page_header(writer, &header)?;
-    let mut bytes_written = header_size as u64;
+    let header_size = header.write_thrift_to(writer)? as u64;
+    let mut bytes_written = header_size;
 
     bytes_written += match &compressed_page {
         CompressedPage::Data(compressed_page) => {
@@ -89,7 +87,7 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
     }?;
 
-    let header_size = write_page_header_async(writer, &header).await?;
+    let header_size = header.write_thrift_to_async(writer).await? as u64;
     let mut bytes_written = header_size as u64;
 
     bytes_written += match &compressed_page {
@@ -171,21 +169,6 @@ fn assemble_dict_page_header(page: &CompressedDictPage) -> Result<ParquetPageHea
         }),
         data_page_header_v2: None,
     })
-}
-
-/// writes the page header into `writer`, returning the number of bytes used in the process.
-fn write_page_header<W: Write>(mut writer: &mut W, header: &ParquetPageHeader) -> Result<u64> {
-    let mut protocol = TCompactOutputProtocol::new(&mut writer);
-    Ok(header.write_to_out_protocol(&mut protocol)? as u64)
-}
-
-/// writes the page header into `writer`, returning the number of bytes used in the process.
-async fn write_page_header_async<W: AsyncWrite + Unpin + Send>(
-    mut writer: &mut W,
-    header: &ParquetPageHeader,
-) -> Result<u64> {
-    let mut protocol = TCompactOutputStreamProtocol::new(&mut writer);
-    Ok(header.write_to_out_stream_protocol(&mut protocol).await? as u64)
 }
 
 #[cfg(test)]

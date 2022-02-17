@@ -2,11 +2,9 @@ use std::io::Write;
 
 use futures::{AsyncWrite, AsyncWriteExt};
 
-use parquet_format_async_temp::{
-    thrift::protocol::{TCompactOutputStreamProtocol, TOutputStreamProtocol},
-    FileMetaData, RowGroup,
-};
+use parquet_format_async_temp::{FileMetaData, RowGroup};
 
+use crate::thrift_io_wrapper::ThriftWriter;
 use crate::{
     error::{ParquetError, Result},
     metadata::{KeyValue, SchemaDescriptor},
@@ -21,13 +19,11 @@ async fn start_file<W: AsyncWrite + Unpin>(writer: &mut W) -> Result<u64> {
 }
 
 async fn end_file<W: AsyncWrite + Unpin + Send>(
-    mut writer: &mut W,
+    writer: &mut W,
     metadata: FileMetaData,
 ) -> Result<u64> {
     // Write file metadata
-    let mut protocol = TCompactOutputStreamProtocol::new(&mut writer);
-    let metadata_len = metadata.write_to_out_stream_protocol(&mut protocol).await? as i32;
-    protocol.flush().await?;
+    let metadata_len = metadata.write_thrift_to_async(writer).await? as i32;
 
     // Write footer
     let metadata_bytes = metadata_len.to_le_bytes();

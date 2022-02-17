@@ -21,7 +21,6 @@ use std::{
     io::{Cursor, Read, Seek, SeekFrom},
 };
 
-use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 use parquet_format_async_temp::{ColumnOrder as TColumnOrder, FileMetaData as TFileMetaData};
 
 use super::super::metadata::get_sort_order;
@@ -31,6 +30,7 @@ use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_M
 
 use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
+use crate::thrift_io_wrapper::ThriftReader;
 
 pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
@@ -100,14 +100,12 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         let mut reader = Cursor::new(default_len_end_buf);
         reader.seek(SeekFrom::End(-(footer_metadata_len as i64)))?;
 
-        let mut prot = TCompactInputProtocol::new(reader);
-        TFileMetaData::read_from_in_protocol(&mut prot)
+        TFileMetaData::read_thrift_from(&mut reader)
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader.seek(SeekFrom::End(-(footer_metadata_len as i64)))?;
 
-        let mut prot = TCompactInputProtocol::new(reader);
-        TFileMetaData::read_from_in_protocol(&mut prot)
+        TFileMetaData::read_thrift_from(reader)
     }
     .map_err(|e| ParquetError::General(format!("Could not parse metadata: {}", e)))?;
 

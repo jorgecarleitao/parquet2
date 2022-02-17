@@ -6,7 +6,7 @@ mod row_group;
 pub(self) mod statistics;
 
 #[cfg(feature = "stream")]
-mod stream;
+pub mod stream;
 #[cfg(feature = "stream")]
 pub use stream::FileStreamer;
 

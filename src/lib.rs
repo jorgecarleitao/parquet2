@@ -11,6 +11,7 @@ mod parquet_bridge;
 pub mod read;
 pub mod schema;
 pub mod statistics;
+mod thrift_io_wrapper;
 pub mod types;
 pub mod write;
 

@@ -1,12 +1,12 @@
 use std::io::SeekFrom;
 
 use futures::{io::Cursor, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
-use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 use parquet_format_async_temp::FileMetaData as TFileMetaData;
 
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 use super::metadata::{metadata_len, parse_column_orders};
 use crate::error::{ParquetError, Result};
+use crate::thrift_io_wrapper::ThriftReader;
 
 async fn stream_len(
     seek: &mut (impl AsyncSeek + std::marker::Unpin),
@@ -70,16 +70,14 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
             .seek(SeekFrom::End(-(footer_metadata_len as i64)))
             .await?;
 
-        let mut prot = TCompactInputStreamProtocol::new(reader);
-        TFileMetaData::stream_from_in_protocol(&mut prot).await?
+        TFileMetaData::read_thrift_from_async(&mut reader).await?
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader
             .seek(SeekFrom::End(-(footer_metadata_len as i64)))
             .await?;
 
-        let mut prot = TCompactInputStreamProtocol::new(reader);
-        TFileMetaData::stream_from_in_protocol(&mut prot).await?
+        TFileMetaData::read_thrift_from_async(reader).await?
     };
 
     let schema = t_file_metadata.schema.iter().collect::<Vec<_>>();

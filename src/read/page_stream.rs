@@ -2,7 +2,6 @@ use std::io::SeekFrom;
 
 use async_stream::try_stream;
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Stream};
-use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 
 use crate::compression::Compression;
 use crate::error::Result;
@@ -11,6 +10,7 @@ use crate::page::{CompressedDataPage, ParquetPageHeader};
 
 use super::page_iterator::{finish_page, get_page_header, FinishedPage};
 use super::PageFilter;
+use crate::thrift_io_wrapper::ThriftReader;
 
 /// Returns a stream of compressed data pages
 pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
@@ -44,7 +44,7 @@ fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
     try_stream! {
         while seen_values < total_num_values {
             // the header
-            let page_header = read_page_header(reader).await?;
+            let page_header = ParquetPageHeader::read_thrift_from_async(reader).await?;
 
             let data_header = get_page_header(&page_header);
             seen_values += data_header.as_ref().map(|x| x.num_values() as i64).unwrap_or_default();
@@ -85,13 +85,4 @@ fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
             }
         }
     }
-}
-
-/// Reads Page header from Thrift.
-async fn read_page_header<R: AsyncRead + Unpin + Send>(
-    reader: &mut R,
-) -> Result<ParquetPageHeader> {
-    let mut prot = TCompactInputStreamProtocol::new(reader);
-    let page_header = ParquetPageHeader::stream_from_in_protocol(&mut prot).await?;
-    Ok(page_header)
 }

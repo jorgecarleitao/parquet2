@@ -1,11 +1,10 @@
 use std::convert::TryInto;
 use std::{io::Read, sync::Arc};
 
-use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
-
 use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
+use crate::thrift_io_wrapper::ThriftReader;
 
 use crate::page::{
     read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
@@ -63,9 +62,7 @@ impl<R: Read> PageIterator<R> {
 
     /// Reads Page header from Thrift.
     fn read_page_header(&mut self) -> Result<ParquetPageHeader> {
-        let mut prot = TCompactInputProtocol::new(&mut self.reader);
-        let page_header = ParquetPageHeader::read_from_in_protocol(&mut prot)?;
-        Ok(page_header)
+        ParquetPageHeader::read_thrift_from(&mut self.reader)
     }
 
     pub fn reuse_buffer(&mut self, buffer: Vec<u8>) {
