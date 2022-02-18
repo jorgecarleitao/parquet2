@@ -30,7 +30,7 @@ use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_M
 
 use crate::error::{ParquetError, Result};
 use crate::schema::types::ParquetType;
-use crate::thrift_io_wrapper::ThriftReader;
+use crate::thrift_io_wrapper::read_from_thrift;
 
 pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
@@ -89,7 +89,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     }
     let footer_metadata_len = FOOTER_SIZE + metadata_len as u64;
 
-    let t_file_metadata = if footer_metadata_len > file_size {
+    let t_file_metadata: TFileMetaData = if footer_metadata_len > file_size {
         return Err(general_err!(
             "Invalid Parquet file. Metadata start is less than zero ({})",
             file_size as i64 - footer_metadata_len as i64
@@ -100,12 +100,12 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         let mut reader = Cursor::new(default_len_end_buf);
         reader.seek(SeekFrom::End(-(footer_metadata_len as i64)))?;
 
-        TFileMetaData::read_thrift_from(&mut reader)
+        read_from_thrift(&mut reader)
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader.seek(SeekFrom::End(-(footer_metadata_len as i64)))?;
 
-        TFileMetaData::read_thrift_from(reader)
+        read_from_thrift(reader)
     }
     .map_err(|e| ParquetError::General(format!("Could not parse metadata: {}", e)))?;
 

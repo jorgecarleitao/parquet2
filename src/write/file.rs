@@ -2,7 +2,7 @@ use std::io::Write;
 
 use parquet_format_async_temp::FileMetaData;
 
-use crate::thrift_io_wrapper::ThriftWriter;
+use crate::thrift_io_wrapper::write_to_thrift;
 use parquet_format_async_temp::RowGroup;
 
 pub use crate::metadata::KeyValue;
@@ -21,7 +21,7 @@ pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<u64> {
 
 pub(super) fn end_file<W: Write>(writer: &mut W, metadata: FileMetaData) -> Result<u64> {
     // Write metadata
-    let metadata_len = metadata.write_thrift_to(writer)?;
+    let metadata_len = write_to_thrift(&metadata, writer)?;
 
     // Write footer
     let metadata_bytes = metadata_len.to_le_bytes();

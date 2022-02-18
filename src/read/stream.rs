@@ -6,7 +6,7 @@ use parquet_format_async_temp::FileMetaData as TFileMetaData;
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 use super::metadata::{metadata_len, parse_column_orders};
 use crate::error::{ParquetError, Result};
-use crate::thrift_io_wrapper::ThriftReader;
+use crate::thrift_io_wrapper::read_from_thrift_async;
 
 async fn stream_len(
     seek: &mut (impl AsyncSeek + std::marker::Unpin),
@@ -57,7 +57,7 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
     }
     let footer_metadata_len = FOOTER_SIZE + metadata_len as u64;
 
-    let t_file_metadata = if footer_metadata_len > file_size {
+    let t_file_metadata: TFileMetaData = if footer_metadata_len > file_size {
         return Err(general_err!(
             "Invalid Parquet file. Metadata start is less than zero ({})",
             file_size as i64 - footer_metadata_len as i64
@@ -70,14 +70,14 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
             .seek(SeekFrom::End(-(footer_metadata_len as i64)))
             .await?;
 
-        TFileMetaData::read_thrift_from_async(&mut reader).await?
+        read_from_thrift_async(&mut reader).await?
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader
             .seek(SeekFrom::End(-(footer_metadata_len as i64)))
             .await?;
 
-        TFileMetaData::read_thrift_from_async(reader).await?
+        read_from_thrift_async(reader).await?
     };
 
     let schema = t_file_metadata.schema.iter().collect::<Vec<_>>();

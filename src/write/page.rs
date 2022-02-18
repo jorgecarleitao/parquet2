@@ -10,7 +10,7 @@ use crate::page::{
     CompressedDataPage, CompressedDictPage, CompressedPage, DataPageHeader, ParquetPageHeader,
 };
 use crate::statistics::Statistics;
-use crate::thrift_io_wrapper::ThriftWriter;
+use crate::thrift_io_wrapper::{write_to_thrift, write_to_thrift_async};
 
 fn maybe_bytes(uncompressed: usize, compressed: usize) -> Result<(i32, i32)> {
     let uncompressed_page_size: i32 = uncompressed.try_into().map_err(|_| {
@@ -49,7 +49,7 @@ pub fn write_page<W: Write>(
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
     }?;
 
-    let header_size = header.write_thrift_to(writer)? as u64;
+    let header_size = write_to_thrift(&header, writer)? as u64;
     let mut bytes_written = header_size;
 
     bytes_written += match &compressed_page {
@@ -87,7 +87,7 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
     }?;
 
-    let header_size = header.write_thrift_to_async(writer).await? as u64;
+    let header_size = write_to_thrift_async(&header, writer).await? as u64;
     let mut bytes_written = header_size as u64;
 
     bytes_written += match &compressed_page {

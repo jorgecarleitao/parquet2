@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::convert::TryInto;
 use std::io::Write;
 
-use crate::thrift_io_wrapper::ThriftWriter;
+use crate::thrift_io_wrapper::{write_to_thrift, write_to_thrift_async};
 use futures::AsyncWrite;
 use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
 
@@ -47,7 +47,7 @@ where
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
 
-    column_chunk.write_thrift_to(writer)?;
+    write_to_thrift(&column_chunk, writer)?;
 
     Ok((column_chunk, bytes_written))
 }
@@ -76,7 +76,7 @@ where
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
     // write metadata
-    column_chunk.write_thrift_to_async(writer).await?;
+    write_to_thrift_async(&column_chunk, writer).await?;
     Ok((column_chunk, bytes_written))
 }
 

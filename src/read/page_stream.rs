@@ -6,11 +6,11 @@ use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Stream};
 use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::{ColumnChunkMetaData, ColumnDescriptor};
-use crate::page::{CompressedDataPage, ParquetPageHeader};
+use crate::page::CompressedDataPage;
 
 use super::page_iterator::{finish_page, get_page_header, FinishedPage};
 use super::PageFilter;
-use crate::thrift_io_wrapper::ThriftReader;
+use crate::thrift_io_wrapper::read_from_thrift_async;
 
 /// Returns a stream of compressed data pages
 pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
@@ -44,7 +44,7 @@ fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
     try_stream! {
         while seen_values < total_num_values {
             // the header
-            let page_header = ParquetPageHeader::read_thrift_from_async(reader).await?;
+            let page_header = read_from_thrift_async(reader).await?;
 
             let data_header = get_page_header(&page_header);
             seen_values += data_header.as_ref().map(|x| x.num_values() as i64).unwrap_or_default();

@@ -4,7 +4,8 @@ use futures::{AsyncWrite, AsyncWriteExt};
 
 use parquet_format_async_temp::{FileMetaData, RowGroup};
 
-use crate::thrift_io_wrapper::ThriftWriter;
+use crate::thrift_io_wrapper::write_to_thrift_async;
+
 use crate::{
     error::{ParquetError, Result},
     metadata::{KeyValue, SchemaDescriptor},
@@ -23,7 +24,7 @@ async fn end_file<W: AsyncWrite + Unpin + Send>(
     metadata: FileMetaData,
 ) -> Result<u64> {
     // Write file metadata
-    let metadata_len = metadata.write_thrift_to_async(writer).await? as i32;
+    let metadata_len = write_to_thrift_async(&metadata, writer).await? as i32;
 
     // Write footer
     let metadata_bytes = metadata_len.to_le_bytes();

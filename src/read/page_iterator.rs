@@ -4,7 +4,7 @@ use std::{io::Read, sync::Arc};
 use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::ColumnDescriptor;
-use crate::thrift_io_wrapper::ThriftReader;
+use crate::thrift_io_wrapper::read_from_thrift;
 
 use crate::page::{
     read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
@@ -62,7 +62,7 @@ impl<R: Read> PageIterator<R> {
 
     /// Reads Page header from Thrift.
     fn read_page_header(&mut self) -> Result<ParquetPageHeader> {
-        ParquetPageHeader::read_thrift_from(&mut self.reader)
+        read_from_thrift(&mut self.reader)
     }
 
     pub fn reuse_buffer(&mut self, buffer: Vec<u8>) {
