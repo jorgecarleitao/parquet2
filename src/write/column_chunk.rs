@@ -51,7 +51,7 @@ where
 
     // write metadata
     let mut protocol = TCompactOutputProtocol::new(writer);
-    bytes_written += column_chunk.write_to_out_protocol(&mut protocol)? as u64;
+    bytes_written += column_chunk.meta_data.as_ref().unwrap().write_to_out_protocol(&mut protocol)? as u64;
     protocol.flush()?;
 
     Ok((column_chunk, bytes_written))
@@ -83,7 +83,7 @@ where
 
     // write metadata
     let mut protocol = TCompactOutputStreamProtocol::new(writer);
-    bytes_written += column_chunk
+    bytes_written += column_chunk.meta_data.as_ref().unwrap()
         .write_to_out_stream_protocol(&mut protocol)
         .await?;
     protocol.flush().await?;
