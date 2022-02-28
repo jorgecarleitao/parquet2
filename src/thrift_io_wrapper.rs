@@ -75,7 +75,6 @@ pub async fn read_from_thrift_async<T: ThriftType, R: AsyncRead + Unpin + Send>(
 pub fn write_to_thrift<T: ThriftType, W: Write>(value: &T, writer: &mut W) -> Result<usize> {
     let mut protocol = TCompactOutputProtocol::new(writer);
     let r = value.write_to_out_protocol(&mut protocol)?;
-    protocol.flush()?;
     Ok(r)
 }
 
@@ -85,6 +84,5 @@ pub async fn write_to_thrift_async<T: ThriftType, W: AsyncWrite + Unpin + Send>(
 ) -> Result<usize> {
     let mut protocol = TCompactOutputStreamProtocol::new(writer);
     let r = value.write_to_out_stream_protocol(&mut protocol).await?;
-    protocol.flush().await?;
     Ok(r)
 }

@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use std::io::Write;
 
 use crate::thrift_io_wrapper::{write_to_thrift, write_to_thrift_async};
-use futures::AsyncWrite;
+use futures::{AsyncWrite, AsyncWriteExt};
 use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
 
 use crate::statistics::serialize_statistics;
@@ -43,11 +43,11 @@ where
         offset += spec.bytes_written;
         specs.push(spec);
     }
-    let bytes_written = offset - initial;
+    let mut bytes_written = offset - initial;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
 
-    write_to_thrift(&column_chunk, writer)?;
+    bytes_written += write_to_thrift(&column_chunk, writer)? as u64;
 
     Ok((column_chunk, bytes_written))
 }
@@ -72,11 +72,12 @@ where
         offset += spec.bytes_written;
         specs.push(spec);
     }
-    let bytes_written = (offset - initial) as usize;
+    let mut bytes_written = (offset - initial) as usize;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
     // write metadata
-    write_to_thrift_async(&column_chunk, writer).await?;
+    bytes_written += write_to_thrift_async(&column_chunk, writer).await?;
+    writer.flush().await?;
     Ok((column_chunk, bytes_written))
 }
 
