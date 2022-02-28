@@ -3,9 +3,6 @@ use std::convert::TryInto;
 use std::io::Write;
 
 use futures::AsyncWrite;
-use parquet_format_async_temp::thrift::protocol::{
-    TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
-};
 use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
 
 use crate::statistics::serialize_statistics;
@@ -45,14 +42,9 @@ where
         offset += spec.bytes_written;
         specs.push(spec);
     }
-    let mut bytes_written = offset - initial;
+    let bytes_written = offset - initial;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
-
-    // write metadata
-    let mut protocol = TCompactOutputProtocol::new(writer);
-    bytes_written += column_chunk.write_to_out_protocol(&mut protocol)? as u64;
-    protocol.flush()?;
 
     Ok((column_chunk, bytes_written))
 }
@@ -77,16 +69,9 @@ where
         offset += spec.bytes_written;
         specs.push(spec);
     }
-    let mut bytes_written = (offset - initial) as usize;
+    let bytes_written = (offset - initial) as usize;
 
     let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
-
-    // write metadata
-    let mut protocol = TCompactOutputStreamProtocol::new(writer);
-    bytes_written += column_chunk
-        .write_to_out_stream_protocol(&mut protocol)
-        .await?;
-    protocol.flush().await?;
 
     Ok((column_chunk, bytes_written))
 }
