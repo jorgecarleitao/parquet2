@@ -62,6 +62,15 @@ pub fn compress(
             crate::error::Feature::Snappy,
             "compress to snappy".to_string(),
         )),
+        #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
+        Compression::Lz4Raw => {
+            let required_len = lz4_flex::block::get_maximum_output_size(input_buf.len());
+            output_buf.resize(required_len, 0);
+
+            let compressed_size = lz4_flex::block::compress_into(input_buf, output_buf).unwrap();
+            output_buf.truncate(compressed_size);
+            Ok(())
+        }
         #[cfg(feature = "lz4")]
         Compression::Lz4Raw => {
             let output_buf_len = output_buf.len();
@@ -76,7 +85,7 @@ pub fn compress(
             output_buf.truncate(output_buf_len + size);
             Ok(())
         }
-        #[cfg(not(feature = "lz4"))]
+        #[cfg(all(not(feature = "lz4"), not(feature = "lz4_flex")))]
         Compression::Lz4Raw => Err(Error::FeatureNotActive(
             crate::error::Feature::Lz4,
             "compress to lz4".to_string(),
@@ -153,13 +162,18 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             crate::error::Feature::Snappy,
             "decompress with snappy".to_string(),
         )),
+        #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
+        Compression::Lz4Raw => {
+            lz4_flex::block::decompress_into(input_buf, output_buf).unwrap();
+            Ok(())
+        }
         #[cfg(feature = "lz4")]
         Compression::Lz4Raw => {
             lz4::block::decompress_to_buffer(input_buf, Some(output_buf.len() as i32), output_buf)
                 .map(|_| {})
                 .map_err(|e| e.into())
         }
-        #[cfg(not(feature = "lz4"))]
+        #[cfg(all(not(feature = "lz4"), not(feature = "lz4_flex")))]
         Compression::Lz4Raw => Err(Error::FeatureNotActive(
             crate::error::Feature::Lz4,
             "decompress with lz4".to_string(),
