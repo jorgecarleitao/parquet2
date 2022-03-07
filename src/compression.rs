@@ -61,7 +61,7 @@ pub fn compress(
             crate::error::Feature::Snappy,
             "compress to snappy".to_string(),
         )),
-        #[cfg(feature = "lz4")]
+        #[cfg(all(feature = "lz4", target_arch = "wasm32"))]
         Compression::Lz4 => {
             use std::io::Write;
             const LZ4_BUFFER_SIZE: usize = 4096;
@@ -77,6 +77,22 @@ pub fn compress(
             }
             encoder.finish().unwrap();
             Ok(())
+        }
+        #[cfg(all(feature = "lz4", not(target_arch = "wasm32")))]
+        Compression::Lz4 => {
+            use std::io::Write;
+            const LZ4_BUFFER_SIZE: usize = 4096;
+            let mut encoder = lz4::EncoderBuilder::new().build(output_buf)?;
+            let mut from = 0;
+            loop {
+                let to = std::cmp::min(from + LZ4_BUFFER_SIZE, input_buf.len());
+                encoder.write_all(&input_buf[from..to])?;
+                from += LZ4_BUFFER_SIZE;
+                if from >= input_buf.len() {
+                    break;
+                }
+            }
+            encoder.finish().1.map_err(|e| e.into())
         }
         #[cfg(not(feature = "lz4"))]
         Compression::Lz4 => Err(ParquetError::FeatureNotActive(
@@ -155,10 +171,16 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             crate::error::Feature::Snappy,
             "decompress with snappy".to_string(),
         )),
-        #[cfg(feature = "lz4")]
+        #[cfg(all(feature = "lz4", target_arch = "wasm32"))]
         Compression::Lz4 => {
             use std::io::Read;
             let mut decoder = lz4_flex::frame::FrameDecoder::new(input_buf);
+            decoder.read_exact(output_buf).map_err(|e| e.into())
+        }
+        #[cfg(all(feature = "lz4", not(target_arch = "wasm32")))]
+        Compression::Lz4 => {
+            use std::io::Read;
+            let mut decoder = lz4::Decoder::new(input_buf)?;
             decoder.read_exact(output_buf).map_err(|e| e.into())
         }
         #[cfg(not(feature = "lz4"))]
