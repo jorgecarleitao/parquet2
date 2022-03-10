@@ -37,6 +37,7 @@ jobs:
           export CARGO_HOME="/github/home/.cargo"
           export CARGO_TARGET_DIR="/github/home/target"
           cargo test
+          cargo test --no-default-features --features snappy --features gzip --features lz4_flex --features zstd --features brotli --features stream
       - name: Setup parquet files
         run: |
           apt update && apt install python3-pip python3-venv -y -q
