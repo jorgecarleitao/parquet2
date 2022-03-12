@@ -5,7 +5,7 @@ license = "Apache-2.0"
 description = "Safe implementation of parquet IO."
 authors = ["Jorge C. Leitao <jorgecarleitao@gmail.com", "Apache Arrow <dev@arrow.apache.org>"]
 readme = "README.md"
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "parquet2"
@@ -13,7 +13,7 @@ bench = false
 
 [dependencies]
 parquet-format-async-temp = "0.2.0"
-bitpacking = { version = "0.8.2", features = ["bitpacker1x"] }
+bitpacking = { version = "0.8.2", default-features = false, features = ["bitpacker1x"] }
 streaming-decompression = "0.1"
 
 async-stream = { version = "0.3.2", optional = true }
