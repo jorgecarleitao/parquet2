@@ -117,11 +117,11 @@ def case_struct(size):
 
 
 def write_pyarrow(
-    case, size=1, page_version=1, use_dictionary=False, use_compression=False
+    case, size=1, page_version=1, use_dictionary=False, compression=None
 ):
     data, schema, path = case(size)
 
-    compression_path = "/snappy" if use_compression else ""
+    compression_path = f"/{compression}" if compression else ""
 
     if use_dictionary:
         base_path = f"{PYARROW_PATH}/v{page_version}/dict{compression_path}"
@@ -136,7 +136,7 @@ def write_pyarrow(
         version=f"{page_version}.0",
         data_page_version=f"{page_version}.0",
         write_statistics=True,
-        compression="snappy" if use_compression else None,
+        compression=compression,
         use_dictionary=use_dictionary,
     )
 
@@ -144,5 +144,5 @@ def write_pyarrow(
 for case in [case_basic_nullable, case_basic_required, case_nested, case_struct]:
     for version in [1, 2]:
         for use_dict in [False, True]:
-            for compression in [False, True]:
+            for compression in [None, "snappy", "lz4"]:
                 write_pyarrow(case, 1, version, use_dict, compression)

@@ -49,12 +49,14 @@ pub enum Compression {
     Brotli,
     Lz4,
     Zstd,
+    Lz4Raw,
 }
 
 impl TryFrom<CompressionCodec> for Compression {
     type Error = ParquetError;
 
     fn try_from(codec: CompressionCodec) -> Result<Self, Self::Error> {
+        println!("{codec:?}");
         Ok(match codec {
             CompressionCodec::UNCOMPRESSED => Compression::Uncompressed,
             CompressionCodec::SNAPPY => Compression::Snappy,
@@ -63,6 +65,7 @@ impl TryFrom<CompressionCodec> for Compression {
             CompressionCodec::BROTLI => Compression::Brotli,
             CompressionCodec::LZ4 => Compression::Lz4,
             CompressionCodec::ZSTD => Compression::Zstd,
+            CompressionCodec::LZ4_RAW => Compression::Lz4Raw,
             _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
         })
     }
@@ -70,6 +73,7 @@ impl TryFrom<CompressionCodec> for Compression {
 
 impl From<Compression> for CompressionCodec {
     fn from(codec: Compression) -> Self {
+        println!("{codec:?}");
         match codec {
             Compression::Uncompressed => CompressionCodec::UNCOMPRESSED,
             Compression::Snappy => CompressionCodec::SNAPPY,
@@ -78,6 +82,7 @@ impl From<Compression> for CompressionCodec {
             Compression::Brotli => CompressionCodec::BROTLI,
             Compression::Lz4 => CompressionCodec::LZ4,
             Compression::Zstd => CompressionCodec::ZSTD,
+            Compression::Lz4Raw => CompressionCodec::LZ4_RAW,
         }
     }
 }
