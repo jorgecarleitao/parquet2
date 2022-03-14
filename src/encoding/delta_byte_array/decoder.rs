@@ -66,7 +66,7 @@ mod tests {
         assert_eq!(lengths, expected_lengths);
 
         // move to the values
-        let values = decoder.into_values();
+        let values = decoder.values();
         assert_eq!(values, expected_values);
     }
 }
