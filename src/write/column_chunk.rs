@@ -51,7 +51,11 @@ where
 
     // write metadata
     let mut protocol = TCompactOutputProtocol::new(writer);
-    bytes_written += column_chunk.meta_data.as_ref().unwrap().write_to_out_protocol(&mut protocol)? as u64;
+    bytes_written += column_chunk
+        .meta_data
+        .as_ref()
+        .unwrap()
+        .write_to_out_protocol(&mut protocol)? as u64;
     protocol.flush()?;
 
     Ok((column_chunk, bytes_written))
@@ -83,7 +87,10 @@ where
 
     // write metadata
     let mut protocol = TCompactOutputStreamProtocol::new(writer);
-    bytes_written += column_chunk.meta_data.as_ref().unwrap()
+    bytes_written += column_chunk
+        .meta_data
+        .as_ref()
+        .unwrap()
         .write_to_out_stream_protocol(&mut protocol)
         .await?;
     protocol.flush().await?;
@@ -126,7 +133,7 @@ fn build_column_chunk(
         .sum();
     let encodings = specs
         .iter()
-        .map(|spec| {
+        .flat_map(|spec| {
             let type_ = spec.header.type_.try_into().unwrap();
             match type_ {
                 PageType::DataPage => vec![
@@ -149,7 +156,6 @@ fn build_column_chunk(
                 _ => todo!(),
             }
         })
-        .flatten()
         .collect::<HashSet<_>>() // unique
         .into_iter() // to vec
         .collect();
