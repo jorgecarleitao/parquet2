@@ -20,7 +20,7 @@ mod tests {
         let result = iter.by_ref().collect::<Vec<_>>();
         assert_eq!(result, vec![2, 3, 1, 2, 1]);
 
-        let result = iter.into_values();
+        let result = iter.values();
         assert_eq!(result, b"aabbbaaab".as_ref());
     }
 

@@ -80,6 +80,7 @@ impl ColumnChunkMetaData {
 
     /// [`Compression`] for this column.
     pub fn compression(&self) -> Compression {
+        println!("{:?}", self.column_metadata().codec);
         self.column_metadata().codec.try_into().unwrap()
     }
 

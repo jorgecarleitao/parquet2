@@ -51,6 +51,15 @@ impl<'a> Decoder<'a> {
         let start = self.lengths.consumed_bytes();
         &self.values[start..start + self.total_length as usize]
     }
+
+    /// Returns the slice of concatenated values.
+    /// # Panics
+    /// This function panics if this iterator has not yet been fully consumed.
+    pub fn values(&self) -> &'a [u8] {
+        assert_eq!(self.lengths.size_hint().0, 0);
+        let start = self.lengths.consumed_bytes();
+        &self.values[start..start + self.total_length as usize]
+    }
 }
 
 impl<'a> Iterator for Decoder<'a> {
