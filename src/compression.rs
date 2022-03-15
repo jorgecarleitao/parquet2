@@ -62,20 +62,12 @@ pub fn compress(
             "compress to snappy".to_string(),
         )),
         #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
-        Compression::Lz4 => {
-            use std::io::Write;
-            const LZ4_BUFFER_SIZE: usize = 4096;
-            let mut encoder = lz4_flex::frame::FrameEncoder::new(output_buf);
-            let mut from = 0;
-            loop {
-                let to = std::cmp::min(from + LZ4_BUFFER_SIZE, input_buf.len());
-                encoder.write_all(&input_buf[from..to])?;
-                from += LZ4_BUFFER_SIZE;
-                if from >= input_buf.len() {
-                    break;
-                }
-            }
-            encoder.finish().unwrap();
+        Compression::Lz4Raw => {
+            let required_len = lz4_flex::block::get_maximum_output_size(input_buf.len());
+            output_buf.resize(required_len, 0);
+
+            let compressed_size = lz4_flex::block::compress_into(input_buf, output_buf).unwrap();
+            output_buf.truncate(compressed_size);
             Ok(())
         }
         #[cfg(feature = "lz4")]
@@ -170,10 +162,9 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             "decompress with snappy".to_string(),
         )),
         #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
-        Compression::Lz4 => {
-            use std::io::Read;
-            let mut decoder = lz4_flex::frame::FrameDecoder::new(input_buf);
-            decoder.read_exact(output_buf).map_err(|e| e.into())
+        Compression::Lz4Raw => {
+            lz4_flex::block::decompress_into(input_buf, output_buf).unwrap();
+            Ok(())
         }
         #[cfg(feature = "lz4")]
         Compression::Lz4Raw => {
