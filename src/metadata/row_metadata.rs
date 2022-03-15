@@ -85,13 +85,14 @@ impl RowGroupMetaData {
             })
             .next()
             .unwrap_or(None);
+        let total_compressed_size = Some(self.compressed_size());
         RowGroup {
             columns: self.columns.into_iter().map(|v| v.into_thrift()).collect(),
             total_byte_size: self.total_byte_size,
             num_rows: self.num_rows,
             sorting_columns: None,
-            file_offset: file_offset,
-            total_compressed_size: None,
+            file_offset,
+            total_compressed_size,
             ordinal: None,
         }
     }

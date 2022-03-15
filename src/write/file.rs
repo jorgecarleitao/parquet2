@@ -101,6 +101,7 @@ impl<W: Write> FileWriter<W> {
                 "You must call `start` before writing the first row group".to_string(),
             ));
         }
+        let ordinal = self.row_groups.len();
         let (group, size) = write_row_group(
             &mut self.writer,
             self.offset,
@@ -108,6 +109,7 @@ impl<W: Write> FileWriter<W> {
             self.options.compression,
             row_group,
             num_rows,
+            ordinal,
         )?;
         self.offset += size;
         self.row_groups.push(group);

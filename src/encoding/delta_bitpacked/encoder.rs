@@ -27,7 +27,7 @@ pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
     let mut values = [0i64; 128];
     let mut deltas = [0u32; 128];
 
-    let first_value = iterator.next().unwrap().into();
+    let first_value = iterator.next().unwrap();
     let (container, encoded_len) = zigzag_leb128::encode(first_value);
     buffer.extend_from_slice(&container[..encoded_len]);
 
@@ -35,7 +35,6 @@ pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
     let mut length = iterator.size_hint().1.unwrap();
     while length != 0 {
         for (i, v) in (0..128).zip(&mut iterator) {
-            let v: i64 = v.into();
             values[i] = v - prev;
             prev = v;
         }

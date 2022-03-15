@@ -62,6 +62,7 @@ pub fn write_row_group<
     compression: Compression,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
     num_rows: usize,
+    ordinal: usize,
 ) -> Result<(RowGroup, u64)>
 where
     W: Write,
@@ -83,14 +84,17 @@ where
 
     // compute row group stats
     let file_offset = columns
-        .iter()
-        .next()
+        .get(0)
         .map(|column_chunk| {
             ColumnOffsetsMetadata::from_column_chunk(column_chunk).calc_row_group_file_offset()
         })
         .unwrap_or(None);
 
     let total_byte_size = columns
+        .iter()
+        .map(|c| c.meta_data.as_ref().unwrap().total_uncompressed_size)
+        .sum();
+    let total_compressed_size = columns
         .iter()
         .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
         .sum();
@@ -102,8 +106,8 @@ where
             num_rows: num_rows as i64,
             sorting_columns: None,
             file_offset,
-            total_compressed_size: None,
-            ordinal: None,
+            total_compressed_size: Some(total_compressed_size),
+            ordinal: ordinal.try_into().ok(),
         },
         bytes_written,
     ))
@@ -140,8 +144,7 @@ where
 
     // compute row group stats
     let file_offest = columns
-        .iter()
-        .next()
+        .get(0)
         .map(|column_chunk| {
             ColumnOffsetsMetadata::from_column_chunk(column_chunk).calc_row_group_file_offset()
         })

@@ -148,6 +148,10 @@ pub(crate) mod tests {
     ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
         let metadata = read_metadata(reader)?;
 
+        let expected = metadata.row_groups[0].column(0).compressed_size();
+        let chunk = metadata.row_groups[0].column(0).clone().into_thrift();
+        assert_eq!(chunk.meta_data.unwrap().total_compressed_size, expected);
+
         let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
         let field = &metadata.schema().fields()[field];
 
