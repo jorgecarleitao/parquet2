@@ -62,23 +62,21 @@ pub fn compress(
             "compress to snappy".to_string(),
         )),
         #[cfg(feature = "lz4")]
-        Compression::Lz4 => {
-            use std::io::Write;
-            const LZ4_BUFFER_SIZE: usize = 4096;
-            let mut encoder = lz4::EncoderBuilder::new().build(output_buf)?;
-            let mut from = 0;
-            loop {
-                let to = std::cmp::min(from + LZ4_BUFFER_SIZE, input_buf.len());
-                encoder.write_all(&input_buf[from..to])?;
-                from += LZ4_BUFFER_SIZE;
-                if from >= input_buf.len() {
-                    break;
-                }
-            }
-            encoder.finish().1.map_err(|e| e.into())
+        Compression::Lz4Raw => {
+            let output_buf_len = output_buf.len();
+            let required_len = input_buf.len();
+            output_buf.resize(output_buf_len + required_len, 0);
+            let size = lz4::block::compress_to_buffer(
+                input_buf,
+                None,
+                false,
+                &mut output_buf[output_buf_len..],
+            )?;
+            output_buf.truncate(output_buf_len + size);
+            Ok(())
         }
         #[cfg(not(feature = "lz4"))]
-        Compression::Lz4 => Err(ParquetError::FeatureNotActive(
+        Compression::Lz4Raw => Err(ParquetError::FeatureNotActive(
             crate::error::Feature::Lz4,
             "compress to lz4".to_string(),
         )),
@@ -155,13 +153,13 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             "decompress with snappy".to_string(),
         )),
         #[cfg(feature = "lz4")]
-        Compression::Lz4 => {
-            use std::io::Read;
-            let mut decoder = lz4::Decoder::new(input_buf)?;
-            decoder.read_exact(output_buf).map_err(|e| e.into())
+        Compression::Lz4Raw => {
+            lz4::block::decompress_to_buffer(input_buf, Some(output_buf.len() as i32), output_buf)
+                .map(|_| {})
+                .map_err(|e| e.into())
         }
         #[cfg(not(feature = "lz4"))]
-        Compression::Lz4 => Err(ParquetError::FeatureNotActive(
+        Compression::Lz4Raw => Err(ParquetError::FeatureNotActive(
             crate::error::Feature::Lz4,
             "decompress with lz4".to_string(),
         )),
@@ -230,7 +228,7 @@ mod tests {
 
     #[test]
     fn test_codec_lz4() {
-        test_codec(Compression::Lz4);
+        test_codec(Compression::Lz4Raw);
     }
 
     #[test]
