@@ -56,7 +56,6 @@ impl TryFrom<CompressionCodec> for Compression {
     type Error = ParquetError;
 
     fn try_from(codec: CompressionCodec) -> Result<Self, Self::Error> {
-        println!("{codec:?}");
         Ok(match codec {
             CompressionCodec::UNCOMPRESSED => Compression::Uncompressed,
             CompressionCodec::SNAPPY => Compression::Snappy,
@@ -73,7 +72,6 @@ impl TryFrom<CompressionCodec> for Compression {
 
 impl From<Compression> for CompressionCodec {
     fn from(codec: Compression) -> Self {
-        println!("{codec:?}");
         match codec {
             Compression::Uncompressed => CompressionCodec::UNCOMPRESSED,
             Compression::Snappy => CompressionCodec::SNAPPY,

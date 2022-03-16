@@ -41,8 +41,14 @@ impl ColumnChunkMetaData {
         self.column_chunk.file_offset
     }
 
+    // The column's metadata
     fn column_metadata(&self) -> &ColumnMetaData {
         self.column_chunk.meta_data.as_ref().unwrap()
+    }
+
+    // The column's metadata
+    pub fn metadata(&self) -> Option<&ColumnMetaData> {
+        self.column_chunk.meta_data.as_ref()
     }
 
     /// Type of this column. Must be primitive.
@@ -80,7 +86,6 @@ impl ColumnChunkMetaData {
 
     /// [`Compression`] for this column.
     pub fn compression(&self) -> Compression {
-        println!("{:?}", self.column_metadata().codec);
         self.column_metadata().codec.try_into().unwrap()
     }
 
