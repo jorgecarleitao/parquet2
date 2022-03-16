@@ -110,3 +110,14 @@ which can be downcasted via its `Statistics::physical_type()`:
 ```rust,no_run,noplayground
 {{#include ../../examples/read_metadata.rs:statistics}}
 ```
+
+## Bloom filters
+
+The metadata of columns can contain bloom filter bitsets that
+can be used to pushdown filter operations.
+
+This crate offers the necessary functionality to check whether an item is not in a column chunk:
+
+```rust,no_run,noplayground
+{{#include ../../examples/read_metadata.rs:bloom_filter}}
+```
