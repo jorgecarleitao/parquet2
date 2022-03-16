@@ -221,7 +221,8 @@ Decompression is done via <code>decompress</code>:</p>
     }
 </code></pre>
 <p>Decoding and deserialization is usually done in the same step, as follows:</p>
-<pre><code class="language-rust no_run noplayground">use parquet2::encoding::Encoding;
+<pre><code class="language-rust no_run noplayground">use parquet2::bloom_filter;
+use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage};
 use parquet2::schema::types::ParquetType;
@@ -288,8 +289,39 @@ which can be downcasted via its <code>Statistics::physical_type()</code>:</p>
                 let _max: i32 = stats.max_value.unwrap();
                 let _null_count: i64 = stats.null_count.unwrap();
             }
+            PhysicalType::Int64 =&gt; {
+                let stats = stats
+                    .as_any()
+                    .downcast_ref::&lt;PrimitiveStatistics&lt;i64&gt;&gt;()
+                    .unwrap();
+                let _min: i64 = stats.min_value.unwrap();
+                let _max: i64 = stats.max_value.unwrap();
+                let _null_count: i64 = stats.null_count.unwrap();
+            }
             _ =&gt; todo!(),
         }
+    }
+</code></pre>
+<h2 id="bloom-filters"><a class="header" href="#bloom-filters">Bloom filters</a></h2>
+<p>The metadata of columns can contain bloom filter bitsets that
+can be used to pushdown filter operations.</p>
+<p>This crate offers the necessary functionality to check whether an item is not in a column chunk:</p>
+<pre><code class="language-rust no_run noplayground">    let mut bitset = vec![];
+    bloom_filter::read(column_metadata, &amp;mut reader, &amp;mut bitset)?;
+    if !bitset.is_empty() {
+        // there is a bitset, we can use it to check if elements are in the column chunk
+
+        // assume that our query engine had resulted in the filter `&quot;column 0&quot; == 100i64` (it also verified that column 0 is i64 in parquet)
+        let value = 100i64;
+
+        // we hash this value
+        let hash = bloom_filter::hash_native(value);
+
+        // and check if the hash is in the bitset.
+        let _in_set = bloom_filter::is_in_set(&amp;bitset, hash);
+        // if not (false), we could skip this entire row group, because no item hits the filter
+        // this can naturally be applied over multiple columns.
+        // if yes (true), the item _may_ be in the row group, and we usually can't skip it.
     }
 </code></pre>
 
