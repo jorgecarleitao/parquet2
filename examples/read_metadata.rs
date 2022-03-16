@@ -1,6 +1,7 @@
 use parquet2::error::Result;
 
 // ANCHOR: deserialize
+use parquet2::bloom_filter;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage};
@@ -74,10 +75,39 @@ fn main() -> Result<()> {
                 let _max: i32 = stats.max_value.unwrap();
                 let _null_count: i64 = stats.null_count.unwrap();
             }
+            PhysicalType::Int64 => {
+                let stats = stats
+                    .as_any()
+                    .downcast_ref::<PrimitiveStatistics<i64>>()
+                    .unwrap();
+                let _min: i64 = stats.min_value.unwrap();
+                let _max: i64 = stats.max_value.unwrap();
+                let _null_count: i64 = stats.null_count.unwrap();
+            }
             _ => todo!(),
         }
     }
     // ANCHOR_END: statistics
+
+    // ANCHOR: bloom_filter
+    let mut bitset = vec![];
+    bloom_filter::read(column_metadata, &mut reader, &mut bitset)?;
+    if !bitset.is_empty() {
+        // there is a bitset, we can use it to check if elements are in the column chunk
+
+        // assume that our query engine had resulted in the filter `"column 0" == 100i64` (it also verified that column 0 is i64 in parquet)
+        let value = 100i64;
+
+        // we hash this value
+        let hash = bloom_filter::hash_native(value);
+
+        // and check if the hash is in the bitset.
+        let _in_set = bloom_filter::is_in_set(&bitset, hash);
+        // if not (false), we could skip this entire row group, because no item hits the filter
+        // this can naturally be applied over multiple columns.
+        // if yes (true), the item _may_ be in the row group, and we usually can't skip it.
+    }
+    // ANCHOR_END: bloom_filter
 
     // ANCHOR: pages
     use parquet2::read::get_page_iterator;
@@ -93,5 +123,6 @@ fn main() -> Result<()> {
         let _array = deserialize(&page, column_metadata.descriptor());
     }
     // ANCHOR_END: decompress
+
     Ok(())
 }

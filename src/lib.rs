@@ -3,6 +3,8 @@
 
 #[macro_use]
 pub mod error;
+#[cfg(feature = "bloom_filter")]
+pub mod bloom_filter;
 pub mod compression;
 pub mod encoding;
 pub mod metadata;
