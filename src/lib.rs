@@ -7,6 +7,7 @@ pub mod error;
 pub mod bloom_filter;
 pub mod compression;
 pub mod encoding;
+pub mod indexes;
 pub mod metadata;
 pub mod page;
 mod parquet_bridge;
