@@ -221,8 +221,7 @@ Decompression is done via <code>decompress</code>:</p>
     }
 </code></pre>
 <p>Decoding and deserialization is usually done in the same step, as follows:</p>
-<pre><code class="language-rust no_run noplayground">use parquet2::bloom_filter;
-use parquet2::encoding::Encoding;
+<pre><code class="language-rust no_run noplayground">use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage};
 use parquet2::schema::types::ParquetType;
@@ -303,8 +302,8 @@ which can be downcasted via its <code>Statistics::physical_type()</code>:</p>
     }
 </code></pre>
 <h2 id="bloom-filters"><a class="header" href="#bloom-filters">Bloom filters</a></h2>
-<p>The metadata of columns can contain bloom filter bitsets that
-can be used to pushdown filter operations.</p>
+<p>The column metadata may contain bloom filter bitsets that can be used to pushdown
+filter operations to row groups.</p>
 <p>This crate offers the necessary functionality to check whether an item is not in a column chunk:</p>
 <pre><code class="language-rust no_run noplayground">    let mut bitset = vec![];
     bloom_filter::read(column_metadata, &amp;mut reader, &amp;mut bitset)?;
@@ -323,6 +322,14 @@ can be used to pushdown filter operations.</p>
         // this can naturally be applied over multiple columns.
         // if yes (true), the item _may_ be in the row group, and we usually can't skip it.
     }
+</code></pre>
+<h2 id="column-and-page-indexes"><a class="header" href="#column-and-page-indexes">Column and page indexes</a></h2>
+<p>The column metadata may contain column and page indexes that can be used to push down filters
+when reading (IO) pages.</p>
+<p>This crate offers the necessary functionality to check whether an item is not in a column chunk:</p>
+<pre><code class="language-rust no_run noplayground">    let row_group = 0;
+    let column = 0;
+    let column_metadata = metadata.row_groups[row_group].column(column);
 </code></pre>
 
                     </main>
