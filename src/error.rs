@@ -70,6 +70,12 @@ impl From<std::io::Error> for ParquetError {
     }
 }
 
+impl From<std::num::TryFromIntError> for ParquetError {
+    fn from(e: std::num::TryFromIntError) -> ParquetError {
+        ParquetError::OutOfSpec(format!("Number must be zero or positive: {}", e))
+    }
+}
+
 /// A specialized `Result` for Parquet errors.
 pub type Result<T> = std::result::Result<T, ParquetError>;
 

@@ -41,6 +41,11 @@ impl ColumnChunkMetaData {
         self.column_chunk.file_offset
     }
 
+    /// Returns this column's [`ColumnChunk`]
+    pub fn column_chunk(&self) -> &ColumnChunk {
+        &self.column_chunk
+    }
+
     // The column's metadata
     fn column_metadata(&self) -> &ColumnMetaData {
         self.column_chunk.meta_data.as_ref().unwrap()
