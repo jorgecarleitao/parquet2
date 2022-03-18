@@ -57,7 +57,7 @@ fn main() -> Result<()> {
 
     // ANCHOR: column_index
     // read the column index
-    let index = indexes::read_column(&mut reader, column_metadata.column_chunk())?;
+    let index = indexes::read_column(&mut reader, column_metadata)?;
     if let Some(index) = index {
         // these are the minimum and maximum within each page, which can be used
         // to skip pages.

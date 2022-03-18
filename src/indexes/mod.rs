@@ -1,60 +1,81 @@
-use std::convert::TryInto;
-use std::io::{Cursor, Read, Seek, SeekFrom};
+mod index;
+mod intervals;
+mod read;
 
-use parquet_format_async_temp::{
-    thrift::protocol::TCompactInputProtocol, ColumnChunk, ColumnIndex, OffsetIndex, PageLocation,
-};
+pub use self::index::{ByteIndex, FixedLenByteIndex, Index, NativeIndex, PageIndex};
+pub use intervals::compute_rows;
+pub use read::*;
 
-use crate::error::ParquetError;
+#[cfg(test)]
+mod tests {
+    use parquet_format_async_temp::PageLocation;
 
-/// Read the [`ColumnIndex`] from the [`ColumnChunk`], if available.
-pub fn read_column<R: Read + Seek>(
-    reader: &mut R,
-    chunk: &ColumnChunk,
-) -> Result<Option<ColumnIndex>, ParquetError> {
-    let (offset, length): (u64, usize) = if let Some(offset) = chunk.column_index_offset {
-        let length = chunk.column_index_length.ok_or_else(|| {
-            ParquetError::OutOfSpec(
-                "The column length must exist if column offset exists".to_string(),
-            )
-        })?;
-        (offset.try_into()?, length.try_into()?)
-    } else {
-        return Ok(None);
-    };
+    use super::*;
 
-    reader.seek(SeekFrom::Start(offset))?;
-    let mut data = vec![0; length];
-    reader.read_exact(&mut data)?;
+    #[test]
+    fn test_basic() {
+        let index = NativeIndex {
+            indexes: vec![PageIndex {
+                min: Some(0i32),
+                max: Some(10),
+                null_count: Some(0),
+            }],
+            boundary_order: Default::default(),
+        };
+        let locations = &[PageLocation {
+            offset: 100,
+            compressed_page_size: 10,
+            first_row_index: 0,
+        }];
+        let num_rows = 10;
 
-    let mut d = Cursor::new(&data);
-    let mut prot = TCompactInputProtocol::new(&mut d);
-    Ok(Some(ColumnIndex::read_from_in_protocol(&mut prot)?))
-}
+        let selector = |_| true;
 
-/// Read [`PageLocation`]s from the [`ColumnChunk`], if available.
-pub fn read_page_locations<R: Read + Seek>(
-    reader: &mut R,
-    chunk: &ColumnChunk,
-) -> Result<Option<Vec<PageLocation>>, ParquetError> {
-    let (offset, length): (u64, usize) = if let Some(offset) = chunk.offset_index_offset {
-        let length = chunk.offset_index_length.ok_or_else(|| {
-            ParquetError::OutOfSpec(
-                "The column length must exist if column offset exists".to_string(),
-            )
-        })?;
-        (offset.try_into()?, length.try_into()?)
-    } else {
-        return Ok(None);
-    };
+        let row_intervals = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
+        assert_eq!(row_intervals, vec![(0, 10)])
+    }
 
-    reader.seek(SeekFrom::Start(offset))?;
-    let mut data = vec![0; length];
-    reader.read_exact(&mut data)?;
+    #[test]
+    fn test_multiple() {
+        // two pages
+        let index = ByteIndex {
+            indexes: vec![
+                PageIndex {
+                    min: Some(vec![0]),
+                    max: Some(vec![8, 9]),
+                    null_count: Some(0),
+                },
+                PageIndex {
+                    min: Some(vec![20]),
+                    max: Some(vec![98, 99]),
+                    null_count: Some(0),
+                },
+            ],
+            boundary_order: Default::default(),
+        };
+        let locations = &[
+            PageLocation {
+                offset: 100,
+                compressed_page_size: 10,
+                first_row_index: 0,
+            },
+            PageLocation {
+                offset: 110,
+                compressed_page_size: 20,
+                first_row_index: 5,
+            },
+        ];
+        let num_rows = 10;
 
-    let mut d = Cursor::new(&data);
-    let mut prot = TCompactInputProtocol::new(&mut d);
-    let offset = OffsetIndex::read_from_in_protocol(&mut prot)?;
+        // filter of the form `x > "a"`
+        let selector = |page: &PageIndex<Vec<u8>>| {
+            page.max
+                .as_ref()
+                .map(|x| x.as_slice() > &[97])
+                .unwrap_or(false) // no max is present => all nulls => not selected
+        };
 
-    Ok(Some(offset.page_locations))
+        let row_intervals = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
+        assert_eq!(row_intervals, vec![(5, 5)])
+    }
 }
