@@ -3,6 +3,7 @@ use std::convert::TryFrom;
 use std::convert::TryInto;
 
 use crate::error::ParquetError;
+use parquet_format_async_temp::BoundaryOrder as ParquetBoundaryOrder;
 use parquet_format_async_temp::CompressionCodec;
 use parquet_format_async_temp::DataPageHeader;
 use parquet_format_async_temp::DataPageHeaderV2;
@@ -188,6 +189,48 @@ impl From<Encoding> for ParquetEncoding {
             Encoding::DeltaByteArray => ParquetEncoding::DELTA_BYTE_ARRAY,
             Encoding::RleDictionary => ParquetEncoding::RLE_DICTIONARY,
             Encoding::ByteStreamSplit => ParquetEncoding::BYTE_STREAM_SPLIT,
+        }
+    }
+}
+
+/// Enum to annotate whether lists of min/max elements inside ColumnIndex
+/// are ordered and if so, in which direction.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub enum BoundaryOrder {
+    Unordered,
+    Ascending,
+    Descending,
+}
+
+impl Default for BoundaryOrder {
+    fn default() -> Self {
+        Self::Unordered
+    }
+}
+
+impl TryFrom<ParquetBoundaryOrder> for BoundaryOrder {
+    type Error = ParquetError;
+
+    fn try_from(encoding: ParquetBoundaryOrder) -> Result<Self, Self::Error> {
+        Ok(match encoding {
+            ParquetBoundaryOrder::UNORDERED => BoundaryOrder::Unordered,
+            ParquetBoundaryOrder::ASCENDING => BoundaryOrder::Ascending,
+            ParquetBoundaryOrder::DESCENDING => BoundaryOrder::Descending,
+            _ => {
+                return Err(ParquetError::OutOfSpec(
+                    "BoundaryOrder Thrift value out of range".to_string(),
+                ))
+            }
+        })
+    }
+}
+
+impl From<BoundaryOrder> for ParquetBoundaryOrder {
+    fn from(encoding: BoundaryOrder) -> Self {
+        match encoding {
+            BoundaryOrder::Unordered => ParquetBoundaryOrder::UNORDERED,
+            BoundaryOrder::Ascending => ParquetBoundaryOrder::ASCENDING,
+            BoundaryOrder::Descending => ParquetBoundaryOrder::DESCENDING,
         }
     }
 }

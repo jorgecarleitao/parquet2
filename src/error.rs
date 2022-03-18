@@ -76,6 +76,12 @@ impl From<std::num::TryFromIntError> for ParquetError {
     }
 }
 
+impl From<std::array::TryFromSliceError> for ParquetError {
+    fn from(e: std::array::TryFromSliceError) -> ParquetError {
+        ParquetError::OutOfSpec(format!("Can't deserialize to parquet native type: {}", e))
+    }
+}
+
 /// A specialized `Result` for Parquet errors.
 pub type Result<T> = std::result::Result<T, ParquetError>;
 

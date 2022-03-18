@@ -4,7 +4,7 @@ use crate::schema::types::PhysicalType;
 
 /// A physical native representation of a Parquet fixed-sized type.
 pub trait NativeType: Sized + Copy + std::fmt::Debug + Send + Sync + 'static {
-    type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8]>;
+    type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = std::array::TryFromSliceError>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
 
