@@ -1,9 +1,9 @@
-use parquet::encoding::hybrid_rle::HybridRleDecoder;
-use parquet::encoding::Encoding;
-use parquet::error::Result;
-use parquet::metadata::ColumnDescriptor;
-use parquet::page::{split_buffer, DataPage, DataPageHeader};
-use parquet::read::levels::get_bit_width;
+use parquet2::encoding::hybrid_rle::HybridRleDecoder;
+use parquet2::encoding::Encoding;
+use parquet2::error::Result;
+use parquet2::metadata::ColumnDescriptor;
+use parquet2::page::{split_buffer, DataPage, DataPageHeader};
+use parquet2::read::levels::get_bit_width;
 
 use super::utils::ValuesDef;
 

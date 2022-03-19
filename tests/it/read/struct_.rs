@@ -1,7 +1,7 @@
-use parquet::encoding::hybrid_rle::HybridRleDecoder;
-use parquet::metadata::ColumnDescriptor;
-use parquet::page::{split_buffer, DataPage};
-use parquet::read::levels::get_bit_width;
+use parquet2::encoding::hybrid_rle::HybridRleDecoder;
+use parquet2::metadata::ColumnDescriptor;
+use parquet2::page::{split_buffer, DataPage};
+use parquet2::read::levels::get_bit_width;
 
 pub fn extend_validity(val: &mut Vec<bool>, page: &DataPage, descriptor: &ColumnDescriptor) {
     let (_, def_levels, _) = split_buffer(page, descriptor);

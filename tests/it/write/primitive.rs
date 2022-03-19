@@ -1,4 +1,4 @@
-use parquet::{
+use parquet2::{
     encoding::Encoding,
     metadata::ColumnDescriptor,
     page::{DataPage, DataPageHeader, DataPageHeaderV1, EncodedPage},

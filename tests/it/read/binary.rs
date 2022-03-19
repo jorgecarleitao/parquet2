@@ -1,4 +1,4 @@
-use parquet::{
+use parquet2::{
     encoding::{hybrid_rle::HybridRleDecoder, plain_byte_array, Encoding},
     error::Result,
     metadata::ColumnDescriptor,
