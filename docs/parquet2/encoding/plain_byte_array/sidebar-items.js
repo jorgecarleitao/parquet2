@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Decoder","Decodes according to Plain strings, prefixes, lengths and values"]]});
