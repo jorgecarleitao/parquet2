@@ -1,1 +1,0 @@
-initSidebarItems({"fn":[["read_column","Read the [`ColumnIndex`] from the [`ColumnChunk`], if available."],["read_page_locations","Read [`PageLocation`]s from the [`ColumnChunk`], if available."]]});
