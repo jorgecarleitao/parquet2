@@ -90,7 +90,6 @@ pub enum PageType {
     DataPage,
     DataPageV2,
     DictionaryPage,
-    IndexPage,
 }
 
 impl TryFrom<ParquetPageType> for PageType {
@@ -101,7 +100,6 @@ impl TryFrom<ParquetPageType> for PageType {
             ParquetPageType::DATA_PAGE => PageType::DataPage,
             ParquetPageType::DATA_PAGE_V2 => PageType::DataPageV2,
             ParquetPageType::DICTIONARY_PAGE => PageType::DictionaryPage,
-            ParquetPageType::INDEX_PAGE => PageType::IndexPage,
             _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
         })
     }
@@ -113,7 +111,6 @@ impl From<PageType> for ParquetPageType {
             PageType::DataPage => ParquetPageType::DATA_PAGE,
             PageType::DataPageV2 => ParquetPageType::DATA_PAGE_V2,
             PageType::DictionaryPage => ParquetPageType::DICTIONARY_PAGE,
-            PageType::IndexPage => ParquetPageType::INDEX_PAGE,
         }
     }
 }

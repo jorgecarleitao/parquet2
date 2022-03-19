@@ -167,7 +167,6 @@ fn build_page<R: Read>(
 pub(super) enum FinishedPage {
     Data(CompressedDataPage),
     Dict(Arc<dyn DictPage>),
-    Index,
 }
 
 pub(super) fn finish_page(
@@ -222,7 +221,6 @@ pub(super) fn finish_page(
                 descriptor.clone(),
             )))
         }
-        PageType::IndexPage => Ok(FinishedPage::Index),
     }
 }
 

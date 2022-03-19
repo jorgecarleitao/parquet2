@@ -153,7 +153,6 @@ fn build_column_chunk(
                         .unwrap()
                         .encoding,
                 ],
-                _ => todo!(),
             }
         })
         .collect::<HashSet<_>>() // unique
