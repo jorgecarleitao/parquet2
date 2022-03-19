@@ -71,6 +71,7 @@ fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
                 compression,
                 &current_dictionary,
                 descriptor,
+                None,
             )?;
 
             match result {
