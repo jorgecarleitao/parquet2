@@ -77,18 +77,27 @@ pub enum FilteredPage {
     Select {
         /// Location of the page in the file
         start: u64,
-        length: u64,
+        length: usize,
         /// Location of rows to select in the page
-        rows_offset: u64,
-        rows_length: u64,
+        rows_offset: usize,
+        rows_length: usize,
     },
     Skip {
         /// Location of the page in the file
         start: u64,
-        length: u64,
+        length: usize,
         /// number of rows that are skip by skipping this page
         num_rows: usize,
     },
+}
+
+impl FilteredPage {
+    pub fn start(&self) -> u64 {
+        match self {
+            Self::Select { start, .. } => *start,
+            Self::Skip { start, .. } => *start,
+        }
+    }
 }
 
 fn is_in(probe: Interval, intervals: &[Interval]) -> Option<Interval> {
@@ -122,8 +131,8 @@ pub fn select_pages(
                 FilteredPage::Select {
                     start: location.offset.try_into()?,
                     length: location.compressed_page_size.try_into()?,
-                    rows_offset: overlap.start,
-                    rows_length: overlap.length,
+                    rows_offset: overlap.start.try_into()?,
+                    rows_length: overlap.length.try_into()?,
                 }
             } else {
                 FilteredPage::Skip {

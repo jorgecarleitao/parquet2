@@ -7,7 +7,7 @@ use parquet_format_async_temp::{
 
 use crate::error::ParquetError;
 use crate::metadata::ColumnChunkMetaData;
-use crate::schema::types::{ParquetType, PhysicalType};
+use crate::schema::types::PhysicalType;
 
 use super::{ByteIndex, FixedLenByteIndex, Index, NativeIndex};
 
@@ -36,20 +36,17 @@ pub fn read_column<R: Read + Seek>(
     let mut prot = TCompactInputProtocol::new(&mut d);
 
     let index = ColumnIndex::read_from_in_protocol(&mut prot)?;
-    let index = match chunk.descriptor().type_() {
-        ParquetType::PrimitiveType { physical_type, .. } => match physical_type {
-            PhysicalType::Boolean => return Ok(None),
-            PhysicalType::Int32 => Box::new(NativeIndex::<i32>::try_from(index)?) as Box<dyn Index>,
-            PhysicalType::Int64 => Box::new(NativeIndex::<i64>::try_from(index)?) as _,
-            PhysicalType::Int96 => Box::new(NativeIndex::<[u32; 3]>::try_from(index)?) as _,
-            PhysicalType::Float => Box::new(NativeIndex::<f32>::try_from(index)?),
-            PhysicalType::Double => Box::new(NativeIndex::<f64>::try_from(index)?),
-            PhysicalType::ByteArray => Box::new(ByteIndex::try_from(index)?),
-            PhysicalType::FixedLenByteArray(size) => {
-                Box::new(FixedLenByteIndex::try_from((index, *size))?)
-            }
-        },
-        _ => unreachable!(),
+    let index = match chunk.descriptor().descriptor.primitive_type.physical_type {
+        PhysicalType::Boolean => return Ok(None),
+        PhysicalType::Int32 => Box::new(NativeIndex::<i32>::try_from(index)?) as Box<dyn Index>,
+        PhysicalType::Int64 => Box::new(NativeIndex::<i64>::try_from(index)?) as _,
+        PhysicalType::Int96 => Box::new(NativeIndex::<[u32; 3]>::try_from(index)?) as _,
+        PhysicalType::Float => Box::new(NativeIndex::<f32>::try_from(index)?),
+        PhysicalType::Double => Box::new(NativeIndex::<f64>::try_from(index)?),
+        PhysicalType::ByteArray => Box::new(ByteIndex::try_from(index)?),
+        PhysicalType::FixedLenByteArray(size) => {
+            Box::new(FixedLenByteIndex::try_from((index, size))?)
+        }
     };
 
     Ok(Some(index))

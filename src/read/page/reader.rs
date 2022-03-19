@@ -17,8 +17,11 @@ use super::PageIterator;
 /// Type declaration for a page filter
 pub type PageFilter = Arc<dyn Fn(&Descriptor, &DataPageHeader) -> bool + Send + Sync>;
 
-/// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
-/// contiguously arranged in memory and therefore must be read in sequence.
+/// A fallible [`Iterator`] of [`CompressedDataPage`]. This iterator reads pages back
+/// to back until all pages have been consumed.
+/// The pages from this iterator always have [`None`] [`CompressedDataPage::rows()`] since
+/// filter pushdown is not supported without a
+/// pre-computed [page index](https://github.com/apache/parquet-format/blob/master/PageIndex.md).
 pub struct PageReader<R: Read> {
     // The source
     reader: R,
@@ -63,13 +66,6 @@ impl<R: Read> PageReader<R> {
         }
     }
 
-    /// Reads Page header from Thrift.
-    fn read_page_header(&mut self) -> Result<ParquetPageHeader> {
-        let mut prot = TCompactInputProtocol::new(&mut self.reader);
-        let page_header = ParquetPageHeader::read_from_in_protocol(&mut prot)?;
-        Ok(page_header)
-    }
-
     pub fn into_inner(self) -> (R, Vec<u8>) {
         (self.reader, self.buffer)
     }
@@ -104,6 +100,13 @@ impl<R: Read> Iterator for PageReader<R> {
     }
 }
 
+/// Reads Page header from Thrift.
+pub(super) fn read_page_header<R: Read>(reader: &mut R) -> Result<ParquetPageHeader> {
+    let mut prot = TCompactInputProtocol::new(reader);
+    let page_header = ParquetPageHeader::read_from_in_protocol(&mut prot)?;
+    Ok(page_header)
+}
+
 /// This function is lightweight and executes a minimal amount of work so that it is IO bounded.
 // Any un-necessary CPU-intensive tasks SHOULD be executed on individual pages.
 fn next_page<R: Read>(
@@ -126,11 +129,11 @@ fn next_page<R: Read>(
     Ok(None)
 }
 
-fn build_page<R: Read>(
+pub(super) fn build_page<R: Read>(
     reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedDataPage>> {
-    let page_header = reader.read_page_header()?;
+    let page_header = read_page_header(&mut reader.reader)?;
     reader.seen_num_values += get_page_header(&page_header)
         .map(|x| x.num_values() as i64)
         .unwrap_or_default();
@@ -152,6 +155,7 @@ fn build_page<R: Read>(
         reader.compression,
         &reader.current_dictionary,
         &reader.descriptor,
+        None,
     )?;
 
     match result {
@@ -170,10 +174,11 @@ pub(super) enum FinishedPage {
 
 pub(super) fn finish_page(
     page_header: ParquetPageHeader,
-    buffer: &mut Vec<u8>,
+    data: &mut Vec<u8>,
     compression: Compression,
     current_dictionary: &Option<Arc<dyn DictPage>>,
     descriptor: &Descriptor,
+    rows: Option<(usize, usize)>,
 ) -> Result<FinishedPage> {
     let type_ = page_header.type_.try_into()?;
     match type_ {
@@ -183,7 +188,7 @@ pub(super) fn finish_page(
 
             // move the buffer to `dict_page`
             let mut dict_page =
-                EncodedDictPage::new(std::mem::take(buffer), dict_header.num_values as usize);
+                EncodedDictPage::new(std::mem::take(data), dict_header.num_values as usize);
 
             let page = read_dict_page(
                 &dict_page,
@@ -192,7 +197,7 @@ pub(super) fn finish_page(
                 descriptor.primitive_type.physical_type,
             )?;
             // take the buffer out of the `dict_page` to re-use it
-            std::mem::swap(&mut dict_page.buffer, buffer);
+            std::mem::swap(&mut dict_page.buffer, data);
 
             Ok(FinishedPage::Dict(page))
         }
@@ -201,11 +206,12 @@ pub(super) fn finish_page(
 
             Ok(FinishedPage::Data(CompressedDataPage::new(
                 DataPageHeader::V1(header),
-                std::mem::take(buffer),
+                std::mem::take(data),
                 compression,
                 page_header.uncompressed_page_size as usize,
                 current_dictionary.clone(),
                 descriptor.clone(),
+                rows,
             )))
         }
         PageType::DataPageV2 => {
@@ -213,11 +219,12 @@ pub(super) fn finish_page(
 
             Ok(FinishedPage::Data(CompressedDataPage::new(
                 DataPageHeader::V2(header),
-                std::mem::take(buffer),
+                std::mem::take(data),
                 compression,
                 page_header.uncompressed_page_size as usize,
                 current_dictionary.clone(),
                 descriptor.clone(),
+                rows,
             )))
         }
     }

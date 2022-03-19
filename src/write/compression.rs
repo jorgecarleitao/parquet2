@@ -47,6 +47,7 @@ fn compress_data(
         uncompressed_page_size,
         dictionary_page,
         descriptor,
+        None, // the writing of a page has no selected rows, so this value is not used
     ))
 }
 
