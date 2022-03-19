@@ -90,6 +90,7 @@ pub fn decompress(
         std::mem::take(buffer),
         compressed_page.dictionary_page,
         compressed_page.descriptor,
+        compressed_page.rows,
     ))
 }
 
@@ -105,6 +106,7 @@ fn decompress_reuse<P: PageIterator>(
         std::mem::take(buffer),
         compressed_page.dictionary_page,
         compressed_page.descriptor,
+        compressed_page.rows,
     );
 
     if was_decompressed {

@@ -28,7 +28,7 @@ pub struct CompressedDataPage {
     pub(crate) descriptor: Descriptor,
 
     // The offset and length in rows
-    rows: Option<(usize, usize)>,
+    pub(crate) rows: Option<(usize, usize)>,
 }
 
 impl CompressedDataPage {
@@ -119,6 +119,7 @@ pub struct DataPage {
     pub(super) buffer: Vec<u8>,
     pub(super) dictionary_page: Option<Arc<dyn DictPage>>,
     pub descriptor: Descriptor,
+    pub rows: Option<(usize, usize)>,
 }
 
 impl DataPage {
@@ -127,12 +128,14 @@ impl DataPage {
         buffer: Vec<u8>,
         dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
+        rows: Option<(usize, usize)>,
     ) -> Self {
         Self {
             header,
             buffer,
             dictionary_page,
             descriptor,
+            rows,
         }
     }
 
@@ -146,6 +149,12 @@ impl DataPage {
 
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
+    }
+
+    /// the rows to be selected by this page.
+    /// When `None`, all rows are to be considered.
+    pub fn rows(&self) -> Option<(usize, usize)> {
+        self.rows
     }
 
     /// Returns a mutable reference to the internal buffer.
