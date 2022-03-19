@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use super::utils::ValuesDef;
 
-use parquet::{
+use parquet2::{
     encoding::{hybrid_rle::HybridRleDecoder, Encoding},
     error::Result,
     metadata::ColumnDescriptor,

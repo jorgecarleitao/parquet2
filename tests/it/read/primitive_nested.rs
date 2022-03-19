@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use super::Array;
 
-use parquet::{
+use parquet2::{
     encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
