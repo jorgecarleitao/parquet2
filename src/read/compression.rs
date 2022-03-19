@@ -93,9 +93,9 @@ pub fn decompress(
     ))
 }
 
-fn decompress_reuse<R: std::io::Read>(
+fn decompress_reuse<P: PageIterator>(
     mut compressed_page: CompressedDataPage,
-    iterator: &mut PageIterator<R>,
+    iterator: &mut P,
     buffer: &mut Vec<u8>,
 ) -> Result<(DataPage, bool)> {
     let was_decompressed = decompress_buffer(&mut compressed_page, buffer)?;
@@ -108,20 +108,20 @@ fn decompress_reuse<R: std::io::Read>(
     );
 
     if was_decompressed {
-        iterator.reuse_buffer(compressed_page.buffer)
+        iterator.swap_buffer(&mut compressed_page.buffer)
     };
     Ok((new_page, was_decompressed))
 }
 
-/// Decompressor that allows re-using the page buffer of [`PageIterator`].
+/// Decompressor that allows re-using the page buffer of [`PageReader`].
 /// # Implementation
 /// The implementation depends on whether a page is compressed or not.
-/// > `PageIterator(a)`, `CompressedPage(b)`, `Decompressor(c)`, `DecompressedPage(d)`
+/// > `PageReader(a)`, `CompressedPage(b)`, `Decompressor(c)`, `DecompressedPage(d)`
 /// ### un-compressed pages:
 /// > page iter: `a` is swapped with `b`
 /// > decompress iter: `b` is swapped with `d`, `b` is swapped with `a`
 /// therefore:
-/// * `PageIterator` has its buffer back
+/// * `PageReader` has its buffer back
 /// * `Decompressor`'s buffer is un-used
 /// * `DecompressedPage` has the same data as `CompressedPage` had
 /// ### compressed pages:
@@ -132,23 +132,23 @@ fn decompress_reuse<R: std::io::Read>(
 /// > * `c` is moved to `d`
 /// > * (next iteration): `d` is moved to `c`
 /// therefore, while the page is available:
-/// * `PageIterator` has its buffer back
+/// * `PageReader` has its buffer back
 /// * `Decompressor`'s buffer empty
 /// * `DecompressedPage` has the decompressed buffer
 /// after the page is used:
-/// * `PageIterator` has its buffer back
+/// * `PageReader` has its buffer back
 /// * `Decompressor` has its buffer back
 /// * `DecompressedPage` has an empty buffer
-pub struct Decompressor<R: std::io::Read> {
-    iter: PageIterator<R>,
+pub struct Decompressor<P: PageIterator> {
+    iter: P,
     buffer: Vec<u8>,
     current: Option<DataPage>,
     was_decompressed: bool,
 }
 
-impl<R: std::io::Read> Decompressor<R> {
+impl<P: PageIterator> Decompressor<P> {
     /// Creates a new [`Decompressor`].
-    pub fn new(iter: PageIterator<R>, buffer: Vec<u8>) -> Self {
+    pub fn new(iter: P, buffer: Vec<u8>) -> Self {
         Self {
             iter,
             buffer,
@@ -159,13 +159,14 @@ impl<R: std::io::Read> Decompressor<R> {
 
     /// Returns two buffers: the first buffer corresponds to the page buffer,
     /// the second to the decompression buffer.
-    pub fn into_buffers(self) -> (Vec<u8>, Vec<u8>) {
-        let page_buffer = self.iter.into_buffer();
+    pub fn into_buffers(mut self) -> (Vec<u8>, Vec<u8>) {
+        let mut page_buffer = vec![];
+        self.iter.swap_buffer(&mut page_buffer);
         (page_buffer, self.buffer)
     }
 }
 
-impl<R: std::io::Read> FallibleStreamingIterator for Decompressor<R> {
+impl<P: PageIterator> FallibleStreamingIterator for Decompressor<P> {
     type Item = DataPage;
     type Error = ParquetError;
 
@@ -174,7 +175,7 @@ impl<R: std::io::Read> FallibleStreamingIterator for Decompressor<R> {
             if self.was_decompressed {
                 self.buffer = std::mem::take(&mut page.buffer);
             } else {
-                self.iter.reuse_buffer(std::mem::take(&mut page.buffer));
+                self.iter.swap_buffer(&mut page.buffer);
             }
         }
 

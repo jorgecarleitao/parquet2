@@ -12,12 +12,14 @@ use crate::page::{
     ParquetPageHeader,
 };
 
+use super::PageIterator;
+
 /// Type declaration for a page filter
 pub type PageFilter = Arc<dyn Fn(&ColumnDescriptor, &DataPageHeader) -> bool + Send + Sync>;
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
-pub struct PageIterator<R: Read> {
+pub struct PageReader<R: Read> {
     // The source
     reader: R,
 
@@ -40,7 +42,7 @@ pub struct PageIterator<R: Read> {
     pub(crate) buffer: Vec<u8>,
 }
 
-impl<R: Read> PageIterator<R> {
+impl<R: Read> PageReader<R> {
     pub fn new(
         reader: R,
         total_num_values: i64,
@@ -68,20 +70,18 @@ impl<R: Read> PageIterator<R> {
         Ok(page_header)
     }
 
-    pub fn reuse_buffer(&mut self, buffer: Vec<u8>) {
-        self.buffer = buffer;
-    }
-
-    pub fn into_buffer(self) -> Vec<u8> {
-        self.buffer
-    }
-
     pub fn into_inner(self) -> (R, Vec<u8>) {
         (self.reader, self.buffer)
     }
 }
 
-impl<R: Read> Iterator for PageIterator<R> {
+impl<R: Read> PageIterator for PageReader<R> {
+    fn swap_buffer(&mut self, buffer: &mut Vec<u8>) {
+        std::mem::swap(&mut self.buffer, buffer)
+    }
+}
+
+impl<R: Read> Iterator for PageReader<R> {
     type Item = Result<CompressedDataPage>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -107,7 +107,7 @@ impl<R: Read> Iterator for PageIterator<R> {
 /// This function is lightweight and executes a minimal amount of work so that it is IO bounded.
 // Any un-necessary CPU-intensive tasks SHOULD be executed on individual pages.
 fn next_page<R: Read>(
-    reader: &mut PageIterator<R>,
+    reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedDataPage>> {
     let total_values = reader.total_num_values;
@@ -127,7 +127,7 @@ fn next_page<R: Read>(
 }
 
 fn build_page<R: Read>(
-    reader: &mut PageIterator<R>,
+    reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedDataPage>> {
     let page_header = reader.read_page_header()?;
