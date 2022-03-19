@@ -2,7 +2,7 @@ use std::convert::TryInto;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
 use parquet_format_async_temp::{
-    thrift::protocol::TCompactInputProtocol, ColumnChunk, ColumnIndex, OffsetIndex, PageLocation,
+    thrift::protocol::TCompactInputProtocol, ColumnIndex, OffsetIndex, PageLocation,
 };
 
 use crate::error::ParquetError;
@@ -55,18 +55,19 @@ pub fn read_column<R: Read + Seek>(
 /// Read [`PageLocation`]s from the [`ColumnChunk`], if available.
 pub fn read_page_locations<R: Read + Seek>(
     reader: &mut R,
-    chunk: &ColumnChunk,
+    chunk: &ColumnChunkMetaData,
 ) -> Result<Option<Vec<PageLocation>>, ParquetError> {
-    let (offset, length): (u64, usize) = if let Some(offset) = chunk.offset_index_offset {
-        let length = chunk.offset_index_length.ok_or_else(|| {
-            ParquetError::OutOfSpec(
-                "The column length must exist if column offset exists".to_string(),
-            )
-        })?;
-        (offset.try_into()?, length.try_into()?)
-    } else {
-        return Ok(None);
-    };
+    let (offset, length): (u64, usize) =
+        if let Some(offset) = chunk.column_chunk().offset_index_offset {
+            let length = chunk.column_chunk().offset_index_length.ok_or_else(|| {
+                ParquetError::OutOfSpec(
+                    "The column length must exist if column offset exists".to_string(),
+                )
+            })?;
+            (offset.try_into()?, length.try_into()?)
+        } else {
+            return Ok(None);
+        };
 
     reader.seek(SeekFrom::Start(offset))?;
     let mut data = vec![0; length];

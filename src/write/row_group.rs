@@ -12,6 +12,7 @@ use crate::{
 
 use super::{
     column_chunk::{write_column_chunk, write_column_chunk_async},
+    page::PageWriteSpec,
     DynIter, DynStreamingIterator,
 };
 
@@ -63,7 +64,7 @@ pub fn write_row_group<
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
     num_rows: usize,
     ordinal: usize,
-) -> Result<(RowGroup, u64)>
+) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
     W: Write,
     ParquetError: From<E>,
@@ -74,10 +75,10 @@ where
     let initial = offset;
     let columns = column_iter
         .map(|(descriptor, page_iter)| {
-            let (column, size) =
+            let (column, page_specs, size) =
                 write_column_chunk(writer, offset, descriptor, compression, page_iter?)?;
             offset += size;
-            Ok(column)
+            Ok((column, page_specs))
         })
         .collect::<Result<Vec<_>>>()?;
     let bytes_written = offset - initial;
@@ -85,19 +86,21 @@ where
     // compute row group stats
     let file_offset = columns
         .get(0)
-        .map(|column_chunk| {
+        .map(|(column_chunk, _)| {
             ColumnOffsetsMetadata::from_column_chunk(column_chunk).calc_row_group_file_offset()
         })
         .unwrap_or(None);
 
     let total_byte_size = columns
         .iter()
-        .map(|c| c.meta_data.as_ref().unwrap().total_uncompressed_size)
+        .map(|(c, _)| c.meta_data.as_ref().unwrap().total_uncompressed_size)
         .sum();
     let total_compressed_size = columns
         .iter()
-        .map(|c| c.meta_data.as_ref().unwrap().total_compressed_size)
+        .map(|(c, _)| c.meta_data.as_ref().unwrap().total_compressed_size)
         .sum();
+
+    let (columns, specs) = columns.into_iter().unzip();
 
     Ok((
         RowGroup {
@@ -109,6 +112,7 @@ where
             total_compressed_size: Some(total_compressed_size),
             ordinal: ordinal.try_into().ok(),
         },
+        specs,
         bytes_written,
     ))
 }

@@ -234,6 +234,20 @@ impl CompressedPage {
             CompressedPage::Dict(page) => &mut page.buffer,
         }
     }
+
+    pub(crate) fn num_values(&self) -> usize {
+        match self {
+            CompressedPage::Data(page) => page.num_values(),
+            CompressedPage::Dict(_) => 0,
+        }
+    }
+
+    pub(crate) fn rows(&self) -> Option<(usize, usize)> {
+        match self {
+            CompressedPage::Data(page) => page.rows,
+            CompressedPage::Dict(_) => None,
+        }
+    }
 }
 
 /// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values) for v1 pages.

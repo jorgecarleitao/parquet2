@@ -29,7 +29,7 @@ pub fn write_column_chunk<'a, W, E>(
     descriptor: &ColumnDescriptor,
     compression: Compression,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
-) -> Result<(ColumnChunk, u64)>
+) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: Write,
     ParquetError: From<E>,
@@ -58,7 +58,7 @@ where
         .write_to_out_protocol(&mut protocol)? as u64;
     protocol.flush()?;
 
-    Ok((column_chunk, bytes_written))
+    Ok((column_chunk, specs, bytes_written))
 }
 
 pub async fn write_column_chunk_async<W, E>(

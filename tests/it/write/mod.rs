@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use parquet2::compression::Compression;
 use parquet2::error::Result;
+use parquet2::indexes::{self, BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::read_metadata;
 use parquet2::statistics::Statistics;
@@ -180,6 +181,82 @@ fn basic() -> Result<()> {
         metadata.row_groups[0].columns()[0].uncompressed_size(),
         expected
     );
+
+    Ok(())
+}
+
+#[test]
+fn indexes() -> Result<()> {
+    let array1 = vec![Some(0), Some(1), None, Some(3), Some(4), Some(5), Some(6)];
+    let array2 = vec![Some(10), Some(11)];
+
+    let options = WriteOptions {
+        write_statistics: true,
+        compression: Compression::Uncompressed,
+        version: Version::V1,
+    };
+
+    let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
+
+    let pages = vec![
+        array_to_page_v1::<i32>(&array1, &options, &schema.columns()[0].descriptor),
+        array_to_page_v1::<i32>(&array2, &options, &schema.columns()[0].descriptor),
+    ];
+
+    let expected_page_locations = vec![
+        PageLocation {
+            offset: 4,
+            compressed_page_size: 63,
+            first_row_index: 0,
+        },
+        PageLocation {
+            offset: 67,
+            compressed_page_size: 47,
+            first_row_index: array1.len() as i64,
+        },
+    ];
+    let expected_index = Box::new(NativeIndex::<i32> {
+        indexes: vec![
+            PageIndex {
+                min: Some(0),
+                max: Some(6),
+                null_count: Some(1),
+            },
+            PageIndex {
+                min: Some(10),
+                max: Some(11),
+                null_count: Some(0),
+            },
+        ],
+        boundary_order: BoundaryOrder::Unordered,
+    }) as Box<dyn Index>;
+
+    let pages = DynStreamingIterator::new(Compressor::new(
+        DynIter::new(pages.into_iter()),
+        options.compression,
+        vec![],
+    ));
+    let columns = std::iter::once(Ok(pages));
+
+    let writer = Cursor::new(vec![]);
+    let mut writer = FileWriter::new(writer, schema, options, None);
+
+    writer.start()?;
+    writer.write(DynIter::new(columns), 7 + 2)?;
+    let writer = writer.end(None)?.1;
+
+    let data = writer.into_inner();
+    let mut reader = Cursor::new(data);
+
+    let metadata = read_metadata(&mut reader)?;
+
+    let column_metadata = &metadata.row_groups[0].columns()[0];
+
+    let index = indexes::read_column(&mut reader, column_metadata)?.expect("column index");
+    assert_eq!(&index, &expected_index);
+
+    let pages = indexes::read_page_locations(&mut reader, column_metadata)?.expect("offset index");
+    assert_eq!(pages, expected_page_locations);
 
     Ok(())
 }

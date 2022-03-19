@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     }
 
     // read the offset index containing page locations
-    let maybe_pages = indexes::read_page_locations(&mut reader, column_metadata.column_chunk())?;
+    let maybe_pages = indexes::read_page_locations(&mut reader, column_metadata)?;
     if let Some(pages) = maybe_pages {
         // there are page locations in the file
         println!("{pages:?}");

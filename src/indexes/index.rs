@@ -11,15 +11,66 @@ pub trait Index: Send + Sync + std::fmt::Debug {
     fn physical_type(&self) -> &PhysicalType;
 }
 
+impl PartialEq for dyn Index + '_ {
+    fn eq(&self, that: &dyn Index) -> bool {
+        equal(self, that)
+    }
+}
+
+impl Eq for dyn Index + '_ {}
+
+fn equal(lhs: &dyn Index, rhs: &dyn Index) -> bool {
+    if lhs.physical_type() != rhs.physical_type() {
+        return false;
+    }
+
+    match lhs.physical_type() {
+        PhysicalType::Boolean => unreachable!(),
+        PhysicalType::Int32 => {
+            lhs.as_any().downcast_ref::<NativeIndex<i32>>().unwrap()
+                == rhs.as_any().downcast_ref::<NativeIndex<i32>>().unwrap()
+        }
+        PhysicalType::Int64 => {
+            lhs.as_any().downcast_ref::<NativeIndex<i64>>().unwrap()
+                == rhs.as_any().downcast_ref::<NativeIndex<i64>>().unwrap()
+        }
+        PhysicalType::Int96 => {
+            lhs.as_any()
+                .downcast_ref::<NativeIndex<[u32; 3]>>()
+                .unwrap()
+                == rhs
+                    .as_any()
+                    .downcast_ref::<NativeIndex<[u32; 3]>>()
+                    .unwrap()
+        }
+        PhysicalType::Float => {
+            lhs.as_any().downcast_ref::<NativeIndex<f32>>().unwrap()
+                == rhs.as_any().downcast_ref::<NativeIndex<f32>>().unwrap()
+        }
+        PhysicalType::Double => {
+            lhs.as_any().downcast_ref::<NativeIndex<f64>>().unwrap()
+                == rhs.as_any().downcast_ref::<NativeIndex<f64>>().unwrap()
+        }
+        PhysicalType::ByteArray => {
+            lhs.as_any().downcast_ref::<ByteIndex>().unwrap()
+                == rhs.as_any().downcast_ref::<ByteIndex>().unwrap()
+        }
+        PhysicalType::FixedLenByteArray(_) => {
+            lhs.as_any().downcast_ref::<FixedLenByteIndex>().unwrap()
+                == rhs.as_any().downcast_ref::<FixedLenByteIndex>().unwrap()
+        }
+    }
+}
+
 /// An index of a column of [`NativeType`] physical representation
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NativeIndex<T: NativeType> {
     pub indexes: Vec<PageIndex<T>>,
     pub boundary_order: BoundaryOrder,
 }
 
 /// The index of a page, containing the min and max values of the page.
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PageIndex<T> {
     /// The minimum value in the page. It is None when all values are null
     pub min: Option<T>,
@@ -80,7 +131,7 @@ impl<T: NativeType> Index for NativeIndex<T> {
 }
 
 /// An index of a column of bytes physical type
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ByteIndex {
     pub indexes: Vec<PageIndex<Vec<u8>>>,
     pub boundary_order: BoundaryOrder,
@@ -135,7 +186,7 @@ impl Index for ByteIndex {
 }
 
 /// An index of a column of fixed len byte physical type
-#[derive(Debug, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FixedLenByteIndex {
     pub type_: PhysicalType,
     pub indexes: Vec<PageIndex<Vec<u8>>>,
