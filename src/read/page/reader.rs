@@ -160,7 +160,6 @@ fn build_page<R: Read>(
             reader.current_dictionary = Some(dict);
             Ok(None)
         }
-        _ => Ok(None),
     }
 }
 

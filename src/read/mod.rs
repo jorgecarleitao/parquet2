@@ -1,9 +1,7 @@
 mod compression;
 pub mod levels;
 mod metadata;
-mod page_iterator;
-#[cfg(feature = "stream")]
-mod page_stream;
+mod page;
 #[cfg(feature = "stream")]
 mod stream;
 
@@ -13,9 +11,9 @@ use std::vec::IntoIter;
 
 pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::read_metadata;
-pub use page_iterator::{PageFilter, PageReader};
 #[cfg(feature = "stream")]
-pub use page_stream::get_page_stream;
+pub use page::get_page_stream;
+pub use page::{PageFilter, PageReader};
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
@@ -24,10 +22,6 @@ use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::page::CompressedDataPage;
 use crate::schema::types::ParquetType;
 use crate::{error::Result, metadata::FileMetaData};
-
-pub trait PageIterator: Iterator<Item = Result<CompressedDataPage>> {
-    fn swap_buffer(&mut self, buffer: &mut Vec<u8>);
-}
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true

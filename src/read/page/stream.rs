@@ -9,7 +9,7 @@ use crate::error::Result;
 use crate::metadata::{ColumnChunkMetaData, ColumnDescriptor};
 use crate::page::{CompressedDataPage, ParquetPageHeader};
 
-use super::page_iterator::{finish_page, get_page_header, FinishedPage};
+use super::reader::{finish_page, get_page_header, FinishedPage};
 use super::PageFilter;
 
 /// Returns a stream of compressed data pages
@@ -81,7 +81,6 @@ fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
                     current_dictionary = Some(dict);
                     continue
                 }
-                _ => continue,
             }
         }
     }

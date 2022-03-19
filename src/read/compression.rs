@@ -6,7 +6,7 @@ use crate::error::{ParquetError, Result};
 use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
 use crate::FallibleStreamingIterator;
 
-use super::PageIterator;
+use super::page::PageIterator;
 
 fn decompress_v1(compressed: &[u8], compression: Compression, buffer: &mut [u8]) -> Result<()> {
     compression::decompress(compression, compressed, buffer)
