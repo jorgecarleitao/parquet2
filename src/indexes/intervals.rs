@@ -4,11 +4,27 @@ use crate::error::ParquetError;
 
 use super::index::PageIndex;
 
+/// An interval
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Interval {
+    /// Its start
+    pub start: u64,
+    /// Its length
+    pub length: u64,
+}
+
+impl Interval {
+    /// Create a new interal
+    pub fn new(start: u64, length: u64) -> Self {
+        Self { start, length }
+    }
+}
+
 /// Returns the set of (row) intervals of the pages.
 fn compute_row_page_intervals(
     locations: &[PageLocation],
     num_rows: u64,
-) -> Result<Vec<(u64, u64)>, ParquetError> {
+) -> Result<Vec<Interval>, ParquetError> {
     if locations.is_empty() {
         return Ok(vec![]);
     };
@@ -17,7 +33,7 @@ fn compute_row_page_intervals(
         let first = locations.last().unwrap().first_row_index;
         let start = u64::try_from(first)?;
         let length = num_rows - start;
-        Result::<_, ParquetError>::Ok((start, length))
+        Result::<_, ParquetError>::Ok(Interval::new(start, length))
     })();
 
     let pages_lengths = locations
@@ -25,7 +41,7 @@ fn compute_row_page_intervals(
         .map(|x| {
             let start = u64::try_from(x[0].first_row_index)?;
             let length = u64::try_from(x[1].first_row_index - x[0].first_row_index)?;
-            Ok((start, length))
+            Ok(Interval::new(start, length))
         })
         .chain(std::iter::once(last));
     pages_lengths.collect()
@@ -38,7 +54,7 @@ pub fn compute_rows<'a, T>(
     locations: &[PageLocation],
     num_rows: u64,
     selector: &dyn Fn(&'a PageIndex<T>) -> bool,
-) -> Result<Vec<(u64, u64)>, ParquetError> {
+) -> Result<Vec<Interval>, ParquetError> {
     let page_intervals = compute_row_page_intervals(locations, num_rows)?;
 
     Ok(index
@@ -53,4 +69,69 @@ pub fn compute_rows<'a, T>(
             }
         })
         .collect())
+}
+
+/// An enum describing a page that was either selected in a filter pushdown or skipped
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FilteredPage {
+    Select {
+        /// Location of the page in the file
+        start: u64,
+        length: u64,
+        /// Location of rows to select in the page
+        rows_offset: u64,
+        rows_length: u64,
+    },
+    Skip {
+        /// Location of the page in the file
+        start: u64,
+        length: u64,
+        /// number of rows that are skip by skipping this page
+        num_rows: usize,
+    },
+}
+
+fn is_in(probe: Interval, intervals: &[Interval]) -> Option<Interval> {
+    intervals.iter().find_map(|interval| {
+        let interval_end = interval.start + interval.length;
+        let probe_end = probe.start + probe.length;
+        let overlaps = (probe.start < interval_end) && (probe_end > interval.start);
+        if overlaps {
+            let start = interval.start.max(probe.start);
+            let end = interval_end.min(probe_end);
+            Some(Interval::new(start - probe.start, end - start))
+        } else {
+            None
+        }
+    })
+}
+
+/// Given a set of selected [Interval]s of rows and the set of page locations, returns the
+pub fn select_pages(
+    intervals: &[Interval],
+    locations: &[PageLocation],
+    num_rows: u64,
+) -> Result<Vec<FilteredPage>, ParquetError> {
+    let page_intervals = compute_row_page_intervals(locations, num_rows)?;
+
+    page_intervals
+        .into_iter()
+        .zip(locations.iter())
+        .map(|(interval, location)| {
+            Ok(if let Some(overlap) = is_in(interval, intervals) {
+                FilteredPage::Select {
+                    start: location.offset.try_into()?,
+                    length: location.compressed_page_size.try_into()?,
+                    rows_offset: overlap.start,
+                    rows_length: overlap.length,
+                }
+            } else {
+                FilteredPage::Skip {
+                    start: location.offset.try_into()?,
+                    length: location.compressed_page_size.try_into()?,
+                    num_rows: interval.length.try_into()?,
+                }
+            })
+        })
+        .collect()
 }

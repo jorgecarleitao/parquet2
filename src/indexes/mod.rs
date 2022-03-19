@@ -3,7 +3,7 @@ mod intervals;
 mod read;
 
 pub use self::index::{ByteIndex, FixedLenByteIndex, Index, NativeIndex, PageIndex};
-pub use intervals::compute_rows;
+pub use intervals::{compute_rows, select_pages, FilteredPage, Interval};
 pub use read::*;
 
 #[cfg(test)]
@@ -32,7 +32,7 @@ mod tests {
         let selector = |_| true;
 
         let row_intervals = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
-        assert_eq!(row_intervals, vec![(0, 10)])
+        assert_eq!(row_intervals, vec![Interval::new(0, 10)])
     }
 
     #[test]
@@ -75,7 +75,163 @@ mod tests {
                 .unwrap_or(false) // no max is present => all nulls => not selected
         };
 
-        let row_intervals = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
-        assert_eq!(row_intervals, vec![(5, 5)])
+        let rows = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
+        assert_eq!(rows, vec![Interval::new(5, 5)]);
+
+        let pages = select_pages(&rows, locations, num_rows).unwrap();
+
+        assert_eq!(
+            pages,
+            vec![
+                FilteredPage::Skip {
+                    start: 100,
+                    length: 10,
+                    num_rows: 5
+                },
+                FilteredPage::Select {
+                    start: 110,
+                    length: 20,
+                    rows_offset: 0,
+                    rows_length: 5
+                }
+            ]
+        );
+    }
+
+    #[test]
+    fn test_other_column() {
+        let locations = &[
+            PageLocation {
+                offset: 100,
+                compressed_page_size: 20,
+                first_row_index: 0,
+            },
+            PageLocation {
+                offset: 120,
+                compressed_page_size: 20,
+                first_row_index: 10,
+            },
+        ];
+        let num_rows = 100;
+
+        let intervals = &[Interval::new(5, 5)];
+
+        let pages = select_pages(intervals, locations, num_rows).unwrap();
+
+        assert_eq!(
+            pages,
+            vec![
+                FilteredPage::Select {
+                    start: 100,
+                    length: 20,
+                    rows_offset: 5,
+                    rows_length: 5
+                },
+                FilteredPage::Skip {
+                    start: 120,
+                    length: 20,
+                    num_rows: 90
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_other_interval_in_middle() {
+        let locations = &[
+            PageLocation {
+                offset: 100,
+                compressed_page_size: 20,
+                first_row_index: 0,
+            },
+            PageLocation {
+                offset: 120,
+                compressed_page_size: 20,
+                first_row_index: 10,
+            },
+            PageLocation {
+                offset: 140,
+                compressed_page_size: 20,
+                first_row_index: 100,
+            },
+        ];
+        let num_rows = 200;
+
+        // interval partially intersects 2 pages (0 and 1)
+        let intervals = &[Interval::new(5, 6)];
+
+        let pages = select_pages(intervals, locations, num_rows).unwrap();
+
+        assert_eq!(
+            pages,
+            vec![
+                FilteredPage::Select {
+                    start: 100,
+                    length: 20,
+                    rows_offset: 5,
+                    rows_length: 5
+                },
+                FilteredPage::Select {
+                    start: 120,
+                    length: 20,
+                    rows_offset: 0,
+                    rows_length: 1
+                },
+                FilteredPage::Skip {
+                    start: 140,
+                    length: 20,
+                    num_rows: 100
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_other_column2() {
+        let locations = &[
+            PageLocation {
+                offset: 100,
+                compressed_page_size: 20,
+                first_row_index: 0,
+            },
+            PageLocation {
+                offset: 120,
+                compressed_page_size: 20,
+                first_row_index: 10,
+            },
+            PageLocation {
+                offset: 140,
+                compressed_page_size: 20,
+                first_row_index: 100,
+            },
+        ];
+        let num_rows = 200;
+
+        // interval partially intersects 1 page (0)
+        let intervals = &[Interval::new(0, 1)];
+
+        let pages = select_pages(intervals, locations, num_rows).unwrap();
+
+        assert_eq!(
+            pages,
+            vec![
+                FilteredPage::Select {
+                    start: 100,
+                    length: 20,
+                    rows_offset: 0,
+                    rows_length: 1
+                },
+                FilteredPage::Skip {
+                    start: 120,
+                    length: 20,
+                    num_rows: 90
+                },
+                FilteredPage::Skip {
+                    start: 140,
+                    length: 20,
+                    num_rows: 100
+                },
+            ]
+        );
     }
 }
