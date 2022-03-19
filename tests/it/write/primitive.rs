@@ -75,5 +75,6 @@ pub fn array_to_page_v1<T: NativeType>(
         buffer,
         None,
         descriptor.clone(),
+        None,
     )))
 }

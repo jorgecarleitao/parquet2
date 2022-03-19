@@ -18,6 +18,7 @@ fn compress_data(
         header,
         dictionary_page,
         descriptor,
+        rows,
     } = page;
     let uncompressed_page_size = buffer.len();
     if compression != Compression::Uncompressed {
@@ -47,7 +48,7 @@ fn compress_data(
         uncompressed_page_size,
         dictionary_page,
         descriptor,
-        None, // the writing of a page has no selected rows, so this value is not used
+        rows,
     ))
 }
 
