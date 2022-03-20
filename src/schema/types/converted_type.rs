@@ -1,7 +1,7 @@
 use crate::error::{ParquetError, Result};
 use parquet_format_async_temp::ConvertedType;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PrimitiveConvertedType {
     Utf8,
     /// an enum is converted into a binary field

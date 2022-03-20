@@ -6,33 +6,28 @@ use parquet2::indexes;
 use parquet2::encoding::Encoding;
 use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage};
-use parquet2::schema::types::ParquetType;
+use parquet2::schema::types::PhysicalType;
 
 fn deserialize(page: &DataPage, descriptor: &ColumnDescriptor) {
+    // split the data buffer in repetition levels, definition levels and values
     let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page, descriptor);
 
-    if let ParquetType::PrimitiveType {
-        physical_type,
-        converted_type,
-        logical_type,
-        ..
-    } = descriptor.type_()
-    {
-        // map the types to your physical typing system (e.g. this usually adds
-        // casting, tz conversions, int96 to timestamp)
-    } else {
-        // column chunks are always primitive types
-        unreachable!()
-    }
-
-    // finally, decode and deserialize.
-    match (&page.encoding(), page.dictionary_page()) {
-        (Encoding::PlainDictionary | Encoding::RleDictionary, Some(_dict_page)) => {
+    // decode and deserialize.
+    match (
+        descriptor.physical_type(),
+        page.encoding(),
+        page.dictionary_page(),
+    ) {
+        (
+            PhysicalType::Int32,
+            Encoding::PlainDictionary | Encoding::RleDictionary,
+            Some(_dict_page),
+        ) => {
             // plain encoded page with a dictionary
             // _dict_page can be downcasted based on the descriptor's physical type
             todo!()
         }
-        (Encoding::Plain, None) => {
+        (PhysicalType::Int32, Encoding::Plain, None) => {
             // plain encoded page
             todo!()
         }
@@ -81,7 +76,6 @@ fn main() -> Result<()> {
     // ANCHOR: statistics
     if let Some(maybe_stats) = column_metadata.statistics() {
         let stats = maybe_stats?;
-        use parquet2::schema::types::PhysicalType;
         use parquet2::statistics::PrimitiveStatistics;
         match stats.physical_type() {
             PhysicalType::Int32 => {

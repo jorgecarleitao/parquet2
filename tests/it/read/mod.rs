@@ -31,9 +31,9 @@ use super::*;
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
 pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Array> {
-    match (descriptor.type_(), descriptor.max_rep_level()) {
-        (ParquetType::PrimitiveType { physical_type, .. }, 0) => match page.dictionary_page() {
-            Some(_) => match physical_type {
+    match descriptor.max_rep_level() {
+        0 => match page.dictionary_page() {
+            Some(_) => match descriptor.physical_type() {
                 PhysicalType::Int32 => {
                     Ok(Array::Int32(primitive::page_dict_to_vec(page, descriptor)?))
                 }
@@ -54,7 +54,7 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
                 }
                 _ => todo!(),
             },
-            None => match physical_type {
+            None => match descriptor.physical_type() {
                 PhysicalType::Boolean => {
                     Ok(Array::Boolean(boolean::page_to_vec(page, descriptor)?))
                 }
@@ -73,21 +73,20 @@ pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<A
                 _ => todo!(),
             },
         },
-        (ParquetType::PrimitiveType { physical_type, .. }, _) => match page.dictionary_page() {
-            None => match physical_type {
+        _ => match page.dictionary_page() {
+            None => match descriptor.physical_type() {
                 PhysicalType::Int64 => {
                     Ok(primitive_nested::page_to_array::<i64>(page, descriptor)?)
                 }
                 _ => todo!(),
             },
-            Some(_) => match physical_type {
+            Some(_) => match descriptor.physical_type() {
                 PhysicalType::Int64 => Ok(primitive_nested::page_dict_to_array::<i64>(
                     page, descriptor,
                 )?),
                 _ => todo!(),
             },
         },
-        _ => todo!("Nested types are not supported by this in-memory format"),
     }
 }
 

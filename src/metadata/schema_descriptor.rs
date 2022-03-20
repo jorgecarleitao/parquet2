@@ -4,7 +4,7 @@ use crate::{
     error::ParquetError,
     schema::{io_message::from_message, types::ParquetType, Repetition},
 };
-use crate::{error::Result, schema::types::BasicTypeInfo};
+use crate::{error::Result, schema::types::FieldInfo};
 
 use super::column_descriptor::ColumnDescriptor;
 
@@ -63,7 +63,7 @@ impl SchemaDescriptor {
 
     pub(crate) fn into_thrift(self) -> Result<Vec<SchemaElement>> {
         ParquetType::GroupType {
-            basic_info: BasicTypeInfo::new(self.name, Repetition::Optional, None, true),
+            basic_info: FieldInfo::new(self.name, Repetition::Optional, None, true),
             logical_type: None,
             converted_type: None,
             fields: self.fields,
@@ -75,7 +75,7 @@ impl SchemaDescriptor {
         match type_ {
             ParquetType::GroupType {
                 basic_info, fields, ..
-            } => Ok(Self::new(basic_info.name().to_string(), fields)),
+            } => Ok(Self::new(basic_info.name, fields)),
             _ => Err(ParquetError::OutOfSpec(
                 "The parquet schema MUST be a group type".to_string(),
             )),
@@ -102,7 +102,7 @@ fn build_tree<'a>(
     path_so_far: &mut Vec<&'a str>,
 ) {
     path_so_far.push(tp.name());
-    match *tp.get_basic_info().repetition() {
+    match tp.get_basic_info().repetition {
         Repetition::Optional => {
             max_def_level += 1;
         }
@@ -114,10 +114,10 @@ fn build_tree<'a>(
     }
 
     match tp {
-        ParquetType::PrimitiveType { .. } => {
+        ParquetType::PrimitiveType(p) => {
             let path_in_schema = path_so_far.iter().copied().map(String::from).collect();
             leaves.push(ColumnDescriptor::new(
-                tp.clone(),
+                p.clone(),
                 max_def_level,
                 max_rep_level,
                 path_in_schema,

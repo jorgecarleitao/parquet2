@@ -54,7 +54,7 @@ pub fn read_dict_page(
     page: &EncodedDictPage,
     compression: (Compression, usize),
     is_sorted: bool,
-    physical_type: &PhysicalType,
+    physical_type: PhysicalType,
 ) -> Result<Arc<dyn DictPage>> {
     if compression.0 != Compression::Uncompressed {
         let mut decompressed = vec![0; compression.1];
@@ -69,7 +69,7 @@ fn deserialize(
     buf: &[u8],
     num_values: usize,
     is_sorted: bool,
-    physical_type: &PhysicalType,
+    physical_type: PhysicalType,
 ) -> Result<Arc<dyn DictPage>> {
     match physical_type {
         PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
@@ -81,6 +81,6 @@ fn deserialize(
         PhysicalType::Float => primitive::read::<f32>(buf, num_values, is_sorted),
         PhysicalType::Double => primitive::read::<f64>(buf, num_values, is_sorted),
         PhysicalType::ByteArray => binary::read(buf, num_values),
-        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(buf, *size, num_values),
+        PhysicalType::FixedLenByteArray(size) => fixed_len_binary::read(buf, size, num_values),
     }
 }

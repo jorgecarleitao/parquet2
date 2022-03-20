@@ -58,9 +58,8 @@ pub enum Value {
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use parquet2::metadata::ColumnDescriptor;
-use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
+use parquet2::schema::types::PrimitiveType;
 use parquet2::statistics::*;
 
 pub fn get_path() -> PathBuf {
@@ -157,45 +156,9 @@ pub fn alltypes_plain(column: usize) -> Array {
 }
 
 pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
-    let descriptor_i32 = ColumnDescriptor::new(
-        ParquetType::from_physical("col".to_string(), PhysicalType::Int32),
-        1,
-        0,
-        vec!["col".to_string()],
-        ParquetType::from_physical("col".to_string(), PhysicalType::Int32),
-    );
-    let descriptor_i64 = ColumnDescriptor::new(
-        ParquetType::from_physical("col".to_string(), PhysicalType::Int64),
-        1,
-        0,
-        vec!["col".to_string()],
-        ParquetType::from_physical("col".to_string(), PhysicalType::Int64),
-    );
-    let descriptor_f32 = ColumnDescriptor::new(
-        ParquetType::from_physical("col".to_string(), PhysicalType::Float),
-        1,
-        0,
-        vec!["col".to_string()],
-        ParquetType::from_physical("col".to_string(), PhysicalType::Float),
-    );
-    let descriptor_f64 = ColumnDescriptor::new(
-        ParquetType::from_physical("col".to_string(), PhysicalType::Double),
-        1,
-        0,
-        vec!["col".to_string()],
-        ParquetType::from_physical("col".to_string(), PhysicalType::Double),
-    );
-    let descriptor_byte = ColumnDescriptor::new(
-        ParquetType::from_physical("col".to_string(), PhysicalType::ByteArray),
-        1,
-        0,
-        vec!["col".to_string()],
-        ParquetType::from_physical("col".to_string(), PhysicalType::ByteArray),
-    );
-
     match column {
         0 => Arc::new(PrimitiveStatistics::<i32> {
-            descriptor: descriptor_i32,
+            primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0),
@@ -208,42 +171,48 @@ pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
             max_value: Some(true),
         }),
         2 | 3 | 4 => Arc::new(PrimitiveStatistics::<i32> {
-            descriptor: descriptor_i32,
+            primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0),
             max_value: Some(1),
         }),
         5 => Arc::new(PrimitiveStatistics::<i64> {
-            descriptor: descriptor_i64,
+            primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int64),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0),
             max_value: Some(10),
         }),
         6 => Arc::new(PrimitiveStatistics::<f32> {
-            descriptor: descriptor_f32,
+            primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Float),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0.0),
             max_value: Some(1.1),
         }),
         7 => Arc::new(PrimitiveStatistics::<f64> {
-            descriptor: descriptor_f64,
+            primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Double),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0.0),
             max_value: Some(10.1),
         }),
         8 => Arc::new(BinaryStatistics {
-            descriptor: descriptor_byte,
+            primitive_type: PrimitiveType::from_physical(
+                "col".to_string(),
+                PhysicalType::ByteArray,
+            ),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(vec![48, 49, 47, 48, 49, 47, 48, 57]),
             max_value: Some(vec![48, 52, 47, 48, 49, 47, 48, 57]),
         }),
         9 => Arc::new(BinaryStatistics {
-            descriptor: descriptor_byte,
+            primitive_type: PrimitiveType::from_physical(
+                "col".to_string(),
+                PhysicalType::ByteArray,
+            ),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(vec![48]),

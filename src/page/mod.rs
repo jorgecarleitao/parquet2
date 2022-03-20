@@ -73,11 +73,11 @@ impl CompressedDataPage {
             DataPageHeader::V1(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
             DataPageHeader::V2(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
         }
     }
 
@@ -175,11 +175,11 @@ impl DataPage {
             DataPageHeader::V1(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
             DataPageHeader::V2(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
         }
     }
 
