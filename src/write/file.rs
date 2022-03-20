@@ -96,7 +96,7 @@ impl<W: Write> FileWriter<W> {
     /// Writes a row group to the file.
     ///
     /// This call is IO-bounded
-    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>, num_rows: usize) -> Result<()>
+    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>) -> Result<()>
     where
         ParquetError: From<E>,
         E: std::error::Error,
@@ -113,7 +113,6 @@ impl<W: Write> FileWriter<W> {
             self.schema.columns(),
             self.options.compression,
             row_group,
-            num_rows,
             ordinal,
         )?;
         self.offset += size;

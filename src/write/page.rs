@@ -14,6 +14,10 @@ use crate::page::{
 };
 use crate::statistics::Statistics;
 
+pub(crate) fn is_data_page(page: &PageWriteSpec) -> bool {
+    page.header.type_ == PageType::DATA_PAGE || page.header.type_ == PageType::DATA_PAGE_V2
+}
+
 fn maybe_bytes(uncompressed: usize, compressed: usize) -> Result<(i32, i32)> {
     let uncompressed_page_size: i32 = uncompressed.try_into().map_err(|_| {
         ParquetError::OutOfSpec(format!(

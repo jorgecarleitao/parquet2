@@ -60,7 +60,6 @@ fn test_column(column: usize) -> Result<()> {
 
     let a = schema.columns();
 
-    let num_rows = array.len();
     let pages = DynStreamingIterator::new(Compressor::new_from_vec(
         DynIter::new(std::iter::once(array_to_page(
             &array,
@@ -76,7 +75,7 @@ fn test_column(column: usize) -> Result<()> {
     let mut writer = FileWriter::new(writer, schema, options, None);
 
     writer.start()?;
-    writer.write(DynIter::new(columns), num_rows)?;
+    writer.write(DynIter::new(columns))?;
     let writer = writer.end(None)?.1;
 
     let data = writer.into_inner();
@@ -167,7 +166,7 @@ fn basic() -> Result<()> {
     let mut writer = FileWriter::new(writer, schema, options, None);
 
     writer.start()?;
-    writer.write(DynIter::new(columns), 7)?;
+    writer.write(DynIter::new(columns))?;
     let writer = writer.end(None)?.1;
 
     let data = writer.into_inner();
@@ -214,7 +213,7 @@ fn indexes() -> Result<()> {
     let mut writer = FileWriter::new(writer, schema, options, None);
 
     writer.start()?;
-    writer.write(DynIter::new(columns), 7 + 2)?;
+    writer.write(DynIter::new(columns))?;
     let writer = writer.end(None)?.1;
 
     let data = writer.into_inner();

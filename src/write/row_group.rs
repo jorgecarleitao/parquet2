@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     column_chunk::{write_column_chunk, write_column_chunk_async},
-    page::PageWriteSpec,
+    page::{is_data_page, PageWriteSpec},
     DynIter, DynStreamingIterator,
 };
 
@@ -62,7 +62,6 @@ pub fn write_row_group<
     descriptors: &[ColumnDescriptor],
     compression: Compression,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
-    num_rows: usize,
     ordinal: usize,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
@@ -82,6 +81,25 @@ where
         })
         .collect::<Result<Vec<_>>>()?;
     let bytes_written = offset - initial;
+
+    let num_rows = columns
+        .get(0)
+        .map(|(_, specs)| {
+            let mut num_rows = 0;
+            specs
+                .iter()
+                .filter(|x| is_data_page(x))
+                .try_for_each(|spec| {
+                    num_rows += spec.num_rows.ok_or_else(|| {
+                        ParquetError::OutOfSpec(
+                            "All data pages must declare a number of rows on it".to_string(),
+                        )
+                    })? as i64;
+                    Result::Ok(())
+                })?;
+            Result::Ok(num_rows)
+        })
+        .unwrap_or(Ok(0))?;
 
     // compute row group stats
     let file_offset = columns
@@ -106,7 +124,7 @@ where
         RowGroup {
             columns,
             total_byte_size,
-            num_rows: num_rows as i64,
+            num_rows,
             sorting_columns: None,
             file_offset,
             total_compressed_size: Some(total_compressed_size),

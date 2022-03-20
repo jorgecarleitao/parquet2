@@ -6,17 +6,12 @@ use parquet_format_async_temp::ColumnIndex;
 use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::OffsetIndex;
 use parquet_format_async_temp::PageLocation;
-use parquet_format_async_temp::PageType;
 
 use crate::error::{ParquetError, Result};
 pub use crate::metadata::KeyValue;
 use crate::statistics::serialize_statistics;
 
-use crate::write::page::PageWriteSpec;
-
-fn is_data_page(page: &PageWriteSpec) -> bool {
-    page.header.type_ == PageType::DATA_PAGE || page.header.type_ == PageType::DATA_PAGE_V2
-}
+use crate::write::page::{is_data_page, PageWriteSpec};
 
 pub fn write_column_index<W: Write>(writer: &mut W, pages: &[PageWriteSpec]) -> Result<u64> {
     let mut null_pages = Vec::with_capacity(pages.len());
