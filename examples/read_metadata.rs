@@ -1,6 +1,5 @@
 use parquet2::bloom_filter;
 use parquet2::error::Result;
-use parquet2::indexes;
 
 // ANCHOR: deserialize
 use parquet2::encoding::Encoding;
@@ -57,7 +56,8 @@ fn main() -> Result<()> {
 
     // ANCHOR: column_index
     // read the column index
-    let index = indexes::read_column(&mut reader, column_metadata)?;
+    use parquet2::read;
+    let index = read::read_column_index(&mut reader, column_metadata)?;
     if let Some(index) = index {
         // these are the minimum and maximum within each page, which can be used
         // to skip pages.
@@ -65,7 +65,7 @@ fn main() -> Result<()> {
     }
 
     // read the offset index containing page locations
-    let maybe_pages = indexes::read_page_locations(&mut reader, column_metadata)?;
+    let maybe_pages = read::read_page_locations(&mut reader, column_metadata)?;
     if let Some(pages) = maybe_pages {
         // there are page locations in the file
         println!("{pages:?}");

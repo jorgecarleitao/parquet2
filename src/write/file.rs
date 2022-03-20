@@ -6,7 +6,7 @@ use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
 use parquet_format_async_temp::RowGroup;
 
-use crate::indexes::{write_column_index, write_offset_index};
+use crate::indexes::write::{write_column_index, write_offset_index};
 use crate::{
     error::{ParquetError, Result},
     metadata::SchemaDescriptor,

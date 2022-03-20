@@ -12,7 +12,7 @@ use crate::schema::types::PhysicalType;
 use super::{ByteIndex, FixedLenByteIndex, Index, NativeIndex};
 
 /// Read the [`ColumnIndex`] from the [`ColumnChunk`], if available.
-pub fn read_column<R: Read + Seek>(
+pub fn read_column_index<R: Read + Seek>(
     reader: &mut R,
     chunk: &ColumnChunkMetaData,
 ) -> Result<Option<Box<dyn Index>>, ParquetError> {

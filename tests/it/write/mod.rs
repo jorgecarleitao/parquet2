@@ -5,9 +5,9 @@ use std::sync::Arc;
 
 use parquet2::compression::Compression;
 use parquet2::error::Result;
-use parquet2::indexes::{self, BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
+use parquet2::indexes::{BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
 use parquet2::metadata::SchemaDescriptor;
-use parquet2::read::read_metadata;
+use parquet2::read::{read_column_index, read_metadata, read_page_locations};
 use parquet2::statistics::Statistics;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
 use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
@@ -252,10 +252,10 @@ fn indexes() -> Result<()> {
 
     let column_metadata = &metadata.row_groups[0].columns()[0];
 
-    let index = indexes::read_column(&mut reader, column_metadata)?.expect("column index");
+    let index = read_column_index(&mut reader, column_metadata)?.expect("column index");
     assert_eq!(&index, &expected_index);
 
-    let pages = indexes::read_page_locations(&mut reader, column_metadata)?.expect("offset index");
+    let pages = read_page_locations(&mut reader, column_metadata)?.expect("offset index");
     assert_eq!(pages, expected_page_locations);
 
     Ok(())

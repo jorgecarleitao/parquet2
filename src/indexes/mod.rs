@@ -1,15 +1,13 @@
 mod index;
 mod intervals;
-mod read;
-mod write;
+pub(crate) mod read;
+pub(crate) mod write;
 
 pub use crate::parquet_bridge::BoundaryOrder;
 pub use parquet_format_async_temp::PageLocation;
 
 pub use self::index::{ByteIndex, FixedLenByteIndex, Index, NativeIndex, PageIndex};
 pub use intervals::{compute_rows, select_pages, FilteredPage, Interval};
-pub use read::*;
-pub(crate) use write::*;
 
 #[cfg(test)]
 mod tests {
