@@ -163,7 +163,6 @@ where
         let (column, page_specs, size) =
             write_column_chunk_async(writer, offset, descriptor, compression, page_iter?).await?;
         offset += size;
-        offset += size as u64;
         columns.push((column, page_specs));
     }
     let bytes_written = offset - initial;

@@ -2,16 +2,16 @@ use std::convert::TryInto;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
 use parquet_format_async_temp::{
-    thrift::protocol::TCompactInputProtocol, ColumnIndex, OffsetIndex, PageLocation,
+    thrift::protocol::TCompactInputProtocol, OffsetIndex, PageLocation,
 };
 
 use crate::error::ParquetError;
 use crate::metadata::ColumnChunkMetaData;
-use crate::schema::types::PhysicalType;
 
-use super::{ByteIndex, FixedLenByteIndex, Index, NativeIndex};
+use super::deserialize::deserialize;
+use super::Index;
 
-/// Read the [`ColumnIndex`] from the [`ColumnChunk`], if available.
+/// Read the column index from the [`ColumnChunkMetaData`] if available and deserializes it into [`Index`].
 pub fn read_column_index<R: Read + Seek>(
     reader: &mut R,
     chunk: &ColumnChunkMetaData,
@@ -32,24 +32,8 @@ pub fn read_column_index<R: Read + Seek>(
     let mut data = vec![0; length];
     reader.read_exact(&mut data)?;
 
-    let mut d = Cursor::new(&data);
-    let mut prot = TCompactInputProtocol::new(&mut d);
-
-    let index = ColumnIndex::read_from_in_protocol(&mut prot)?;
-    let index = match chunk.descriptor().descriptor.primitive_type.physical_type {
-        PhysicalType::Boolean => return Ok(None),
-        PhysicalType::Int32 => Box::new(NativeIndex::<i32>::try_from(index)?) as Box<dyn Index>,
-        PhysicalType::Int64 => Box::new(NativeIndex::<i64>::try_from(index)?) as _,
-        PhysicalType::Int96 => Box::new(NativeIndex::<[u32; 3]>::try_from(index)?) as _,
-        PhysicalType::Float => Box::new(NativeIndex::<f32>::try_from(index)?),
-        PhysicalType::Double => Box::new(NativeIndex::<f64>::try_from(index)?),
-        PhysicalType::ByteArray => Box::new(ByteIndex::try_from(index)?),
-        PhysicalType::FixedLenByteArray(size) => {
-            Box::new(FixedLenByteIndex::try_from((index, size))?)
-        }
-    };
-
-    Ok(Some(index))
+    let primitive_type = chunk.descriptor().descriptor.primitive_type.clone();
+    deserialize(&data, primitive_type)
 }
 
 /// Read [`PageLocation`]s from the [`ColumnChunk`], if available.

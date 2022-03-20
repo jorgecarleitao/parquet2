@@ -1,6 +1,8 @@
+mod deserialize;
 mod index;
 mod intervals;
 pub(crate) mod read;
+mod serialize;
 pub(crate) mod write;
 
 pub use crate::parquet_bridge::BoundaryOrder;
@@ -13,9 +15,12 @@ pub use intervals::{compute_rows, select_pages, FilteredPage, Interval};
 mod tests {
     use super::*;
 
+    use crate::schema::types::{PhysicalType, PrimitiveType};
+
     #[test]
     fn test_basic() {
         let index = NativeIndex {
+            primitive_type: PrimitiveType::from_physical("c1".to_string(), PhysicalType::Int32),
             indexes: vec![PageIndex {
                 min: Some(0i32),
                 max: Some(10),
@@ -40,6 +45,7 @@ mod tests {
     fn test_multiple() {
         // two pages
         let index = ByteIndex {
+            primitive_type: PrimitiveType::from_physical("c1".to_string(), PhysicalType::ByteArray),
             indexes: vec![
                 PageIndex {
                     min: Some(vec![0]),

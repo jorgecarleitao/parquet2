@@ -3,8 +3,12 @@ use std::any::Any;
 use parquet_format_async_temp::ColumnIndex;
 
 use crate::parquet_bridge::BoundaryOrder;
+use crate::schema::types::PrimitiveType;
 use crate::{error::ParquetError, schema::types::PhysicalType, types::NativeType};
 
+/// Trait object representing a [`ColumnIndex`] in Rust's native format.
+///
+/// See [`NativeIndex`], [`ByteIndex`] and [`FixedLenByteIndex`] for concrete implementations.
 pub trait Index: Send + Sync + std::fmt::Debug {
     fn as_any(&self) -> &dyn Any;
 
@@ -65,25 +69,20 @@ fn equal(lhs: &dyn Index, rhs: &dyn Index) -> bool {
 /// An index of a column of [`NativeType`] physical representation
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct NativeIndex<T: NativeType> {
+    /// The primitive type
+    pub primitive_type: PrimitiveType,
+    /// The indexes, one item per page
     pub indexes: Vec<PageIndex<T>>,
+    /// the order
     pub boundary_order: BoundaryOrder,
 }
 
-/// The index of a page, containing the min and max values of the page.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct PageIndex<T> {
-    /// The minimum value in the page. It is None when all values are null
-    pub min: Option<T>,
-    /// The maximum value in the page. It is None when all values are null
-    pub max: Option<T>,
-    /// The number of null values in the page
-    pub null_count: Option<i64>,
-}
-
-impl<T: NativeType> TryFrom<ColumnIndex> for NativeIndex<T> {
-    type Error = ParquetError;
-
-    fn try_from(index: ColumnIndex) -> Result<Self, ParquetError> {
+impl<T: NativeType> NativeIndex<T> {
+    /// Creates a new [`NativeIndex`]
+    pub(crate) fn try_new(
+        index: ColumnIndex,
+        primitive_type: PrimitiveType,
+    ) -> Result<Self, ParquetError> {
         let len = index.min_values.len();
 
         let null_counts = index
@@ -114,10 +113,22 @@ impl<T: NativeType> TryFrom<ColumnIndex> for NativeIndex<T> {
             .collect::<Result<Vec<_>, ParquetError>>()?;
 
         Ok(Self {
+            primitive_type,
             indexes,
             boundary_order: index.boundary_order.try_into()?,
         })
     }
+}
+
+/// The index of a page, containing the min and max values of the page.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PageIndex<T> {
+    /// The minimum value in the page. It is None when all values are null
+    pub min: Option<T>,
+    /// The maximum value in the page. It is None when all values are null
+    pub max: Option<T>,
+    /// The number of null values in the page
+    pub null_count: Option<i64>,
 }
 
 impl<T: NativeType> Index for NativeIndex<T> {
@@ -133,14 +144,18 @@ impl<T: NativeType> Index for NativeIndex<T> {
 /// An index of a column of bytes physical type
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ByteIndex {
+    /// The [`PrimitiveType`].
+    pub primitive_type: PrimitiveType,
+    /// The indexes, one item per page
     pub indexes: Vec<PageIndex<Vec<u8>>>,
     pub boundary_order: BoundaryOrder,
 }
 
-impl TryFrom<ColumnIndex> for ByteIndex {
-    type Error = ParquetError;
-
-    fn try_from(index: ColumnIndex) -> Result<Self, ParquetError> {
+impl ByteIndex {
+    pub(crate) fn try_new(
+        index: ColumnIndex,
+        primitive_type: PrimitiveType,
+    ) -> Result<Self, ParquetError> {
         let len = index.min_values.len();
 
         let null_counts = index
@@ -169,6 +184,7 @@ impl TryFrom<ColumnIndex> for ByteIndex {
             .collect::<Result<Vec<_>, ParquetError>>()?;
 
         Ok(Self {
+            primitive_type,
             indexes,
             boundary_order: index.boundary_order.try_into()?,
         })
@@ -188,15 +204,18 @@ impl Index for ByteIndex {
 /// An index of a column of fixed len byte physical type
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FixedLenByteIndex {
-    pub type_: PhysicalType,
+    /// The [`PrimitiveType`].
+    pub primitive_type: PrimitiveType,
+    /// The indexes, one item per page
     pub indexes: Vec<PageIndex<Vec<u8>>>,
     pub boundary_order: BoundaryOrder,
 }
 
-impl TryFrom<(ColumnIndex, i32)> for FixedLenByteIndex {
-    type Error = ParquetError;
-
-    fn try_from((index, size): (ColumnIndex, i32)) -> Result<Self, ParquetError> {
+impl FixedLenByteIndex {
+    pub(crate) fn try_new(
+        index: ColumnIndex,
+        primitive_type: PrimitiveType,
+    ) -> Result<Self, ParquetError> {
         let len = index.min_values.len();
 
         let null_counts = index
@@ -225,7 +244,7 @@ impl TryFrom<(ColumnIndex, i32)> for FixedLenByteIndex {
             .collect::<Result<Vec<_>, ParquetError>>()?;
 
         Ok(Self {
-            type_: PhysicalType::FixedLenByteArray(size),
+            primitive_type,
             indexes,
             boundary_order: index.boundary_order.try_into()?,
         })
@@ -238,6 +257,6 @@ impl Index for FixedLenByteIndex {
     }
 
     fn physical_type(&self) -> &PhysicalType {
-        &self.type_
+        &self.primitive_type.physical_type
     }
 }

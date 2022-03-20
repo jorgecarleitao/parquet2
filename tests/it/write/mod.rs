@@ -8,6 +8,7 @@ use parquet2::error::Result;
 use parquet2::indexes::{BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::{read_column_index, read_metadata, read_page_locations};
+use parquet2::schema::types::{PhysicalType, PrimitiveType};
 use parquet2::statistics::Statistics;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
 use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
@@ -236,6 +237,7 @@ fn indexes() -> Result<()> {
         },
     ];
     let expected_index = Box::new(NativeIndex::<i32> {
+        primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
         indexes: vec![
             PageIndex {
                 min: Some(0),
