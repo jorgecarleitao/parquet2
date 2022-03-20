@@ -203,6 +203,27 @@ fn indexes() -> Result<()> {
         array_to_page_v1::<i32>(&array2, &options, &schema.columns()[0].descriptor),
     ];
 
+    let pages = DynStreamingIterator::new(Compressor::new(
+        DynIter::new(pages.into_iter()),
+        options.compression,
+        vec![],
+    ));
+    let columns = std::iter::once(Ok(pages));
+
+    let writer = Cursor::new(vec![]);
+    let mut writer = FileWriter::new(writer, schema, options, None);
+
+    writer.start()?;
+    writer.write(DynIter::new(columns), 7 + 2)?;
+    let writer = writer.end(None)?.1;
+
+    let data = writer.into_inner();
+    let mut reader = Cursor::new(data);
+
+    let metadata = read_metadata(&mut reader)?;
+
+    let column_metadata = &metadata.row_groups[0].columns()[0];
+
     let expected_page_locations = vec![
         PageLocation {
             offset: 4,
@@ -230,27 +251,6 @@ fn indexes() -> Result<()> {
         ],
         boundary_order: BoundaryOrder::Unordered,
     }) as Box<dyn Index>;
-
-    let pages = DynStreamingIterator::new(Compressor::new(
-        DynIter::new(pages.into_iter()),
-        options.compression,
-        vec![],
-    ));
-    let columns = std::iter::once(Ok(pages));
-
-    let writer = Cursor::new(vec![]);
-    let mut writer = FileWriter::new(writer, schema, options, None);
-
-    writer.start()?;
-    writer.write(DynIter::new(columns), 7 + 2)?;
-    let writer = writer.end(None)?.1;
-
-    let data = writer.into_inner();
-    let mut reader = Cursor::new(data);
-
-    let metadata = read_metadata(&mut reader)?;
-
-    let column_metadata = &metadata.row_groups[0].columns()[0];
 
     let index = read_column_index(&mut reader, column_metadata)?.expect("column index");
     assert_eq!(&index, &expected_index);
