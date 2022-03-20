@@ -5,7 +5,6 @@ use super::Array;
 use parquet2::{
     encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
     error::{ParquetError, Result},
-    metadata::ColumnDescriptor,
     page::{split_buffer, DataPage, PrimitivePageDict},
     read::levels::get_bit_width,
     types::NativeType,
@@ -138,11 +137,8 @@ fn read_array<T: NativeType>(
     )
 }
 
-pub fn page_to_array<T: NativeType>(
-    page: &DataPage,
-    descriptor: &ColumnDescriptor,
-) -> Result<Array> {
-    let (rep_levels, def_levels, values) = split_buffer(page, descriptor);
+pub fn page_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
+    let (rep_levels, def_levels, values) = split_buffer(page);
 
     match (&page.encoding(), &page.dictionary_page()) {
         (Encoding::Plain, None) => Ok(read_array::<T>(
@@ -152,11 +148,11 @@ pub fn page_to_array<T: NativeType>(
             page.num_values() as u32,
             (
                 &page.repetition_level_encoding(),
-                descriptor.max_rep_level(),
+                page.descriptor.max_rep_level,
             ),
             (
                 &page.definition_level_encoding(),
-                descriptor.max_def_level(),
+                page.descriptor.max_def_level,
             ),
         )),
         _ => todo!(),
@@ -194,13 +190,10 @@ fn read_dict_array<T: NativeType>(
     )
 }
 
-pub fn page_dict_to_array<T: NativeType>(
-    page: &DataPage,
-    descriptor: &ColumnDescriptor,
-) -> Result<Array> {
-    assert_eq!(descriptor.max_rep_level(), 1);
+pub fn page_dict_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
+    assert_eq!(page.descriptor.max_rep_level, 1);
 
-    let (rep_levels, def_levels, values) = split_buffer(page, descriptor);
+    let (rep_levels, def_levels, values) = split_buffer(page);
 
     match (page.encoding(), &page.dictionary_page()) {
         (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_array::<T>(
@@ -211,11 +204,11 @@ pub fn page_dict_to_array<T: NativeType>(
             dict.as_any().downcast_ref().unwrap(),
             (
                 &page.repetition_level_encoding(),
-                descriptor.max_rep_level(),
+                page.descriptor.max_rep_level,
             ),
             (
                 &page.definition_level_encoding(),
-                descriptor.max_def_level(),
+                page.descriptor.max_def_level,
             ),
         )),
         (_, None) => Err(ParquetError::OutOfSpec(

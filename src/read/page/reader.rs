@@ -5,7 +5,7 @@ use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 
 use crate::compression::Compression;
 use crate::error::Result;
-use crate::metadata::ColumnDescriptor;
+use crate::metadata::Descriptor;
 
 use crate::page::{
     read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
@@ -15,7 +15,7 @@ use crate::page::{
 use super::PageIterator;
 
 /// Type declaration for a page filter
-pub type PageFilter = Arc<dyn Fn(&ColumnDescriptor, &DataPageHeader) -> bool + Send + Sync>;
+pub type PageFilter = Arc<dyn Fn(&Descriptor, &DataPageHeader) -> bool + Send + Sync>;
 
 /// A page iterator iterates over row group's pages. In parquet, pages are guaranteed to be
 /// contiguously arranged in memory and therefore must be read in sequence.
@@ -36,7 +36,7 @@ pub struct PageReader<R: Read> {
 
     pages_filter: PageFilter,
 
-    descriptor: ColumnDescriptor,
+    descriptor: Descriptor,
 
     // The currently allocated buffer.
     pub(crate) buffer: Vec<u8>,
@@ -47,7 +47,7 @@ impl<R: Read> PageReader<R> {
         reader: R,
         total_num_values: i64,
         compression: Compression,
-        descriptor: ColumnDescriptor,
+        descriptor: Descriptor,
         pages_filter: PageFilter,
         buffer: Vec<u8>,
     ) -> Self {
@@ -173,7 +173,7 @@ pub(super) fn finish_page(
     buffer: &mut Vec<u8>,
     compression: Compression,
     current_dictionary: &Option<Arc<dyn DictPage>>,
-    descriptor: &ColumnDescriptor,
+    descriptor: &Descriptor,
 ) -> Result<FinishedPage> {
     let type_ = page_header.type_.try_into()?;
     match type_ {
@@ -189,7 +189,7 @@ pub(super) fn finish_page(
                 &dict_page,
                 (compression, page_header.uncompressed_page_size as usize),
                 is_sorted,
-                descriptor.physical_type(),
+                descriptor.primitive_type.physical_type,
             )?;
             // take the buffer out of the `dict_page` to re-use it
             std::mem::swap(&mut dict_page.buffer, buffer);

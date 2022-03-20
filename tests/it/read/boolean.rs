@@ -1,7 +1,6 @@
 use parquet2::encoding::hybrid_rle::HybridRleDecoder;
 use parquet2::encoding::Encoding;
 use parquet2::error::Result;
-use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage, DataPageHeader};
 use parquet2::read::levels::get_bit_width;
 
@@ -59,8 +58,8 @@ fn read_buffer(
     }
 }
 
-pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec<Option<bool>>> {
-    let (_, def_levels, values) = split_buffer(page, descriptor);
+pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<bool>>> {
+    let (_, def_levels, values) = split_buffer(page);
 
     match page.header() {
         DataPageHeader::V1(_) => match page.encoding() {
@@ -70,7 +69,7 @@ pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec
                 page.num_values(),
                 (
                     &page.definition_level_encoding(),
-                    descriptor.max_def_level(),
+                    page.descriptor.max_def_level,
                 ),
             )),
             _ => todo!(),
@@ -82,7 +81,7 @@ pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec
                 page.num_values(),
                 (
                     &page.definition_level_encoding(),
-                    descriptor.max_def_level(),
+                    page.descriptor.max_def_level,
                 ),
             )),
             _ => todo!(),

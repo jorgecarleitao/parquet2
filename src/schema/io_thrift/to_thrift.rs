@@ -27,7 +27,7 @@ impl ParquetType {
 fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
     match schema {
         ParquetType::PrimitiveType(PrimitiveType {
-            basic_info,
+            field_info,
             logical_type,
             converted_type,
             physical_type,
@@ -43,43 +43,43 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
             let element = SchemaElement {
                 type_: Some(type_),
                 type_length,
-                repetition_type: Some(basic_info.repetition.into()),
-                name: basic_info.name.clone(),
+                repetition_type: Some(field_info.repetition.into()),
+                name: field_info.name.clone(),
                 num_children: None,
                 converted_type,
                 precision: maybe_decimal.map(|x| x.0),
                 scale: maybe_decimal.map(|x| x.1),
-                field_id: basic_info.id,
+                field_id: field_info.id,
                 logical_type: logical_type.clone(),
             };
 
             elements.push(element);
         }
         ParquetType::GroupType {
-            basic_info,
+            field_info,
             fields,
             logical_type,
             converted_type,
         } => {
             let converted_type = converted_type.as_ref().map(group_converted_converted_to);
 
-            let repetition_type = if basic_info.is_root {
+            let repetition_type = if field_info.is_root {
                 // https://github.com/apache/parquet-format/blob/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46/src/main/thrift/parquet.thrift#L363
                 None
             } else {
-                Some(basic_info.repetition)
+                Some(field_info.repetition)
             };
 
             let element = SchemaElement {
                 type_: None,
                 type_length: None,
                 repetition_type: repetition_type.map(|x| x.into()),
-                name: basic_info.name.clone(),
+                name: field_info.name.clone(),
                 num_children: Some(fields.len() as i32),
                 converted_type,
                 scale: None,
                 precision: None,
-                field_id: basic_info.id,
+                field_id: field_info.id,
                 logical_type: logical_type.clone(),
             };
 

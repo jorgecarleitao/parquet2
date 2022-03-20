@@ -155,9 +155,9 @@ pub(super) fn parse_column_orders(
         .map(|(column, order)| match order {
             TColumnOrder::TYPEORDER(_) => {
                 let sort_order = get_sort_order(
-                    &column.primitive_type().logical_type,
-                    &column.primitive_type().converted_type,
-                    &column.primitive_type().physical_type,
+                    &column.descriptor.primitive_type.logical_type,
+                    &column.descriptor.primitive_type.converted_type,
+                    &column.descriptor.primitive_type.physical_type,
                 );
                 ColumnOrder::TypeDefinedOrder(sort_order)
             }
@@ -218,10 +218,10 @@ mod tests {
             .iter()
             .map(|column| {
                 assert_eq!(
-                    column.primitive_type().basic_info.repetition,
+                    column.descriptor.primitive_type.field_info.repetition,
                     Repetition::Optional
                 );
-                column.physical_type()
+                column.descriptor.primitive_type.physical_type
             })
             .collect::<Vec<_>>();
 

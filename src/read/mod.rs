@@ -55,7 +55,7 @@ pub fn get_page_iterator<R: Read + Seek>(
         reader,
         column_chunk.num_values(),
         column_chunk.compression(),
-        column_chunk.descriptor().clone(),
+        column_chunk.descriptor().descriptor.clone(),
         pages_filter,
         buffer,
     ))
@@ -74,7 +74,7 @@ pub fn get_field_columns<'a>(
         .columns()
         .iter()
         .enumerate()
-        .filter(move |x| x.1.path_in_schema()[0] == field.name())
+        .filter(move |x| x.1.path_in_schema[0] == field.name())
         .map(move |x| metadata.row_groups[row_group].column(x.0))
 }
 

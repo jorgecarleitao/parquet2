@@ -12,7 +12,7 @@ pub use crate::parquet_bridge::{DataPageHeaderExt, PageType};
 use crate::compression::Compression;
 use crate::encoding::{get_length, Encoding};
 use crate::error::Result;
-use crate::metadata::ColumnDescriptor;
+use crate::metadata::Descriptor;
 
 use crate::statistics::{deserialize_statistics, Statistics};
 
@@ -25,7 +25,7 @@ pub struct CompressedDataPage {
     compression: Compression,
     uncompressed_page_size: usize,
     pub(crate) dictionary_page: Option<Arc<dyn DictPage>>,
-    pub(crate) descriptor: ColumnDescriptor,
+    pub descriptor: Descriptor,
 }
 
 impl CompressedDataPage {
@@ -35,7 +35,7 @@ impl CompressedDataPage {
         compression: Compression,
         uncompressed_page_size: usize,
         dictionary_page: Option<Arc<dyn DictPage>>,
-        descriptor: ColumnDescriptor,
+        descriptor: Descriptor,
     ) -> Self {
         Self {
             header,
@@ -73,16 +73,12 @@ impl CompressedDataPage {
             DataPageHeader::V1(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor.primitive_type.clone())),
             DataPageHeader::V2(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor.primitive_type.clone())),
         }
-    }
-
-    pub fn descriptor(&self) -> &ColumnDescriptor {
-        &self.descriptor
     }
 }
 
@@ -108,7 +104,7 @@ pub struct DataPage {
     pub(super) header: DataPageHeader,
     pub(super) buffer: Vec<u8>,
     pub(super) dictionary_page: Option<Arc<dyn DictPage>>,
-    pub(super) descriptor: ColumnDescriptor,
+    pub descriptor: Descriptor,
 }
 
 impl DataPage {
@@ -116,7 +112,7 @@ impl DataPage {
         header: DataPageHeader,
         buffer: Vec<u8>,
         dictionary_page: Option<Arc<dyn DictPage>>,
-        descriptor: ColumnDescriptor,
+        descriptor: Descriptor,
     ) -> Self {
         Self {
             header,
@@ -175,16 +171,12 @@ impl DataPage {
             DataPageHeader::V1(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor.primitive_type.clone())),
             DataPageHeader::V2(d) => d
                 .statistics
                 .as_ref()
-                .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone())),
+                .map(|x| deserialize_statistics(x, self.descriptor.primitive_type.clone())),
         }
-    }
-
-    pub fn descriptor(&self) -> &ColumnDescriptor {
-        &self.descriptor
     }
 }
 
@@ -261,15 +253,12 @@ pub fn split_buffer_v2(
 }
 
 /// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values).
-pub fn split_buffer<'a>(
-    page: &'a DataPage,
-    descriptor: &ColumnDescriptor,
-) -> (&'a [u8], &'a [u8], &'a [u8]) {
+pub fn split_buffer(page: &DataPage) -> (&[u8], &[u8], &[u8]) {
     match page.header() {
         DataPageHeader::V1(_) => split_buffer_v1(
             page.buffer(),
-            descriptor.max_rep_level() > 0,
-            descriptor.max_def_level() > 0,
+            page.descriptor.max_rep_level > 0,
+            page.descriptor.max_def_level > 0,
         ),
         DataPageHeader::V2(header) => {
             let def_level_buffer_length = header.definition_levels_byte_length as usize;

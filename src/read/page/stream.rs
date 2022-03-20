@@ -6,7 +6,7 @@ use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 
 use crate::compression::Compression;
 use crate::error::Result;
-use crate::metadata::{ColumnChunkMetaData, ColumnDescriptor};
+use crate::metadata::{ColumnChunkMetaData, Descriptor};
 use crate::page::{CompressedDataPage, ParquetPageHeader};
 
 use super::reader::{finish_page, get_page_header, FinishedPage};
@@ -25,7 +25,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
         reader,
         column_metadata.num_values(),
         column_metadata.compression(),
-        column_metadata.descriptor(),
+        &column_metadata.descriptor().descriptor,
         buffer,
         pages_filter,
     ))
@@ -35,7 +35,7 @@ fn _get_page_stream<'a, R: AsyncRead + AsyncSeek + Unpin + Send>(
     reader: &'a mut R,
     total_num_values: i64,
     compression: Compression,
-    descriptor: &'a ColumnDescriptor,
+    descriptor: &'a Descriptor,
     mut buffer: Vec<u8>,
     pages_filter: PageFilter,
 ) -> impl Stream<Item = Result<CompressedDataPage>> + 'a {

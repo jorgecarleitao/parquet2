@@ -163,12 +163,12 @@ fn build_column_chunk(
     let statistics = reduce(&statistics)?;
     let statistics = statistics.map(|x| serialize_statistics(x.as_ref()));
 
-    let type_ = physical_type_to_type(&descriptor.physical_type()).0;
+    let type_ = physical_type_to_type(&descriptor.descriptor.primitive_type.physical_type).0;
 
     let metadata = ColumnMetaData {
         type_,
         encodings,
-        path_in_schema: descriptor.path_in_schema().to_vec(),
+        path_in_schema: descriptor.path_in_schema.clone(),
         codec: compression.into(),
         num_values,
         total_uncompressed_size,

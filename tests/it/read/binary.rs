@@ -1,7 +1,6 @@
 use parquet2::{
     encoding::{hybrid_rle::HybridRleDecoder, plain_byte_array, Encoding},
     error::Result,
-    metadata::ColumnDescriptor,
     page::{split_buffer, BinaryPageDict, DataPage},
     read::levels::get_bit_width,
 };
@@ -61,13 +60,10 @@ fn read_dict_buffer(
     }
 }
 
-pub fn page_dict_to_vec(
-    page: &DataPage,
-    descriptor: &ColumnDescriptor,
-) -> Result<Vec<Option<Vec<u8>>>> {
-    assert_eq!(descriptor.max_rep_level(), 0);
+pub fn page_dict_to_vec(page: &DataPage) -> Result<Vec<Option<Vec<u8>>>> {
+    assert_eq!(page.descriptor.max_rep_level, 0);
 
-    let (_, def_levels, values) = split_buffer(page, descriptor);
+    let (_, def_levels, values) = split_buffer(page);
 
     match (&page.encoding(), &page.dictionary_page()) {
         (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_buffer(
@@ -77,7 +73,7 @@ pub fn page_dict_to_vec(
             dict.as_any().downcast_ref().unwrap(),
             (
                 &page.definition_level_encoding(),
-                descriptor.max_def_level(),
+                page.descriptor.max_def_level,
             ),
         )),
         (_, None) => todo!("Dictionary-encoded page requires a dictionary"),
@@ -120,10 +116,10 @@ fn read_buffer(
     }
 }
 
-pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec<Option<Vec<u8>>>> {
-    assert_eq!(descriptor.max_rep_level(), 0);
+pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<Vec<u8>>>> {
+    assert_eq!(page.descriptor.max_rep_level, 0);
 
-    let (_, def_levels, values) = split_buffer(page, descriptor);
+    let (_, def_levels, values) = split_buffer(page);
 
     match (&page.encoding(), &page.dictionary_page()) {
         (Encoding::Plain, None) => Ok(read_buffer(
@@ -132,7 +128,7 @@ pub fn page_to_vec(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Vec
             page.num_values() as u32,
             (
                 &page.definition_level_encoding(),
-                descriptor.max_def_level(),
+                page.descriptor.max_def_level,
             ),
         )),
         _ => todo!(),

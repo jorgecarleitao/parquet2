@@ -70,7 +70,7 @@ impl ColumnChunkMetaData {
     /// The [`ColumnDescriptor`] for this column. This descriptor contains the physical and logical type
     /// of the pages.
     pub fn physical_type(&self) -> PhysicalType {
-        self.descriptor().physical_type()
+        self.column_descr.descriptor.primitive_type.physical_type
     }
 
     /// Decodes the raw statistics into a statistics
@@ -78,7 +78,7 @@ impl ColumnChunkMetaData {
         self.column_metadata()
             .statistics
             .as_ref()
-            .map(|x| deserialize_statistics(x, self.descriptor().primitive_type().clone()))
+            .map(|x| deserialize_statistics(x, self.column_descr.descriptor.primitive_type.clone()))
     }
 
     /// Total number of values in this column chunk.

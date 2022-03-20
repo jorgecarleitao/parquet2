@@ -4,17 +4,16 @@ use parquet2::indexes;
 
 // ANCHOR: deserialize
 use parquet2::encoding::Encoding;
-use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage};
 use parquet2::schema::types::PhysicalType;
 
-fn deserialize(page: &DataPage, descriptor: &ColumnDescriptor) {
+fn deserialize(page: &DataPage) {
     // split the data buffer in repetition levels, definition levels and values
-    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page, descriptor);
+    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page);
 
     // decode and deserialize.
     match (
-        descriptor.physical_type(),
+        page.descriptor.primitive_type.physical_type,
         page.encoding(),
         page.dictionary_page(),
     ) {
@@ -132,7 +131,7 @@ fn main() -> Result<()> {
         let page = maybe_page?;
         let page = parquet2::read::decompress(page, &mut decompress_buffer)?;
 
-        let _array = deserialize(&page, column_metadata.descriptor());
+        let _array = deserialize(&page);
     }
     // ANCHOR_END: decompress
 
