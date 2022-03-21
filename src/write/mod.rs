@@ -1,6 +1,7 @@
 mod column_chunk;
 mod compression;
 mod file;
+mod indexes;
 pub(crate) mod page;
 mod row_group;
 pub(self) mod statistics;

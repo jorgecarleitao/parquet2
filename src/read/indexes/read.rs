@@ -7,10 +7,10 @@ use parquet_format_async_temp::{
 };
 
 use crate::error::ParquetError;
+use crate::indexes::Index;
 use crate::metadata::ColumnChunkMetaData;
 
 use super::deserialize::deserialize;
-use super::Index;
 
 fn prepare_read<F: Fn(&ColumnChunk) -> Option<i64>, G: Fn(&ColumnChunk) -> Option<i32>>(
     chunks: &[ColumnChunkMetaData],

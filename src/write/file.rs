@@ -6,13 +6,13 @@ use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
 use parquet_format_async_temp::RowGroup;
 
-use crate::indexes::write::{write_column_index, write_offset_index};
 use crate::{
     error::{ParquetError, Result},
     metadata::SchemaDescriptor,
     FOOTER_SIZE, PARQUET_MAGIC,
 };
 
+use super::indexes::{write_column_index, write_offset_index};
 use super::page::PageWriteSpec;
 use super::{row_group::write_row_group, RowGroupIter, WriteOptions};
 

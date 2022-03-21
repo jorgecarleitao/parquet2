@@ -1,9 +1,5 @@
-mod deserialize;
 mod index;
 mod intervals;
-pub(crate) mod read;
-mod serialize;
-pub(crate) mod write;
 
 pub use crate::parquet_bridge::BoundaryOrder;
 pub use parquet_format_async_temp::PageLocation;

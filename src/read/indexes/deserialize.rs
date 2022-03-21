@@ -5,7 +5,7 @@ use parquet_format_async_temp::{thrift::protocol::TCompactInputProtocol, ColumnI
 use crate::error::ParquetError;
 use crate::schema::types::{PhysicalType, PrimitiveType};
 
-use super::{ByteIndex, FixedLenByteIndex, Index, NativeIndex};
+use crate::indexes::{ByteIndex, FixedLenByteIndex, Index, NativeIndex};
 
 pub fn deserialize(
     data: &[u8],
