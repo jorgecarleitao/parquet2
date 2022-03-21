@@ -7,7 +7,7 @@ use parquet2::compression::Compression;
 use parquet2::error::Result;
 use parquet2::indexes::{BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
 use parquet2::metadata::SchemaDescriptor;
-use parquet2::read::{read_column_index, read_metadata, read_page_locations};
+use parquet2::read::{read_columns_indexes, read_metadata, read_pages_locations};
 use parquet2::schema::types::{PhysicalType, PrimitiveType};
 use parquet2::statistics::Statistics;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
@@ -222,9 +222,9 @@ fn indexes() -> Result<()> {
 
     let metadata = read_metadata(&mut reader)?;
 
-    let column_metadata = &metadata.row_groups[0].columns()[0];
+    let columns = &metadata.row_groups[0].columns();
 
-    let expected_page_locations = vec![
+    let expected_page_locations = vec![vec![
         PageLocation {
             offset: 4,
             compressed_page_size: 63,
@@ -235,8 +235,8 @@ fn indexes() -> Result<()> {
             compressed_page_size: 47,
             first_row_index: array1.len() as i64,
         },
-    ];
-    let expected_index = Box::new(NativeIndex::<i32> {
+    ]];
+    let expected_index = vec![Some(Box::new(NativeIndex::<i32> {
         primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
         indexes: vec![
             PageIndex {
@@ -251,12 +251,12 @@ fn indexes() -> Result<()> {
             },
         ],
         boundary_order: BoundaryOrder::Unordered,
-    }) as Box<dyn Index>;
+    }) as Box<dyn Index>)];
 
-    let index = read_column_index(&mut reader, column_metadata)?.expect("column index");
-    assert_eq!(&index, &expected_index);
+    let indexes = read_columns_indexes(&mut reader, columns)?;
+    assert_eq!(&indexes, &expected_index);
 
-    let pages = read_page_locations(&mut reader, column_metadata)?.expect("offset index");
+    let pages = read_pages_locations(&mut reader, columns)?;
     assert_eq!(pages, expected_page_locations);
 
     Ok(())

@@ -24,7 +24,7 @@ use crate::page::CompressedDataPage;
 use crate::schema::types::ParquetType;
 use crate::{error::Result, metadata::FileMetaData};
 
-pub use crate::indexes::read::{read_column_index, read_page_locations};
+pub use crate::indexes::read::{read_columns_indexes, read_pages_locations};
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true

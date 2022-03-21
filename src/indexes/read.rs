@@ -1,6 +1,7 @@
 use std::convert::TryInto;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
+use parquet_format_async_temp::ColumnChunk;
 use parquet_format_async_temp::{
     thrift::protocol::TCompactInputProtocol, OffsetIndex, PageLocation,
 };
@@ -11,55 +12,130 @@ use crate::metadata::ColumnChunkMetaData;
 use super::deserialize::deserialize;
 use super::Index;
 
-/// Read the column index from the [`ColumnChunkMetaData`] if available and deserializes it into [`Index`].
-pub fn read_column_index<R: Read + Seek>(
-    reader: &mut R,
-    chunk: &ColumnChunkMetaData,
-) -> Result<Option<Box<dyn Index>>, ParquetError> {
-    let metadata = chunk.column_chunk();
-    let (offset, length): (u64, usize) = if let Some(offset) = metadata.column_index_offset {
-        let length = metadata.column_index_length.ok_or_else(|| {
-            ParquetError::OutOfSpec(
-                "The column length must exist if column offset exists".to_string(),
-            )
-        })?;
-        (offset.try_into()?, length.try_into()?)
+fn prepare_read<F: Fn(&ColumnChunk) -> Option<i64>, G: Fn(&ColumnChunk) -> Option<i32>>(
+    chunks: &[ColumnChunkMetaData],
+    get_offset: F,
+    get_length: G,
+) -> Result<(u64, Vec<usize>), ParquetError> {
+    // c1: [start, length]
+    // ...
+    // cN: [start, length]
+
+    let first_chunk = if let Some(chunk) = chunks.first() {
+        chunk
     } else {
-        return Ok(None);
+        return Ok((0, vec![]));
+    };
+    let metadata = first_chunk.column_chunk();
+
+    let offset: u64 = if let Some(offset) = get_offset(metadata) {
+        offset.try_into()?
+    } else {
+        return Ok((0, vec![]));
     };
 
-    reader.seek(SeekFrom::Start(offset))?;
-    let mut data = vec![0; length];
-    reader.read_exact(&mut data)?;
-
-    let primitive_type = chunk.descriptor().descriptor.primitive_type.clone();
-    deserialize(&data, primitive_type)
-}
-
-/// Read [`PageLocation`]s from the [`ColumnChunk`], if available.
-pub fn read_page_locations<R: Read + Seek>(
-    reader: &mut R,
-    chunk: &ColumnChunkMetaData,
-) -> Result<Option<Vec<PageLocation>>, ParquetError> {
-    let (offset, length): (u64, usize) =
-        if let Some(offset) = chunk.column_chunk().offset_index_offset {
-            let length = chunk.column_chunk().offset_index_length.ok_or_else(|| {
+    let lengths = chunks
+        .iter()
+        .map(|x| get_length(x.column_chunk()))
+        .map(|maybe_length| {
+            let index_length = maybe_length.ok_or_else(|| {
                 ParquetError::OutOfSpec(
                     "The column length must exist if column offset exists".to_string(),
                 )
             })?;
-            (offset.try_into()?, length.try_into()?)
-        } else {
-            return Ok(None);
-        };
+
+            Ok(index_length.try_into()?)
+        })
+        .collect::<Result<Vec<_>, ParquetError>>()?;
+
+    Ok((offset, lengths))
+}
+
+fn prepare_column_index_read(
+    chunks: &[ColumnChunkMetaData],
+) -> Result<(u64, Vec<usize>), ParquetError> {
+    // c1: [start, length]
+    // ...
+    // cN: [start, length]
+    prepare_read(chunks, |x| x.column_index_offset, |x| x.column_index_length)
+}
+
+fn prepare_offset_index_read(
+    chunks: &[ColumnChunkMetaData],
+) -> Result<(u64, Vec<usize>), ParquetError> {
+    // c1: [start, length]
+    // ...
+    // cN: [start, length]
+    prepare_read(chunks, |x| x.offset_index_offset, |x| x.offset_index_length)
+}
+
+fn deserialize_column_indexes(
+    chunks: &[ColumnChunkMetaData],
+    data: &[u8],
+    lengths: Vec<usize>,
+) -> Result<Vec<Option<Box<dyn Index>>>, ParquetError> {
+    let mut start = 0;
+    let data = lengths.into_iter().map(|length| {
+        let r = &data[start..length];
+        start += length;
+        r
+    });
+
+    chunks
+        .iter()
+        .zip(data)
+        .map(|(chunk, data)| {
+            let primitive_type = chunk.descriptor().descriptor.primitive_type.clone();
+            deserialize(data, primitive_type)
+        })
+        .collect()
+}
+
+/// Reads the column indexes of all [`ColumnChunkMetaData`] and deserializes them into [`Index`].
+/// Returns an empty vector if indexes are not available
+pub fn read_columns_indexes<R: Read + Seek>(
+    reader: &mut R,
+    chunks: &[ColumnChunkMetaData],
+) -> Result<Vec<Option<Box<dyn Index>>>, ParquetError> {
+    let (offset, lengths) = prepare_column_index_read(chunks)?;
+
+    let length = lengths.iter().sum::<usize>();
 
     reader.seek(SeekFrom::Start(offset))?;
     let mut data = vec![0; length];
     reader.read_exact(&mut data)?;
 
-    let mut d = Cursor::new(&data);
-    let mut prot = TCompactInputProtocol::new(&mut d);
-    let offset = OffsetIndex::read_from_in_protocol(&mut prot)?;
+    deserialize_column_indexes(chunks, &data, lengths)
+}
 
-    Ok(Some(offset.page_locations))
+fn deserialize_page_locations(
+    data: &[u8],
+    column_number: usize,
+) -> Result<Vec<Vec<PageLocation>>, ParquetError> {
+    let mut d = Cursor::new(data);
+
+    (0..column_number)
+        .map(|_| {
+            let mut prot = TCompactInputProtocol::new(&mut d);
+            let offset = OffsetIndex::read_from_in_protocol(&mut prot)?;
+            Ok(offset.page_locations)
+        })
+        .collect()
+}
+
+/// Read [`PageLocation`]s from the [`ColumnChunkMetaData`]s.
+/// Returns an empty vector if indexes are not available
+pub fn read_pages_locations<R: Read + Seek>(
+    reader: &mut R,
+    chunks: &[ColumnChunkMetaData],
+) -> Result<Vec<Vec<PageLocation>>, ParquetError> {
+    let (offset, lengths) = prepare_offset_index_read(chunks)?;
+
+    let length = lengths.iter().sum::<usize>();
+
+    reader.seek(SeekFrom::Start(offset))?;
+    let mut data = vec![0; length];
+    reader.read_exact(&mut data)?;
+
+    deserialize_page_locations(&data, chunks.len())
 }
