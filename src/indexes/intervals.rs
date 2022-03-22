@@ -2,8 +2,6 @@ use parquet_format_async_temp::PageLocation;
 
 use crate::error::ParquetError;
 
-use super::index::PageIndex;
-
 /// An interval
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Interval {
@@ -21,7 +19,7 @@ impl Interval {
 }
 
 /// Returns the set of (row) intervals of the pages.
-fn compute_row_page_intervals(
+fn compute_page_row_intervals(
     locations: &[PageLocation],
     num_rows: u64,
 ) -> Result<Vec<Interval>, ParquetError> {
@@ -49,25 +47,25 @@ fn compute_row_page_intervals(
 
 /// Returns the set of intervals `(start, len)` containing all the
 /// selected rows (for a given column)
-pub fn compute_rows<'a, T>(
-    index: &'a [PageIndex<T>],
+pub fn compute_rows(
+    selected: &[bool],
     locations: &[PageLocation],
     num_rows: u64,
-    selector: &dyn Fn(&'a PageIndex<T>) -> bool,
 ) -> Result<Vec<Interval>, ParquetError> {
-    let page_intervals = compute_row_page_intervals(locations, num_rows)?;
+    let page_intervals = compute_page_row_intervals(locations, num_rows)?;
 
-    Ok(index
+    Ok(selected
         .iter()
         .zip(page_intervals.iter().copied())
-        .filter_map(|(index, page)| {
-            let is_selected = selector(index);
-            if is_selected {
-                Some(page)
-            } else {
-                None
-            }
-        })
+        .filter_map(
+            |(&is_selected, page)| {
+                if is_selected {
+                    Some(page)
+                } else {
+                    None
+                }
+            },
+        )
         .collect())
 }
 
@@ -121,7 +119,7 @@ pub fn select_pages(
     locations: &[PageLocation],
     num_rows: u64,
 ) -> Result<Vec<FilteredPage>, ParquetError> {
-    let page_intervals = compute_row_page_intervals(locations, num_rows)?;
+    let page_intervals = compute_page_row_intervals(locations, num_rows)?;
 
     page_intervals
         .into_iter()

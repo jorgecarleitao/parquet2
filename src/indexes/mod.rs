@@ -15,15 +15,6 @@ mod tests {
 
     #[test]
     fn test_basic() {
-        let index = NativeIndex {
-            primitive_type: PrimitiveType::from_physical("c1".to_string(), PhysicalType::Int32),
-            indexes: vec![PageIndex {
-                min: Some(0i32),
-                max: Some(10),
-                null_count: Some(0),
-            }],
-            boundary_order: Default::default(),
-        };
         let locations = &[PageLocation {
             offset: 100,
             compressed_page_size: 10,
@@ -31,9 +22,7 @@ mod tests {
         }];
         let num_rows = 10;
 
-        let selector = |_| true;
-
-        let row_intervals = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
+        let row_intervals = compute_rows(&[true; 1], locations, num_rows).unwrap();
         assert_eq!(row_intervals, vec![Interval::new(0, 10)])
     }
 
@@ -77,8 +66,9 @@ mod tests {
                 .map(|x| x.as_slice() > &[97])
                 .unwrap_or(false) // no max is present => all nulls => not selected
         };
+        let selected = index.indexes.iter().map(selector).collect::<Vec<_>>();
 
-        let rows = compute_rows(&index.indexes, locations, num_rows, &selector).unwrap();
+        let rows = compute_rows(&selected, locations, num_rows).unwrap();
         assert_eq!(rows, vec![Interval::new(5, 5)]);
 
         let pages = select_pages(&rows, locations, num_rows).unwrap();

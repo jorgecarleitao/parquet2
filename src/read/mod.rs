@@ -19,7 +19,6 @@ pub use page::{IndexedPageReader, PageFilter, PageReader};
 pub use stream::read_metadata as read_metadata_async;
 
 use crate::error::ParquetError;
-use crate::indexes::FilteredPage;
 use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::page::CompressedDataPage;
 use crate::schema::types::ParquetType;
@@ -62,25 +61,6 @@ pub fn get_page_iterator<R: Read + Seek>(
         column_chunk.descriptor().descriptor.clone(),
         pages_filter,
         buffer,
-    ))
-}
-
-/// Returns a new [`IndexedPageReader`] by seeking `reader` to the begining of `column_chunk`.
-pub fn get_indexed_page_reader<R: Read + Seek>(
-    column_chunk: &ColumnChunkMetaData,
-    reader: R,
-    pages: Vec<FilteredPage>,
-    buffer: Vec<u8>,
-    data_buffer: Vec<u8>,
-) -> Result<IndexedPageReader<R>> {
-    Ok(IndexedPageReader::new(
-        reader,
-        column_chunk.compression(),
-        column_chunk.descriptor().descriptor.clone(),
-        column_chunk.byte_range().0,
-        pages,
-        buffer,
-        data_buffer,
     ))
 }
 

@@ -7,7 +7,7 @@ use std::{
 use crate::{
     error::ParquetError,
     indexes::FilteredPage,
-    metadata::Descriptor,
+    metadata::{ColumnChunkMetaData, Descriptor},
     page::{CompressedDataPage, DictPage, ParquetPageHeader},
     parquet_bridge::Compression,
 };
@@ -102,15 +102,15 @@ fn read_dict_page<R: Read + Seek>(
 }
 
 impl<R: Read + Seek> IndexedPageReader<R> {
+    /// Returns a new [`IndexedPageReader`].
     pub fn new(
         reader: R,
-        compression: Compression,
-        descriptor: Descriptor,
-        column_start: u64,
+        column: &ColumnChunkMetaData,
         pages: Vec<FilteredPage>,
         buffer: Vec<u8>,
         data_buffer: Vec<u8>,
     ) -> Self {
+        let column_start = column.byte_range().0;
         // a dictionary page exists iff the first data page is not at the start of
         // the column
         let dictionary = match pages.get(0) {
@@ -128,8 +128,8 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         let pages = pages.into_iter().collect();
         Self {
             reader,
-            compression,
-            descriptor,
+            compression: column.compression(),
+            descriptor: column.descriptor().descriptor.clone(),
             buffer,
             data_buffer,
             pages,
