@@ -236,7 +236,7 @@ fn indexes() -> Result<()> {
             first_row_index: array1.len() as i64,
         },
     ]];
-    let expected_index = vec![Some(Box::new(NativeIndex::<i32> {
+    let expected_index = vec![Box::new(NativeIndex::<i32> {
         primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
         indexes: vec![
             PageIndex {
@@ -251,7 +251,7 @@ fn indexes() -> Result<()> {
             },
         ],
         boundary_order: BoundaryOrder::Unordered,
-    }) as Box<dyn Index>)];
+    }) as Box<dyn Index>];
 
     let indexes = read_columns_indexes(&mut reader, columns)?;
     assert_eq!(&indexes, &expected_index);

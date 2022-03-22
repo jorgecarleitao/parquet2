@@ -260,3 +260,59 @@ impl Index for FixedLenByteIndex {
         &self.primitive_type.physical_type
     }
 }
+
+/// An index of a column of boolean physical type
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BooleanIndex {
+    /// The indexes, one item per page
+    pub indexes: Vec<PageIndex<bool>>,
+    pub boundary_order: BoundaryOrder,
+}
+
+impl BooleanIndex {
+    pub(crate) fn try_new(index: ColumnIndex) -> Result<Self, ParquetError> {
+        let len = index.min_values.len();
+
+        let null_counts = index
+            .null_counts
+            .map(|x| x.into_iter().map(Some).collect::<Vec<_>>())
+            .unwrap_or_else(|| vec![None; len]);
+
+        let indexes = index
+            .min_values
+            .into_iter()
+            .zip(index.max_values.into_iter())
+            .zip(index.null_pages.into_iter())
+            .zip(null_counts.into_iter())
+            .map(|(((min, max), is_null), null_count)| {
+                let (min, max) = if is_null {
+                    (None, None)
+                } else {
+                    let min = min[0] == 1;
+                    let max = max[0] == 1;
+                    (Some(min), Some(max))
+                };
+                Ok(PageIndex {
+                    min,
+                    max,
+                    null_count,
+                })
+            })
+            .collect::<Result<Vec<_>, ParquetError>>()?;
+
+        Ok(Self {
+            indexes,
+            boundary_order: index.boundary_order.try_into()?,
+        })
+    }
+}
+
+impl Index for BooleanIndex {
+    fn as_any(&self) -> &dyn Any {
+        self
+    }
+
+    fn physical_type(&self) -> &PhysicalType {
+        &PhysicalType::Boolean
+    }
+}

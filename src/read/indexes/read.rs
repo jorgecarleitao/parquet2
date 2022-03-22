@@ -54,18 +54,12 @@ fn prepare_read<F: Fn(&ColumnChunk) -> Option<i64>, G: Fn(&ColumnChunk) -> Optio
 fn prepare_column_index_read(
     chunks: &[ColumnChunkMetaData],
 ) -> Result<(u64, Vec<usize>), ParquetError> {
-    // c1: [start, length]
-    // ...
-    // cN: [start, length]
     prepare_read(chunks, |x| x.column_index_offset, |x| x.column_index_length)
 }
 
 fn prepare_offset_index_read(
     chunks: &[ColumnChunkMetaData],
 ) -> Result<(u64, Vec<usize>), ParquetError> {
-    // c1: [start, length]
-    // ...
-    // cN: [start, length]
     prepare_read(chunks, |x| x.offset_index_offset, |x| x.offset_index_length)
 }
 
@@ -73,10 +67,10 @@ fn deserialize_column_indexes(
     chunks: &[ColumnChunkMetaData],
     data: &[u8],
     lengths: Vec<usize>,
-) -> Result<Vec<Option<Box<dyn Index>>>, ParquetError> {
+) -> Result<Vec<Box<dyn Index>>, ParquetError> {
     let mut start = 0;
     let data = lengths.into_iter().map(|length| {
-        let r = &data[start..length];
+        let r = &data[start..start + length];
         start += length;
         r
     });
@@ -96,7 +90,7 @@ fn deserialize_column_indexes(
 pub fn read_columns_indexes<R: Read + Seek>(
     reader: &mut R,
     chunks: &[ColumnChunkMetaData],
-) -> Result<Vec<Option<Box<dyn Index>>>, ParquetError> {
+) -> Result<Vec<Box<dyn Index>>, ParquetError> {
     let (offset, lengths) = prepare_column_index_read(chunks)?;
 
     let length = lengths.iter().sum::<usize>();
