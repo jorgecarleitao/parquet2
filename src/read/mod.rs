@@ -54,14 +54,7 @@ pub fn get_page_iterator<R: Read + Seek>(
 
     let (col_start, _) = column_chunk.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
-    Ok(PageReader::new(
-        reader,
-        column_chunk.num_values(),
-        column_chunk.compression(),
-        column_chunk.descriptor().descriptor.clone(),
-        pages_filter,
-        buffer,
-    ))
+    Ok(PageReader::new(reader, column_chunk, pages_filter, buffer))
 }
 
 /// Returns an [`Iterator`] of [`ColumnChunkMetaData`] corresponding to the columns

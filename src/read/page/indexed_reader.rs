@@ -196,9 +196,6 @@ impl<R: Read + Seek> Iterator for IndexedPageReader<R> {
     type Item = Result<CompressedDataPage, ParquetError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // todo: check if the first page is a dictionary page and read it accordingly so that
-        // we can attach it to data pages
-
         if let Some(page) = self.pages.pop_front() {
             match page {
                 FilteredPage::Select {

@@ -5,7 +5,7 @@ use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 
 use crate::compression::Compression;
 use crate::error::Result;
-use crate::metadata::Descriptor;
+use crate::metadata::{ColumnChunkMetaData, Descriptor};
 
 use crate::page::{
     read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
@@ -46,21 +46,22 @@ pub struct PageReader<R: Read> {
 }
 
 impl<R: Read> PageReader<R> {
+    /// Returns a new [`PageReader`].
+    ///
+    /// It assumes that the reader has been `seeked` to the beginning of `column`.
     pub fn new(
         reader: R,
-        total_num_values: i64,
-        compression: Compression,
-        descriptor: Descriptor,
+        column: &ColumnChunkMetaData,
         pages_filter: PageFilter,
         buffer: Vec<u8>,
     ) -> Self {
         Self {
             reader,
-            total_num_values,
-            compression,
+            total_num_values: column.num_values(),
+            compression: column.compression(),
             seen_num_values: 0,
             current_dictionary: None,
-            descriptor,
+            descriptor: column.descriptor().descriptor.clone(),
             pages_filter,
             buffer,
         }
