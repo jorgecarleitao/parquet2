@@ -14,6 +14,10 @@ use crate::page::{
 };
 use crate::statistics::Statistics;
 
+pub(crate) fn is_data_page(page: &PageWriteSpec) -> bool {
+    page.header.type_ == PageType::DATA_PAGE || page.header.type_ == PageType::DATA_PAGE_V2
+}
+
 fn maybe_bytes(uncompressed: usize, compressed: usize) -> Result<(i32, i32)> {
     let uncompressed_page_size: i32 = uncompressed.try_into().map_err(|_| {
         ParquetError::OutOfSpec(format!(
@@ -35,6 +39,8 @@ fn maybe_bytes(uncompressed: usize, compressed: usize) -> Result<(i32, i32)> {
 /// Contains page write metrics.
 pub struct PageWriteSpec {
     pub header: ParquetPageHeader,
+    pub num_values: usize,
+    pub num_rows: Option<usize>,
     pub header_size: u64,
     pub offset: u64,
     pub bytes_written: u64,
@@ -46,6 +52,9 @@ pub fn write_page<W: Write>(
     offset: u64,
     compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
+    let num_values = compressed_page.num_values();
+    let rows = compressed_page.rows();
+
     let header = match &compressed_page {
         CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
@@ -76,6 +85,8 @@ pub fn write_page<W: Write>(
         offset,
         bytes_written,
         statistics,
+        num_rows: rows.map(|x| x.1),
+        num_values,
     })
 }
 
@@ -84,6 +95,9 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
     offset: u64,
     compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
+    let num_values = compressed_page.num_values();
+    let rows = compressed_page.rows();
+
     let header = match &compressed_page {
         CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),
         CompressedPage::Dict(compressed_page) => assemble_dict_page_header(compressed_page),
@@ -114,6 +128,8 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
         offset,
         bytes_written,
         statistics,
+        num_rows: rows.map(|x| x.1),
+        num_values,
     })
 }
 

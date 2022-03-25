@@ -15,7 +15,6 @@ pub struct FixedLenStatistics {
     pub distinct_count: Option<i64>,
     pub max_value: Option<Vec<u8>>,
     pub min_value: Option<Vec<u8>>,
-    pub(self) physical_type: PhysicalType,
 }
 
 impl Statistics for FixedLenStatistics {
@@ -24,7 +23,7 @@ impl Statistics for FixedLenStatistics {
     }
 
     fn physical_type(&self) -> &PhysicalType {
-        &self.physical_type
+        &self.primitive_type.physical_type
     }
 
     fn null_count(&self) -> Option<i64> {
@@ -64,7 +63,6 @@ pub fn read(
             x.truncate(size as usize);
             x
         }),
-        physical_type: PhysicalType::FixedLenByteArray(size),
     }))
 }
 

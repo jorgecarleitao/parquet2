@@ -1,4 +1,5 @@
 mod compression;
+mod indexes;
 pub mod levels;
 mod metadata;
 mod page;
@@ -13,7 +14,7 @@ pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::read_metadata;
 #[cfg(feature = "stream")]
 pub use page::get_page_stream;
-pub use page::{PageFilter, PageReader};
+pub use page::{IndexedPageReader, PageFilter, PageReader};
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
@@ -22,6 +23,8 @@ use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::page::CompressedDataPage;
 use crate::schema::types::ParquetType;
 use crate::{error::Result, metadata::FileMetaData};
+
+pub use indexes::{read_columns_indexes, read_pages_locations};
 
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true
@@ -51,14 +54,7 @@ pub fn get_page_iterator<R: Read + Seek>(
 
     let (col_start, _) = column_chunk.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
-    Ok(PageReader::new(
-        reader,
-        column_chunk.num_values(),
-        column_chunk.compression(),
-        column_chunk.descriptor().descriptor.clone(),
-        pages_filter,
-        buffer,
-    ))
+    Ok(PageReader::new(reader, column_chunk, pages_filter, buffer))
 }
 
 /// Returns an [`Iterator`] of [`ColumnChunkMetaData`] corresponding to the columns

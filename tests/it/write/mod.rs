@@ -5,8 +5,10 @@ use std::sync::Arc;
 
 use parquet2::compression::Compression;
 use parquet2::error::Result;
+use parquet2::indexes::{BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
 use parquet2::metadata::SchemaDescriptor;
-use parquet2::read::read_metadata;
+use parquet2::read::{read_columns_indexes, read_metadata, read_pages_locations};
+use parquet2::schema::types::{PhysicalType, PrimitiveType};
 use parquet2::statistics::Statistics;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
 use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
@@ -59,7 +61,6 @@ fn test_column(column: usize) -> Result<()> {
 
     let a = schema.columns();
 
-    let num_rows = array.len();
     let pages = DynStreamingIterator::new(Compressor::new_from_vec(
         DynIter::new(std::iter::once(array_to_page(
             &array,
@@ -75,7 +76,7 @@ fn test_column(column: usize) -> Result<()> {
     let mut writer = FileWriter::new(writer, schema, options, None);
 
     writer.start()?;
-    writer.write(DynIter::new(columns), num_rows)?;
+    writer.write(DynIter::new(columns))?;
     let writer = writer.end(None)?.1;
 
     let data = writer.into_inner();
@@ -166,7 +167,7 @@ fn basic() -> Result<()> {
     let mut writer = FileWriter::new(writer, schema, options, None);
 
     writer.start()?;
-    writer.write(DynIter::new(columns), 7)?;
+    writer.write(DynIter::new(columns))?;
     let writer = writer.end(None)?.1;
 
     let data = writer.into_inner();
@@ -180,6 +181,83 @@ fn basic() -> Result<()> {
         metadata.row_groups[0].columns()[0].uncompressed_size(),
         expected
     );
+
+    Ok(())
+}
+
+#[test]
+fn indexes() -> Result<()> {
+    let array1 = vec![Some(0), Some(1), None, Some(3), Some(4), Some(5), Some(6)];
+    let array2 = vec![Some(10), Some(11)];
+
+    let options = WriteOptions {
+        write_statistics: true,
+        compression: Compression::Uncompressed,
+        version: Version::V1,
+    };
+
+    let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
+
+    let pages = vec![
+        array_to_page_v1::<i32>(&array1, &options, &schema.columns()[0].descriptor),
+        array_to_page_v1::<i32>(&array2, &options, &schema.columns()[0].descriptor),
+    ];
+
+    let pages = DynStreamingIterator::new(Compressor::new(
+        DynIter::new(pages.into_iter()),
+        options.compression,
+        vec![],
+    ));
+    let columns = std::iter::once(Ok(pages));
+
+    let writer = Cursor::new(vec![]);
+    let mut writer = FileWriter::new(writer, schema, options, None);
+
+    writer.start()?;
+    writer.write(DynIter::new(columns))?;
+    let writer = writer.end(None)?.1;
+
+    let data = writer.into_inner();
+    let mut reader = Cursor::new(data);
+
+    let metadata = read_metadata(&mut reader)?;
+
+    let columns = &metadata.row_groups[0].columns();
+
+    let expected_page_locations = vec![vec![
+        PageLocation {
+            offset: 4,
+            compressed_page_size: 63,
+            first_row_index: 0,
+        },
+        PageLocation {
+            offset: 67,
+            compressed_page_size: 47,
+            first_row_index: array1.len() as i64,
+        },
+    ]];
+    let expected_index = vec![Box::new(NativeIndex::<i32> {
+        primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
+        indexes: vec![
+            PageIndex {
+                min: Some(0),
+                max: Some(6),
+                null_count: Some(1),
+            },
+            PageIndex {
+                min: Some(10),
+                max: Some(11),
+                null_count: Some(0),
+            },
+        ],
+        boundary_order: BoundaryOrder::Unordered,
+    }) as Box<dyn Index>];
+
+    let indexes = read_columns_indexes(&mut reader, columns)?;
+    assert_eq!(&indexes, &expected_index);
+
+    let pages = read_pages_locations(&mut reader, columns)?;
+    assert_eq!(pages, expected_page_locations);
 
     Ok(())
 }

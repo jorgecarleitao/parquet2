@@ -6,14 +6,17 @@ use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
 use parquet_format_async_temp::RowGroup;
 
-pub use crate::metadata::KeyValue;
 use crate::{
     error::{ParquetError, Result},
     metadata::SchemaDescriptor,
     FOOTER_SIZE, PARQUET_MAGIC,
 };
 
+use super::indexes::{write_column_index, write_offset_index};
+use super::page::PageWriteSpec;
 use super::{row_group::write_row_group, RowGroupIter, WriteOptions};
+
+pub use crate::metadata::KeyValue;
 
 pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<u64> {
     writer.write_all(&PARQUET_MAGIC)?;
@@ -49,6 +52,7 @@ pub struct FileWriter<W: Write> {
 
     offset: u64,
     row_groups: Vec<RowGroup>,
+    page_specs: Vec<Vec<Vec<PageWriteSpec>>>,
 }
 
 // Accessors
@@ -79,6 +83,7 @@ impl<W: Write> FileWriter<W> {
             created_by,
             offset: 0,
             row_groups: vec![],
+            page_specs: vec![],
         }
     }
 
@@ -91,7 +96,7 @@ impl<W: Write> FileWriter<W> {
     /// Writes a row group to the file.
     ///
     /// This call is IO-bounded
-    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>, num_rows: usize) -> Result<()>
+    pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>) -> Result<()>
     where
         ParquetError: From<E>,
         E: std::error::Error,
@@ -102,17 +107,17 @@ impl<W: Write> FileWriter<W> {
             ));
         }
         let ordinal = self.row_groups.len();
-        let (group, size) = write_row_group(
+        let (group, specs, size) = write_row_group(
             &mut self.writer,
             self.offset,
             self.schema.columns(),
             self.options.compression,
             row_group,
-            num_rows,
             ordinal,
         )?;
         self.offset += size;
         self.row_groups.push(group);
+        self.page_specs.push(specs);
         Ok(())
     }
 
@@ -121,6 +126,43 @@ impl<W: Write> FileWriter<W> {
     pub fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
+
+        if self.options.write_statistics {
+            // write column indexes
+            self.row_groups
+                .iter_mut()
+                .zip(self.page_specs.iter())
+                .try_for_each(|(group, pages)| {
+                    group.columns.iter_mut().zip(pages.iter()).try_for_each(
+                        |(column, pages)| {
+                            let offset = self.offset;
+                            column.column_index_offset = Some(offset as i64);
+                            self.offset += write_column_index(&mut self.writer, pages)?;
+                            let length = self.offset - offset;
+                            column.column_index_length = Some(length as i32);
+                            Result::Ok(())
+                        },
+                    )?;
+                    Result::Ok(())
+                })?;
+
+            // write offset index
+            self.row_groups
+                .iter_mut()
+                .zip(self.page_specs.iter())
+                .try_for_each(|(group, pages)| {
+                    group.columns.iter_mut().zip(pages.iter()).try_for_each(
+                        |(column, pages)| {
+                            let offset = self.offset;
+                            column.offset_index_offset = Some(offset as i64);
+                            self.offset += write_offset_index(&mut self.writer, pages)?;
+                            column.offset_index_length = Some((self.offset - offset) as i32);
+                            Result::Ok(())
+                        },
+                    )?;
+                    Result::Ok(())
+                })?;
+        };
 
         let metadata = FileMetaData::new(
             self.options.version.into(),

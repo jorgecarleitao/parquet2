@@ -25,7 +25,10 @@ pub struct CompressedDataPage {
     compression: Compression,
     uncompressed_page_size: usize,
     pub(crate) dictionary_page: Option<Arc<dyn DictPage>>,
-    pub descriptor: Descriptor,
+    pub(crate) descriptor: Descriptor,
+
+    // The offset and length in rows
+    pub(crate) rows: Option<(usize, usize)>,
 }
 
 impl CompressedDataPage {
@@ -36,6 +39,7 @@ impl CompressedDataPage {
         uncompressed_page_size: usize,
         dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
+        rows: Option<(usize, usize)>,
     ) -> Self {
         Self {
             header,
@@ -44,6 +48,7 @@ impl CompressedDataPage {
             uncompressed_page_size,
             dictionary_page,
             descriptor,
+            rows,
         }
     }
 
@@ -59,8 +64,17 @@ impl CompressedDataPage {
         self.buffer.len()
     }
 
+    /// The compression of the data in this page.
+    /// Note that what is compressed in a page depends on its version:
+    /// in V1, the whole data (`[repetition levels][definition levels][values]`) is compressed; in V2 only the values are compressed.
     pub fn compression(&self) -> Compression {
         self.compression
+    }
+
+    /// the rows to be selected by this page.
+    /// When `None`, all rows are to be considered.
+    pub fn rows(&self) -> Option<(usize, usize)> {
+        self.rows
     }
 
     pub fn num_values(&self) -> usize {
@@ -105,6 +119,7 @@ pub struct DataPage {
     pub(super) buffer: Vec<u8>,
     pub(super) dictionary_page: Option<Arc<dyn DictPage>>,
     pub descriptor: Descriptor,
+    pub rows: Option<(usize, usize)>,
 }
 
 impl DataPage {
@@ -113,12 +128,14 @@ impl DataPage {
         buffer: Vec<u8>,
         dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
+        rows: Option<(usize, usize)>,
     ) -> Self {
         Self {
             header,
             buffer,
             dictionary_page,
             descriptor,
+            rows,
         }
     }
 
@@ -132,6 +149,12 @@ impl DataPage {
 
     pub fn buffer(&self) -> &[u8] {
         &self.buffer
+    }
+
+    /// the rows to be selected by this page.
+    /// When `None`, all rows are to be considered.
+    pub fn rows(&self) -> Option<(usize, usize)> {
+        self.rows
     }
 
     /// Returns a mutable reference to the internal buffer.
@@ -209,6 +232,20 @@ impl CompressedPage {
         match self {
             CompressedPage::Data(page) => &mut page.buffer,
             CompressedPage::Dict(page) => &mut page.buffer,
+        }
+    }
+
+    pub(crate) fn num_values(&self) -> usize {
+        match self {
+            CompressedPage::Data(page) => page.num_values(),
+            CompressedPage::Dict(_) => 0,
+        }
+    }
+
+    pub(crate) fn rows(&self) -> Option<(usize, usize)> {
+        match self {
+            CompressedPage::Data(page) => page.rows,
+            CompressedPage::Dict(_) => None,
         }
     }
 }

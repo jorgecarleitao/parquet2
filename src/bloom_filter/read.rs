@@ -16,10 +16,7 @@ pub fn read<R: Read + Seek>(
     mut reader: &mut R,
     bitset: &mut Vec<u8>,
 ) -> Result<(), ParquetError> {
-    let offset = column_metadata
-        .metadata()
-        .ok_or_else(|| ParquetError::OutOfSpec("Column metadata is required".to_string()))?
-        .bloom_filter_offset;
+    let offset = column_metadata.metadata().bloom_filter_offset;
 
     let offset = if let Some(offset) = offset {
         offset as u64

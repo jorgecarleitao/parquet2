@@ -46,19 +46,14 @@ impl ColumnChunkMetaData {
         &self.column_chunk
     }
 
-    // The column's metadata
-    fn column_metadata(&self) -> &ColumnMetaData {
+    // The column chunk's metadata
+    pub fn metadata(&self) -> &ColumnMetaData {
         self.column_chunk.meta_data.as_ref().unwrap()
-    }
-
-    // The column's metadata
-    pub fn metadata(&self) -> Option<&ColumnMetaData> {
-        self.column_chunk.meta_data.as_ref()
     }
 
     /// Type of this column. Must be primitive.
     pub fn type_(&self) -> &Type {
-        &self.column_metadata().type_
+        &self.metadata().type_
     }
 
     /// The [`ColumnDescriptor`] for this column. This descriptor contains the physical and logical type
@@ -75,7 +70,7 @@ impl ColumnChunkMetaData {
 
     /// Decodes the raw statistics into a statistics
     pub fn statistics(&self) -> Option<Result<Arc<dyn Statistics>>> {
-        self.column_metadata()
+        self.metadata()
             .statistics
             .as_ref()
             .map(|x| deserialize_statistics(x, self.column_descr.descriptor.primitive_type.clone()))
@@ -83,47 +78,47 @@ impl ColumnChunkMetaData {
 
     /// Total number of values in this column chunk.
     pub fn num_values(&self) -> i64 {
-        self.column_metadata().num_values
+        self.metadata().num_values
     }
 
     /// [`Compression`] for this column.
     pub fn compression(&self) -> Compression {
-        self.column_metadata().codec.try_into().unwrap()
+        self.metadata().codec.try_into().unwrap()
     }
 
     /// Returns the total compressed data size of this column chunk.
     pub fn compressed_size(&self) -> i64 {
-        self.column_metadata().total_compressed_size
+        self.metadata().total_compressed_size
     }
 
     /// Returns the total uncompressed data size of this column chunk.
     pub fn uncompressed_size(&self) -> i64 {
-        self.column_metadata().total_uncompressed_size
+        self.metadata().total_uncompressed_size
     }
 
     /// Returns the offset for the column data.
     pub fn data_page_offset(&self) -> i64 {
-        self.column_metadata().data_page_offset
+        self.metadata().data_page_offset
     }
 
     /// Returns `true` if this column chunk contains a index page, `false` otherwise.
     pub fn has_index_page(&self) -> bool {
-        self.column_metadata().index_page_offset.is_some()
+        self.metadata().index_page_offset.is_some()
     }
 
     /// Returns the offset for the index page.
     pub fn index_page_offset(&self) -> Option<i64> {
-        self.column_metadata().index_page_offset
+        self.metadata().index_page_offset
     }
 
     /// Returns the offset for the dictionary page, if any.
     pub fn dictionary_page_offset(&self) -> Option<i64> {
-        self.column_metadata().dictionary_page_offset
+        self.metadata().dictionary_page_offset
     }
 
     /// Returns the encoding for this column
     pub fn column_encoding(&self) -> &Vec<Encoding> {
-        &self.column_metadata().encodings
+        &self.metadata().encodings
     }
 
     /// Returns the offset and length in bytes of the column chunk within the file

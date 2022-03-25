@@ -1,6 +1,5 @@
 use parquet2::bloom_filter;
 use parquet2::error::Result;
-use parquet2::indexes;
 
 // ANCHOR: deserialize
 use parquet2::encoding::Encoding;
@@ -52,24 +51,21 @@ fn main() -> Result<()> {
     // ANCHOR: column_metadata
     let row_group = 0;
     let column = 0;
-    let column_metadata = metadata.row_groups[row_group].column(column);
+    let columns = metadata.row_groups[row_group].columns();
+    let column_metadata = &columns[column];
     // ANCHOR_END: column_metadata
 
     // ANCHOR: column_index
-    // read the column index
-    let index = indexes::read_column(&mut reader, column_metadata.column_chunk())?;
-    if let Some(index) = index {
-        // these are the minimum and maximum within each page, which can be used
-        // to skip pages.
-        println!("{index:?}");
-    }
+    // read the column indexes of every column
+    use parquet2::read;
+    let index = read::read_columns_indexes(&mut reader, columns)?;
+    // these are the minimum and maximum within each page, which can be used
+    // to skip pages.
+    println!("{index:?}");
 
-    // read the offset index containing page locations
-    let maybe_pages = indexes::read_page_locations(&mut reader, column_metadata.column_chunk())?;
-    if let Some(pages) = maybe_pages {
-        // there are page locations in the file
-        println!("{pages:?}");
-    }
+    // read the offset indexes containing page locations of every column
+    let pages = read::read_pages_locations(&mut reader, columns)?;
+    println!("{pages:?}");
     // ANCHOR_END: column_index
 
     // ANCHOR: statistics
