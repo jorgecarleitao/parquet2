@@ -29,7 +29,10 @@ fn equal(lhs: &dyn Index, rhs: &dyn Index) -> bool {
     }
 
     match lhs.physical_type() {
-        PhysicalType::Boolean => unreachable!(),
+        PhysicalType::Boolean => {
+            lhs.as_any().downcast_ref::<BooleanIndex>().unwrap()
+                == rhs.as_any().downcast_ref::<BooleanIndex>().unwrap()
+        }
         PhysicalType::Int32 => {
             lhs.as_any().downcast_ref::<NativeIndex<i32>>().unwrap()
                 == rhs.as_any().downcast_ref::<NativeIndex<i32>>().unwrap()
