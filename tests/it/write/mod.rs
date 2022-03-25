@@ -9,7 +9,7 @@ use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::read_metadata;
 use parquet2::statistics::Statistics;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
-use parquet2::{metadata::ColumnDescriptor, page::EncodedPage, write::WriteOptions};
+use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
 
 use super::Array;
 use super::{alltypes_plain, alltypes_statistics};
@@ -18,7 +18,7 @@ use primitive::array_to_page_v1;
 pub fn array_to_page(
     array: &Array,
     options: &WriteOptions,
-    descriptor: &ColumnDescriptor,
+    descriptor: &Descriptor,
 ) -> Result<EncodedPage> {
     // using plain encoding format
     match array {
@@ -61,7 +61,11 @@ fn test_column(column: usize) -> Result<()> {
 
     let num_rows = array.len();
     let pages = DynStreamingIterator::new(Compressor::new_from_vec(
-        DynIter::new(std::iter::once(array_to_page(&array, &options, &a[0]))),
+        DynIter::new(std::iter::once(array_to_page(
+            &array,
+            &options,
+            &a[0].descriptor,
+        ))),
         options.compression,
         vec![],
     ));
@@ -151,7 +155,7 @@ fn basic() -> Result<()> {
         DynIter::new(std::iter::once(array_to_page_v1(
             &array,
             &options,
-            &schema.columns()[0],
+            &schema.columns()[0].descriptor,
         ))),
         options.compression,
         vec![],

@@ -5,7 +5,7 @@ use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::error::Result;
-use crate::schema::types::{ParquetType, PhysicalType};
+use crate::schema::types::PhysicalType;
 use crate::statistics::{deserialize_statistics, Statistics};
 use crate::{compression::Compression, schema::types::Type};
 
@@ -70,10 +70,7 @@ impl ColumnChunkMetaData {
     /// The [`ColumnDescriptor`] for this column. This descriptor contains the physical and logical type
     /// of the pages.
     pub fn physical_type(&self) -> PhysicalType {
-        match self.descriptor().type_() {
-            ParquetType::PrimitiveType { physical_type, .. } => *physical_type,
-            _ => unreachable!(),
-        }
+        self.column_descr.descriptor.primitive_type.physical_type
     }
 
     /// Decodes the raw statistics into a statistics
@@ -81,7 +78,7 @@ impl ColumnChunkMetaData {
         self.column_metadata()
             .statistics
             .as_ref()
-            .map(|x| deserialize_statistics(x, self.descriptor().clone()))
+            .map(|x| deserialize_statistics(x, self.column_descr.descriptor.primitive_type.clone()))
     }
 
     /// Total number of values in this column chunk.

@@ -1,7 +1,7 @@
 use super::Type;
 use crate::error::{ParquetError, Result};
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PhysicalType {
     Boolean,
     Int32,

@@ -1,6 +1,6 @@
 use parquet2::{
     encoding::Encoding,
-    metadata::ColumnDescriptor,
+    metadata::Descriptor,
     page::{DataPage, DataPageHeader, DataPageHeaderV1, EncodedPage},
     statistics::{serialize_statistics, PrimitiveStatistics, Statistics},
     types::NativeType,
@@ -43,7 +43,7 @@ fn unzip_option<T: NativeType>(array: &[Option<T>]) -> Result<(Vec<u8>, Vec<u8>)
 pub fn array_to_page_v1<T: NativeType>(
     array: &[Option<T>],
     options: &WriteOptions,
-    descriptor: &ColumnDescriptor,
+    descriptor: &Descriptor,
 ) -> Result<EncodedPage> {
     let (values, mut buffer) = unzip_option(array)?;
 
@@ -51,7 +51,7 @@ pub fn array_to_page_v1<T: NativeType>(
 
     let statistics = if options.write_statistics {
         let statistics = &PrimitiveStatistics {
-            descriptor: descriptor.clone(),
+            primitive_type: descriptor.primitive_type.clone(),
             null_count: Some((array.len() - array.iter().flatten().count()) as i64),
             distinct_count: None,
             max_value: array.iter().flatten().max_by(|x, y| x.ord(y)).copied(),

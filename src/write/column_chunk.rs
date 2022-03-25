@@ -16,7 +16,7 @@ use crate::{
     error::{ParquetError, Result},
     metadata::ColumnDescriptor,
     page::{CompressedPage, PageType},
-    schema::types::{physical_type_to_type, ParquetType},
+    schema::types::physical_type_to_type,
 };
 
 use super::page::{write_page, write_page_async, PageWriteSpec};
@@ -163,19 +163,12 @@ fn build_column_chunk(
     let statistics = reduce(&statistics)?;
     let statistics = statistics.map(|x| serialize_statistics(x.as_ref()));
 
-    let type_ = match descriptor.type_() {
-        ParquetType::PrimitiveType { physical_type, .. } => physical_type_to_type(physical_type).0,
-        _ => {
-            return Err(general_err!(
-                "Trying to write a row group of a non-physical type"
-            ))
-        }
-    };
+    let type_ = physical_type_to_type(&descriptor.descriptor.primitive_type.physical_type).0;
 
     let metadata = ColumnMetaData {
         type_,
         encodings,
-        path_in_schema: descriptor.path_in_schema().to_vec(),
+        path_in_schema: descriptor.path_in_schema.clone(),
         codec: compression.into(),
         num_values,
         total_uncompressed_size,

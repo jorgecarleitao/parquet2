@@ -30,7 +30,6 @@ use super::super::metadata::SchemaDescriptor;
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 
 use crate::error::{ParquetError, Result};
-use crate::schema::types::ParquetType;
 
 pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
@@ -152,20 +151,16 @@ pub(super) fn parse_column_orders(
     schema_descr
         .columns()
         .iter()
-        .enumerate()
-        .map(|(i, column)| match orders[i] {
-            TColumnOrder::TYPEORDER(_) => match column.type_() {
-                ParquetType::GroupType { .. } => unreachable!(),
-                ParquetType::PrimitiveType {
-                    logical_type,
-                    converted_type,
-                    physical_type,
-                    ..
-                } => {
-                    let sort_order = get_sort_order(logical_type, converted_type, physical_type);
-                    ColumnOrder::TypeDefinedOrder(sort_order)
-                }
-            },
+        .zip(orders.iter())
+        .map(|(column, order)| match order {
+            TColumnOrder::TYPEORDER(_) => {
+                let sort_order = get_sort_order(
+                    &column.descriptor.primitive_type.logical_type,
+                    &column.descriptor.primitive_type.converted_type,
+                    &column.descriptor.primitive_type.physical_type,
+                );
+                ColumnOrder::TypeDefinedOrder(sort_order)
+            }
         })
         .collect()
 }
@@ -221,18 +216,12 @@ mod tests {
 
         let result = columns
             .iter()
-            .map(|column| match column.type_() {
-                ParquetType::PrimitiveType {
-                    physical_type,
-                    basic_info,
-                    ..
-                } => {
-                    assert_eq!(basic_info.repetition(), &Repetition::Optional);
-                    *physical_type
-                }
-                _ => {
-                    panic!("All types should be primitives");
-                }
+            .map(|column| {
+                assert_eq!(
+                    column.descriptor.primitive_type.field_info.repetition,
+                    Repetition::Optional
+                );
+                column.descriptor.primitive_type.physical_type
             })
             .collect::<Vec<_>>();
 

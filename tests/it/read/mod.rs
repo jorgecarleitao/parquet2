@@ -13,7 +13,6 @@ use std::fs::File;
 use parquet2::error::ParquetError;
 use parquet2::error::Result;
 use parquet2::metadata::ColumnChunkMetaData;
-use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::DataPage;
 use parquet2::read::BasicDecompressor;
@@ -30,64 +29,40 @@ use super::*;
 
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
-pub fn page_to_array(page: &DataPage, descriptor: &ColumnDescriptor) -> Result<Array> {
-    match (descriptor.type_(), descriptor.max_rep_level()) {
-        (ParquetType::PrimitiveType { physical_type, .. }, 0) => match page.dictionary_page() {
+pub fn page_to_array(page: &DataPage) -> Result<Array> {
+    let physical_type = page.descriptor.primitive_type.physical_type;
+    match page.descriptor.max_rep_level {
+        0 => match page.dictionary_page() {
             Some(_) => match physical_type {
-                PhysicalType::Int32 => {
-                    Ok(Array::Int32(primitive::page_dict_to_vec(page, descriptor)?))
-                }
-                PhysicalType::Int64 => {
-                    Ok(Array::Int64(primitive::page_dict_to_vec(page, descriptor)?))
-                }
-                PhysicalType::Int96 => {
-                    Ok(Array::Int96(primitive::page_dict_to_vec(page, descriptor)?))
-                }
-                PhysicalType::Float => Ok(Array::Float32(primitive::page_dict_to_vec(
-                    page, descriptor,
-                )?)),
-                PhysicalType::Double => Ok(Array::Float64(primitive::page_dict_to_vec(
-                    page, descriptor,
-                )?)),
-                PhysicalType::ByteArray => {
-                    Ok(Array::Binary(binary::page_dict_to_vec(page, descriptor)?))
-                }
+                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_dict_to_vec(page)?)),
+                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_dict_to_vec(page)?)),
+                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_dict_to_vec(page)?)),
+                PhysicalType::Float => Ok(Array::Float32(primitive::page_dict_to_vec(page)?)),
+                PhysicalType::Double => Ok(Array::Float64(primitive::page_dict_to_vec(page)?)),
+                PhysicalType::ByteArray => Ok(Array::Binary(binary::page_dict_to_vec(page)?)),
                 _ => todo!(),
             },
             None => match physical_type {
-                PhysicalType::Boolean => {
-                    Ok(Array::Boolean(boolean::page_to_vec(page, descriptor)?))
-                }
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page, descriptor)?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page, descriptor)?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page, descriptor)?)),
-                PhysicalType::Float => {
-                    Ok(Array::Float32(primitive::page_to_vec(page, descriptor)?))
-                }
-                PhysicalType::Double => {
-                    Ok(Array::Float64(primitive::page_to_vec(page, descriptor)?))
-                }
-                PhysicalType::ByteArray => {
-                    Ok(Array::Binary(binary::page_to_vec(page, descriptor)?))
-                }
+                PhysicalType::Boolean => Ok(Array::Boolean(boolean::page_to_vec(page)?)),
+                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page)?)),
+                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page)?)),
+                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page)?)),
+                PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
+                PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
+                PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
                 _ => todo!(),
             },
         },
-        (ParquetType::PrimitiveType { physical_type, .. }, _) => match page.dictionary_page() {
+        _ => match page.dictionary_page() {
             None => match physical_type {
-                PhysicalType::Int64 => {
-                    Ok(primitive_nested::page_to_array::<i64>(page, descriptor)?)
-                }
+                PhysicalType::Int64 => Ok(primitive_nested::page_to_array::<i64>(page)?),
                 _ => todo!(),
             },
             Some(_) => match physical_type {
-                PhysicalType::Int64 => Ok(primitive_nested::page_dict_to_array::<i64>(
-                    page, descriptor,
-                )?),
+                PhysicalType::Int64 => Ok(primitive_nested::page_dict_to_array::<i64>(page)?),
                 _ => todo!(),
             },
         },
-        _ => todo!("Nested types are not supported by this in-memory format"),
     }
 }
 
@@ -102,14 +77,14 @@ where
     let mut has_filled = false;
     let mut arrays = vec![];
     while let State::Some(mut new_iter) = columns.advance()? {
-        if let Some((pages, column)) = new_iter.get() {
+        if let Some((pages, _column)) = new_iter.get() {
             let mut iterator = BasicDecompressor::new(pages, vec![]);
             while let Some(page) = iterator.next()? {
                 if !has_filled {
-                    struct_::extend_validity(&mut validity, page, column.descriptor());
+                    struct_::extend_validity(&mut validity, page);
                 }
                 // todo: this is wrong: multiple pages -> array
-                arrays.push(page_to_array(page, column.descriptor())?)
+                arrays.push(page_to_array(page)?)
             }
         }
         has_filled = true;

@@ -98,23 +98,23 @@ where
 fn parquet_type_str(parquet_type: &ParquetType) -> String {
     match parquet_type {
         ParquetType::PrimitiveType {
-            basic_info,
+            field_info,
             logical_type,
             converted_type,
             physical_type,
         } => {
             format!(
                 "{:27} {:?} {:?} P:{:?} L:{:?} C:{:?}",
-                basic_info.name(),
-                basic_info.repetition(),
-                basic_info.id(),
+                field_info.name(),
+                field_info.repetition(),
+                field_info.id(),
                 physical_type,
                 logical_type,
                 converted_type,
             )
         }
         ParquetType::GroupType {
-            basic_info,
+            field_info,
             logical_type,
             converted_type,
             ..
@@ -122,8 +122,8 @@ fn parquet_type_str(parquet_type: &ParquetType) -> String {
             format!(
                 "{:27} {:?} {:?} L:{:?} C:{:?}",
                 ":",
-                basic_info.repetition(),
-                basic_info.id(),
+                field_info.repetition(),
+                field_info.id(),
                 logical_type,
                 converted_type,
             )
