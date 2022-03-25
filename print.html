@@ -218,40 +218,34 @@ Decompression is done via <code>decompress</code>:</p>
         let page = maybe_page?;
         let page = parquet2::read::decompress(page, &amp;mut decompress_buffer)?;
 
-        let _array = deserialize(&amp;page, column_metadata.descriptor());
+        let _array = deserialize(&amp;page);
     }
 </code></pre>
 <p>Decoding and deserialization is usually done in the same step, as follows:</p>
 <pre><code class="language-rust no_run noplayground">use parquet2::encoding::Encoding;
-use parquet2::metadata::ColumnDescriptor;
 use parquet2::page::{split_buffer, DataPage};
-use parquet2::schema::types::ParquetType;
+use parquet2::schema::types::PhysicalType;
 
-fn deserialize(page: &amp;DataPage, descriptor: &amp;ColumnDescriptor) {
-    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page, descriptor);
+fn deserialize(page: &amp;DataPage) {
+    // split the data buffer in repetition levels, definition levels and values
+    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page);
 
-    if let ParquetType::PrimitiveType {
-        physical_type,
-        converted_type,
-        logical_type,
-        ..
-    } = descriptor.type_()
-    {
-        // map the types to your physical typing system (e.g. this usually adds
-        // casting, tz conversions, int96 to timestamp)
-    } else {
-        // column chunks are always primitive types
-        unreachable!()
-    }
-
-    // finally, decode and deserialize.
-    match (&amp;page.encoding(), page.dictionary_page()) {
-        (Encoding::PlainDictionary | Encoding::RleDictionary, Some(_dict_page)) =&gt; {
+    // decode and deserialize.
+    match (
+        page.descriptor.primitive_type.physical_type,
+        page.encoding(),
+        page.dictionary_page(),
+    ) {
+        (
+            PhysicalType::Int32,
+            Encoding::PlainDictionary | Encoding::RleDictionary,
+            Some(_dict_page),
+        ) =&gt; {
             // plain encoded page with a dictionary
             // _dict_page can be downcasted based on the descriptor's physical type
             todo!()
         }
-        (Encoding::Plain, None) =&gt; {
+        (PhysicalType::Int32, Encoding::Plain, None) =&gt; {
             // plain encoded page
             todo!()
         }
@@ -277,7 +271,6 @@ are represented via trait objects of the trait <code>Statistics</code>,
 which can be downcasted via its <code>Statistics::physical_type()</code>:</p>
 <pre><code class="language-rust no_run noplayground">    if let Some(maybe_stats) = column_metadata.statistics() {
         let stats = maybe_stats?;
-        use parquet2::schema::types::PhysicalType;
         use parquet2::statistics::PrimitiveStatistics;
         match stats.physical_type() {
             PhysicalType::Int32 =&gt; {
