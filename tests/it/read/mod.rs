@@ -11,7 +11,7 @@ mod utils;
 
 use std::fs::File;
 
-use parquet2::error::ParquetError;
+use parquet2::error::Error;
 use parquet2::error::Result;
 use parquet2::metadata::ColumnChunkMetaData;
 use parquet2::page::CompressedDataPage;
@@ -72,7 +72,7 @@ pub fn page_to_array(page: &DataPage) -> Result<Array> {
 pub fn columns_to_array<II, I>(mut columns: I, field: &ParquetType) -> Result<Array>
 where
     II: Iterator<Item = Result<CompressedDataPage>>,
-    I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = ParquetError>,
+    I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = Error>,
 {
     let mut validity = vec![];
     let mut has_filled = false;

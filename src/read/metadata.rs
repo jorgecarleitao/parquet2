@@ -29,7 +29,7 @@ use super::super::metadata::ColumnOrder;
 use super::super::metadata::SchemaDescriptor;
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
@@ -108,7 +108,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         let mut prot = TCompactInputProtocol::new(reader);
         TFileMetaData::read_from_in_protocol(&mut prot)
     }
-    .map_err(|e| ParquetError::General(format!("Could not parse metadata: {}", e)))?;
+    .map_err(|e| Error::General(format!("Could not parse metadata: {}", e)))?;
 
     let schema = t_file_metadata.schema.iter().collect::<Vec<_>>();
     let schema_descr = SchemaDescriptor::try_from_thrift(&schema)?;

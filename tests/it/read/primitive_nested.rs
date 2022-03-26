@@ -4,7 +4,7 @@ use super::Array;
 
 use parquet2::{
     encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
-    error::{ParquetError, Result},
+    error::{Error, Result},
     page::{split_buffer, DataPage, PrimitivePageDict},
     read::levels::get_bit_width,
     types::NativeType,
@@ -211,7 +211,7 @@ pub fn page_dict_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
                 page.descriptor.max_def_level,
             ),
         )),
-        (_, None) => Err(ParquetError::OutOfSpec(
+        (_, None) => Err(Error::OutOfSpec(
             "A dictionary-encoded page MUST be preceeded by a dictionary page".to_string(),
         )),
         _ => todo!(),

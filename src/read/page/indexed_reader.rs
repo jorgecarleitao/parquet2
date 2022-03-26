@@ -5,7 +5,7 @@ use std::{
 };
 
 use crate::{
-    error::ParquetError,
+    error::Error,
     indexes::FilteredPage,
     metadata::{ColumnChunkMetaData, Descriptor},
     page::{CompressedDataPage, DictPage, ParquetPageHeader},
@@ -61,7 +61,7 @@ fn read_page<R: Read + Seek>(
     length: usize,
     buffer: &mut Vec<u8>,
     data: &mut Vec<u8>,
-) -> Result<ParquetPageHeader, ParquetError> {
+) -> Result<ParquetPageHeader, Error> {
     // seek to the page
     reader.seek(SeekFrom::Start(start))?;
 
@@ -89,12 +89,12 @@ fn read_dict_page<R: Read + Seek>(
     data: &mut Vec<u8>,
     compression: Compression,
     descriptor: &Descriptor,
-) -> Result<Arc<dyn DictPage>, ParquetError> {
+) -> Result<Arc<dyn DictPage>, Error> {
     let page_header = read_page(reader, start, length, buffer, data)?;
 
     let result = finish_page(page_header, data, compression, &None, descriptor, None)?;
     match result {
-        FinishedPage::Data(_) => Err(ParquetError::OutOfSpec(
+        FinishedPage::Data(_) => Err(Error::OutOfSpec(
             "The first page is not a dictionary page but it should".to_string(),
         )),
         FinishedPage::Dict(dict) => Ok(dict),
@@ -147,7 +147,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         start: u64,
         length: usize,
         rows: (usize, usize),
-    ) -> Result<FinishedPage, ParquetError> {
+    ) -> Result<FinishedPage, Error> {
         // it will be read - take buffer
         let mut data = std::mem::take(&mut self.data_buffer);
 
@@ -193,7 +193,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
 }
 
 impl<R: Read + Seek> Iterator for IndexedPageReader<R> {
-    type Item = Result<CompressedDataPage, ParquetError>;
+    type Item = Result<CompressedDataPage, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(page) = self.pages.pop_front() {
@@ -210,7 +210,7 @@ impl<R: Read + Seek> Iterator for IndexedPageReader<R> {
                     };
                     match page {
                         FinishedPage::Data(page) => Some(Ok(page)),
-                        FinishedPage::Dict(_) => Some(Err(ParquetError::OutOfSpec(
+                        FinishedPage::Dict(_) => Some(Err(Error::OutOfSpec(
                             "Dictionary pages cannot be selected via indexes".to_string(),
                         ))),
                     }

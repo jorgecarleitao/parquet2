@@ -2,7 +2,7 @@
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
-use crate::error::ParquetError;
+use crate::error::Error;
 use parquet_format_async_temp::BoundaryOrder as ParquetBoundaryOrder;
 use parquet_format_async_temp::CompressionCodec;
 use parquet_format_async_temp::DataPageHeader;
@@ -19,14 +19,14 @@ pub enum Repetition {
 }
 
 impl TryFrom<FieldRepetitionType> for Repetition {
-    type Error = ParquetError;
+    type Error = Error;
 
     fn try_from(repetition: FieldRepetitionType) -> Result<Self, Self::Error> {
         Ok(match repetition {
             FieldRepetitionType::REQUIRED => Repetition::Required,
             FieldRepetitionType::OPTIONAL => Repetition::Optional,
             FieldRepetitionType::REPEATED => Repetition::Repeated,
-            _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
         })
     }
 }
@@ -54,7 +54,7 @@ pub enum Compression {
 }
 
 impl TryFrom<CompressionCodec> for Compression {
-    type Error = ParquetError;
+    type Error = Error;
 
     fn try_from(codec: CompressionCodec) -> Result<Self, Self::Error> {
         Ok(match codec {
@@ -66,7 +66,7 @@ impl TryFrom<CompressionCodec> for Compression {
             CompressionCodec::LZ4 => Compression::Lz4,
             CompressionCodec::ZSTD => Compression::Zstd,
             CompressionCodec::LZ4_RAW => Compression::Lz4Raw,
-            _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
         })
     }
 }
@@ -94,14 +94,14 @@ pub enum PageType {
 }
 
 impl TryFrom<ParquetPageType> for PageType {
-    type Error = ParquetError;
+    type Error = Error;
 
     fn try_from(type_: ParquetPageType) -> Result<Self, Self::Error> {
         Ok(match type_ {
             ParquetPageType::DATA_PAGE => PageType::DataPage,
             ParquetPageType::DATA_PAGE_V2 => PageType::DataPageV2,
             ParquetPageType::DICTIONARY_PAGE => PageType::DictionaryPage,
-            _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
         })
     }
 }
@@ -159,7 +159,7 @@ pub enum Encoding {
 }
 
 impl TryFrom<ParquetEncoding> for Encoding {
-    type Error = ParquetError;
+    type Error = Error;
 
     fn try_from(encoding: ParquetEncoding) -> Result<Self, Self::Error> {
         Ok(match encoding {
@@ -172,7 +172,7 @@ impl TryFrom<ParquetEncoding> for Encoding {
             ParquetEncoding::DELTA_BYTE_ARRAY => Encoding::DeltaByteArray,
             ParquetEncoding::RLE_DICTIONARY => Encoding::RleDictionary,
             ParquetEncoding::BYTE_STREAM_SPLIT => Encoding::ByteStreamSplit,
-            _ => return Err(ParquetError::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
         })
     }
 }
@@ -209,7 +209,7 @@ impl Default for BoundaryOrder {
 }
 
 impl TryFrom<ParquetBoundaryOrder> for BoundaryOrder {
-    type Error = ParquetError;
+    type Error = Error;
 
     fn try_from(encoding: ParquetBoundaryOrder) -> Result<Self, Self::Error> {
         Ok(match encoding {
@@ -217,7 +217,7 @@ impl TryFrom<ParquetBoundaryOrder> for BoundaryOrder {
             ParquetBoundaryOrder::ASCENDING => BoundaryOrder::Ascending,
             ParquetBoundaryOrder::DESCENDING => BoundaryOrder::Descending,
             _ => {
-                return Err(ParquetError::OutOfSpec(
+                return Err(Error::OutOfSpec(
                     "BoundaryOrder Thrift value out of range".to_string(),
                 ))
             }

@@ -3,12 +3,12 @@ mod reader;
 #[cfg(feature = "stream")]
 mod stream;
 
-use crate::{error::ParquetError, page::CompressedDataPage};
+use crate::{error::Error, page::CompressedDataPage};
 
 pub use indexed_reader::IndexedPageReader;
 pub use reader::{PageFilter, PageReader};
 
-pub trait PageIterator: Iterator<Item = Result<CompressedDataPage, ParquetError>> {
+pub trait PageIterator: Iterator<Item = Result<CompressedDataPage, Error>> {
     fn swap_buffer(&mut self, buffer: &mut Vec<u8>);
 }
 

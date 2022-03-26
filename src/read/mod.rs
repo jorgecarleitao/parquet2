@@ -18,7 +18,7 @@ pub use page::{IndexedPageReader, PageFilter, PageReader};
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
-use crate::error::ParquetError;
+use crate::error::Error;
 use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::page::CompressedDataPage;
 use crate::schema::types::ParquetType;
@@ -114,7 +114,7 @@ pub trait MutStreamingIterator: Sized {
 
 /// Trait describing a [`MutStreamingIterator`] of column chunks.
 pub trait ColumnChunkIter<I>:
-    MutStreamingIterator<Item = (I, ColumnChunkMetaData), Error = ParquetError>
+    MutStreamingIterator<Item = (I, ColumnChunkMetaData), Error = Error>
 {
     /// The field associated to the set of column chunks this iterator iterates over.
     fn field(&self) -> &ParquetType;
@@ -153,7 +153,7 @@ impl<R: Read + Seek> ColumnIterator<R> {
 
 impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
     type Item = (PageReader<R>, ColumnChunkMetaData);
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(mut self) -> Result<State<Self>> {
         let (reader, buffer) = if let Some((iter, _)) = self.current {
@@ -212,7 +212,7 @@ impl ReadColumnIterator {
 
 impl MutStreamingIterator for ReadColumnIterator {
     type Item = (IntoIter<Result<CompressedDataPage>>, ColumnChunkMetaData);
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(mut self) -> Result<State<Self>> {
         if self.chunks.is_empty() {

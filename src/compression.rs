@@ -1,6 +1,6 @@
 pub use super::parquet_bridge::Compression;
 
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 /// Compresses data stored in slice `input_buf` and writes the compressed result
 /// to `output_buf`.
@@ -29,7 +29,7 @@ pub fn compress(
             encoder.flush().map_err(|e| e.into())
         }
         #[cfg(not(feature = "brotli"))]
-        Compression::Brotli => Err(ParquetError::FeatureNotActive(
+        Compression::Brotli => Err(Error::FeatureNotActive(
             crate::error::Feature::Brotli,
             "compress to brotli".to_string(),
         )),
@@ -41,7 +41,7 @@ pub fn compress(
             encoder.try_finish().map_err(|e| e.into())
         }
         #[cfg(not(feature = "gzip"))]
-        Compression::Gzip => Err(ParquetError::FeatureNotActive(
+        Compression::Gzip => Err(Error::FeatureNotActive(
             crate::error::Feature::Gzip,
             "compress to gzip".to_string(),
         )),
@@ -57,7 +57,7 @@ pub fn compress(
             Ok(())
         }
         #[cfg(not(feature = "snappy"))]
-        Compression::Snappy => Err(ParquetError::FeatureNotActive(
+        Compression::Snappy => Err(Error::FeatureNotActive(
             crate::error::Feature::Snappy,
             "compress to snappy".to_string(),
         )),
@@ -76,7 +76,7 @@ pub fn compress(
             Ok(())
         }
         #[cfg(not(feature = "lz4"))]
-        Compression::Lz4Raw => Err(ParquetError::FeatureNotActive(
+        Compression::Lz4Raw => Err(Error::FeatureNotActive(
             crate::error::Feature::Lz4,
             "compress to lz4".to_string(),
         )),
@@ -94,7 +94,7 @@ pub fn compress(
             }
         }
         #[cfg(not(feature = "zstd"))]
-        Compression::Zstd => Err(ParquetError::FeatureNotActive(
+        Compression::Zstd => Err(Error::FeatureNotActive(
             crate::error::Feature::Zstd,
             "compress to zstd".to_string(),
         )),
@@ -121,7 +121,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
                 .map_err(|e| e.into())
         }
         #[cfg(not(feature = "brotli"))]
-        Compression::Brotli => Err(ParquetError::FeatureNotActive(
+        Compression::Brotli => Err(Error::FeatureNotActive(
             crate::error::Feature::Brotli,
             "decompress with brotli".to_string(),
         )),
@@ -132,7 +132,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             decoder.read_exact(output_buf).map_err(|e| e.into())
         }
         #[cfg(not(feature = "gzip"))]
-        Compression::Gzip => Err(ParquetError::FeatureNotActive(
+        Compression::Gzip => Err(Error::FeatureNotActive(
             crate::error::Feature::Gzip,
             "decompress with gzip".to_string(),
         )),
@@ -148,7 +148,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
                 .map(|_| ())
         }
         #[cfg(not(feature = "snappy"))]
-        Compression::Snappy => Err(ParquetError::FeatureNotActive(
+        Compression::Snappy => Err(Error::FeatureNotActive(
             crate::error::Feature::Snappy,
             "decompress with snappy".to_string(),
         )),
@@ -159,7 +159,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
                 .map_err(|e| e.into())
         }
         #[cfg(not(feature = "lz4"))]
-        Compression::Lz4Raw => Err(ParquetError::FeatureNotActive(
+        Compression::Lz4Raw => Err(Error::FeatureNotActive(
             crate::error::Feature::Lz4,
             "decompress with lz4".to_string(),
         )),
@@ -170,7 +170,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             decoder.read_exact(output_buf).map_err(|e| e.into())
         }
         #[cfg(not(feature = "zstd"))]
-        Compression::Zstd => Err(ParquetError::FeatureNotActive(
+        Compression::Zstd => Err(Error::FeatureNotActive(
             crate::error::Feature::Zstd,
             "decompress with zstd".to_string(),
         )),

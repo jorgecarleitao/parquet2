@@ -4,7 +4,7 @@ use parquet_format_async_temp::Statistics as ParquetStatistics;
 
 use super::Statistics;
 use crate::{
-    error::{ParquetError, Result},
+    error::{Error, Result},
     schema::types::PhysicalType,
 };
 
@@ -33,14 +33,14 @@ impl Statistics for BooleanStatistics {
 pub fn read(v: &ParquetStatistics) -> Result<Arc<dyn Statistics>> {
     if let Some(ref v) = v.max_value {
         if v.len() != std::mem::size_of::<bool>() {
-            return Err(ParquetError::OutOfSpec(
+            return Err(Error::OutOfSpec(
                 "The max_value of statistics MUST be plain encoded".to_string(),
             ));
         }
     };
     if let Some(ref v) = v.min_value {
         if v.len() != std::mem::size_of::<bool>() {
-            return Err(ParquetError::OutOfSpec(
+            return Err(Error::OutOfSpec(
                 "The min_value of statistics MUST be plain encoded".to_string(),
             ));
         }

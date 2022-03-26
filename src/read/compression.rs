@@ -2,7 +2,7 @@ use parquet_format_async_temp::DataPageHeaderV2;
 use streaming_decompression;
 
 use crate::compression::{self, Compression};
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
 use crate::FallibleStreamingIterator;
 
@@ -170,7 +170,7 @@ impl<P: PageIterator> Decompressor<P> {
 
 impl<P: PageIterator> FallibleStreamingIterator for Decompressor<P> {
     type Item = DataPage;
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(&mut self) -> Result<()> {
         if let Some(page) = self.current.as_mut() {
@@ -206,7 +206,7 @@ type _Decompressor<I> = streaming_decompression::Decompressor<
     CompressedDataPage,
     DataPage,
     fn(CompressedDataPage, &mut Vec<u8>) -> Result<DataPage>,
-    ParquetError,
+    Error,
     I,
 >;
 
@@ -255,7 +255,7 @@ where
     I: Iterator<Item = Result<CompressedDataPage>>,
 {
     type Item = DataPage;
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(&mut self) -> Result<()> {
         self.iter.advance()

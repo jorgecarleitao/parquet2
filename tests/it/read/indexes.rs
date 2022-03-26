@@ -1,5 +1,5 @@
 use parquet2::{
-    error::ParquetError,
+    error::Error,
     indexes::{
         BooleanIndex, BoundaryOrder, ByteIndex, Index, NativeIndex, PageIndex, PageLocation,
     },
@@ -74,7 +74,7 @@ const FILE: &[u8] = &[
 ];
 
 #[test]
-fn test() -> Result<(), ParquetError> {
+fn test() -> Result<(), Error> {
     let mut reader = std::io::Cursor::new(FILE);
 
     let expected_index = vec![

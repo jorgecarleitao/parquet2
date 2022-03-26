@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 use crate::schema::types::PhysicalType;
 use crate::statistics::*;
 use crate::types::NativeType;
@@ -23,7 +23,7 @@ pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn S
         .skip(1)
         .all(|x| x.physical_type() == stats[0].physical_type());
     if !same_type {
-        return Err(ParquetError::OutOfSpec(
+        return Err(Error::OutOfSpec(
             "The statistics do not have the same data_type".to_string(),
         ));
     };

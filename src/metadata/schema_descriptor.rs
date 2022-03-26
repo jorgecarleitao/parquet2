@@ -1,7 +1,7 @@
 use parquet_format_async_temp::SchemaElement;
 
 use crate::{
-    error::ParquetError,
+    error::Error,
     schema::{io_message::from_message, types::ParquetType, Repetition},
 };
 use crate::{error::Result, schema::types::FieldInfo};
@@ -76,7 +76,7 @@ impl SchemaDescriptor {
             ParquetType::GroupType {
                 field_info, fields, ..
             } => Ok(Self::new(field_info.name, fields)),
-            _ => Err(ParquetError::OutOfSpec(
+            _ => Err(Error::OutOfSpec(
                 "The parquet schema MUST be a group type".to_string(),
             )),
         }

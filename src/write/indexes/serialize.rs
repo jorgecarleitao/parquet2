@@ -3,7 +3,7 @@ use parquet_format_async_temp::ColumnIndex;
 use parquet_format_async_temp::OffsetIndex;
 use parquet_format_async_temp::PageLocation;
 
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 pub use crate::metadata::KeyValue;
 use crate::statistics::serialize_statistics;
 
@@ -23,7 +23,7 @@ pub fn serialize_column_index(pages: &[PageWriteSpec]) -> Result<ColumnIndex> {
                 let stats = serialize_statistics(stats.as_ref());
 
                 let null_count = stats.null_count.ok_or_else(|| {
-                    ParquetError::OutOfSpec("null count of a page is required".to_string())
+                    Error::OutOfSpec("null count of a page is required".to_string())
                 })?;
 
                 null_counts.push(null_count);
@@ -33,17 +33,17 @@ pub fn serialize_column_index(pages: &[PageWriteSpec]) -> Result<ColumnIndex> {
                     null_pages.push(true)
                 } else {
                     min_values.push(stats.min_value.ok_or_else(|| {
-                        ParquetError::OutOfSpec("min value of a page is required".to_string())
+                        Error::OutOfSpec("min value of a page is required".to_string())
                     })?);
                     max_values.push(stats.max_value.ok_or_else(|| {
-                        ParquetError::OutOfSpec("max value of a page is required".to_string())
+                        Error::OutOfSpec("max value of a page is required".to_string())
                     })?);
                     null_pages.push(false)
                 };
 
                 Result::Ok(())
             } else {
-                Err(ParquetError::OutOfSpec(
+                Err(Error::OutOfSpec(
                     "options were set to write statistics but some pages miss them".to_string(),
                 ))
             }
@@ -69,7 +69,7 @@ pub fn serialize_offset_index(pages: &[PageWriteSpec]) -> Result<OffsetIndex> {
                 first_row_index,
             };
             let num_rows = spec.num_rows.ok_or_else(|| {
-                ParquetError::OutOfSpec(
+                Error::OutOfSpec(
                     "options were set to write statistics but some data pages miss number of rows"
                         .to_string(),
                 )

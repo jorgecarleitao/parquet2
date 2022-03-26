@@ -9,7 +9,7 @@ pub use primitive::PrimitivePageDict;
 use std::{any::Any, sync::Arc};
 
 use crate::compression::{decompress, Compression};
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 use crate::schema::types::PhysicalType;
 
 /// A dynamic trait describing a decompressed and decoded Dictionary Page.
@@ -72,7 +72,7 @@ fn deserialize(
     physical_type: PhysicalType,
 ) -> Result<Arc<dyn DictPage>> {
     match physical_type {
-        PhysicalType::Boolean => Err(ParquetError::OutOfSpec(
+        PhysicalType::Boolean => Err(Error::OutOfSpec(
             "Boolean physical type cannot be dictionary-encoded".to_string(),
         )),
         PhysicalType::Int32 => primitive::read::<i32>(buf, num_values, is_sorted),

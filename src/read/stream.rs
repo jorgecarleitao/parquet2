@@ -6,7 +6,7 @@ use parquet_format_async_temp::FileMetaData as TFileMetaData;
 
 use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 use super::metadata::{metadata_len, parse_column_orders};
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 async fn stream_len(
     seek: &mut (impl AsyncSeek + std::marker::Unpin),

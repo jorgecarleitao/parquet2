@@ -47,7 +47,7 @@ use super::super::types::{
     ParquetType,
 };
 use super::super::*;
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 use parquet_format_async_temp::*;
 

@@ -1,7 +1,7 @@
 use parquet_format_async_temp::SchemaElement;
 
 use crate::{
-    error::{ParquetError, Result},
+    error::{Error, Result},
     schema::types::PrimitiveType,
 };
 

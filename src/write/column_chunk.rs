@@ -13,7 +13,7 @@ use crate::FallibleStreamingIterator;
 use crate::{
     compression::Compression,
     encoding::Encoding,
-    error::{ParquetError, Result},
+    error::{Error, Result},
     metadata::ColumnDescriptor,
     page::{CompressedPage, PageType},
     schema::types::physical_type_to_type,
@@ -32,7 +32,7 @@ pub fn write_column_chunk<'a, W, E>(
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: Write,
-    ParquetError: From<E>,
+    Error: From<E>,
     E: std::error::Error,
 {
     // write every page
@@ -70,7 +70,7 @@ pub async fn write_column_chunk_async<W, E>(
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: AsyncWrite + Unpin + Send,
-    ParquetError: From<E>,
+    Error: From<E>,
     E: std::error::Error,
 {
     let initial = offset;

@@ -1,4 +1,4 @@
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 use parquet_format_async_temp::ConvertedType;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

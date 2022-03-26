@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use parquet_format_async_temp::SchemaElement;
 
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 use super::super::types::{
     converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,

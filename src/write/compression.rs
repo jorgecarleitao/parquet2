@@ -1,4 +1,4 @@
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 use crate::page::{CompressedDictPage, CompressedPage, DataPageHeader, EncodedDictPage};
 use crate::parquet_bridge::Compression;
 use crate::FallibleStreamingIterator;
@@ -115,7 +115,7 @@ impl<I: Iterator<Item = Result<EncodedPage>>> Compressor<I> {
 
 impl<I: Iterator<Item = Result<EncodedPage>>> FallibleStreamingIterator for Compressor<I> {
     type Item = CompressedPage;
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(&mut self) -> std::result::Result<(), Self::Error> {
         let mut compressed_buffer = if let Some(page) = self.current.as_mut() {
