@@ -9,6 +9,7 @@ pub fn set(byte: u8, i: usize) -> u8 {
 }
 
 /// An iterator of bits according to the LSB format
+#[derive(Debug)]
 pub struct BitmapIter<'a> {
     iter: std::slice::Iter<'a, u8>,
     current_byte: &'a u8,
@@ -51,9 +52,8 @@ impl<'a> Iterator for BitmapIter<'a> {
         self.mask = self.mask.rotate_left(1);
         if self.mask == 1 {
             // reached a new byte => try to fetch it from the iterator
-            match self.iter.next() {
-                Some(v) => self.current_byte = v,
-                None => return None,
+            if let Some(v) = self.iter.next() {
+                self.current_byte = v
             }
         }
         Some(value)

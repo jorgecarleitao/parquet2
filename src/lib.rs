@@ -6,6 +6,7 @@ pub mod error;
 #[cfg(feature = "bloom_filter")]
 pub mod bloom_filter;
 pub mod compression;
+pub mod deserialize;
 pub mod encoding;
 pub mod indexes;
 pub mod metadata;

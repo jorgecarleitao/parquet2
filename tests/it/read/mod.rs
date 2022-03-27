@@ -33,26 +33,15 @@ use super::*;
 pub fn page_to_array(page: &DataPage) -> Result<Array> {
     let physical_type = page.descriptor.primitive_type.physical_type;
     match page.descriptor.max_rep_level {
-        0 => match page.dictionary_page() {
-            Some(_) => match physical_type {
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Float => Ok(Array::Float32(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Double => Ok(Array::Float64(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::ByteArray => Ok(Array::Binary(binary::page_dict_to_vec(page)?)),
-                _ => todo!(),
-            },
-            None => match physical_type {
-                PhysicalType::Boolean => Ok(Array::Boolean(boolean::page_to_vec(page)?)),
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page)?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page)?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page)?)),
-                PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
-                PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
-                PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
-                _ => todo!(),
-            },
+        0 => match physical_type {
+            PhysicalType::Boolean => Ok(Array::Boolean(boolean::page_to_vec(page)?)),
+            PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page)?)),
+            PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page)?)),
+            PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page)?)),
+            PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
+            PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
+            PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
+            _ => todo!(),
         },
         _ => match page.dictionary_page() {
             None => match physical_type {

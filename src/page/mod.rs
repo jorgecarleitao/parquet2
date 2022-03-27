@@ -206,6 +206,7 @@ impl DataPage {
 /// A [`Page`] is an uncompressed, encoded representation of a Parquet page. It may hold actual data
 /// and thus cloning it may be expensive.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum Page {
     Data(DataPage),
     Dict(Arc<dyn DictPage>),
@@ -214,6 +215,7 @@ pub enum Page {
 /// A [`EncodedPage`] is an uncompressed, encoded representation of a Parquet page. It may hold actual data
 /// and thus cloning it may be expensive.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum EncodedPage {
     Data(DataPage),
     Dict(EncodedDictPage),
@@ -222,6 +224,7 @@ pub enum EncodedPage {
 /// A [`CompressedPage`] is a compressed, encoded representation of a Parquet page. It holds actual data
 /// and thus cloning it is expensive.
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum CompressedPage {
     Data(CompressedDataPage),
     Dict(CompressedDictPage),

@@ -115,6 +115,6 @@ pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
 }
 
 #[inline]
-pub fn decode<T: NativeType>(chunk: &[u8]) -> &[T] {
-    bytemuck::cast_slice(chunk)
+pub(super) fn decode<T: NativeType>(values: &[u8]) -> &[T] {
+    bytemuck::cast_slice(values)
 }
