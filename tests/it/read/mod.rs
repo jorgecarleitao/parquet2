@@ -3,6 +3,7 @@
 /// but OTOH it has no external dependencies and is very familiar to Rust developers.
 mod binary;
 mod boolean;
+mod fixed_binary;
 mod indexes;
 mod primitive;
 mod primitive_nested;
@@ -41,7 +42,9 @@ pub fn page_to_array(page: &DataPage) -> Result<Array> {
             PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
             PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
             PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
-            _ => todo!(),
+            PhysicalType::FixedLenByteArray(_) => {
+                Ok(Array::Binary(fixed_binary::page_to_vec(page)?))
+            }
         },
         _ => match page.dictionary_page() {
             None => match physical_type {
@@ -267,6 +270,12 @@ fn assert_eq_stats(expected: (Option<i64>, Value, Value), stats: &dyn Statistics
             assert_eq!(s.min_value, min);
             assert_eq!(s.max_value, max);
         }
+        (Value::FixedLenBinary(min), Value::FixedLenBinary(max)) => {
+            let s = stats.as_any().downcast_ref::<FixedLenStatistics>().unwrap();
+
+            assert_eq!(s.min_value, min);
+            assert_eq!(s.max_value, max);
+        }
         (Value::Boolean(min), Value::Boolean(max)) => {
             let s = stats.as_any().downcast_ref::<BooleanStatistics>().unwrap();
 
@@ -394,6 +403,26 @@ fn pyarrow_v1_non_dict_string_required() -> Result<()> {
 
 #[test]
 fn pyarrow_v1_non_dict_string_optional() -> Result<()> {
+    test_pyarrow_integration("basic", "string", 1, false, false, "")
+}
+
+#[test]
+fn pyarrow_v1_dict_fixed_binary_required() -> Result<()> {
+    test_pyarrow_integration("basic", "fixed_binary", 1, true, true, "")
+}
+
+#[test]
+fn pyarrow_v1_dict_fixed_binary_optional() -> Result<()> {
+    test_pyarrow_integration("basic", "string", 1, false, true, "")
+}
+
+#[test]
+fn pyarrow_v1_non_dict_fixed_binary_required() -> Result<()> {
+    test_pyarrow_integration("basic", "string", 1, true, false, "")
+}
+
+#[test]
+fn pyarrow_v1_non_dict_fixed_binary_optional() -> Result<()> {
     test_pyarrow_integration("basic", "string", 1, false, false, "")
 }
 

@@ -54,6 +54,7 @@ pub enum Value {
     Float64(Option<f64>),
     Boolean(Option<bool>),
     Binary(Option<Vec<u8>>),
+    FixedLenBinary(Option<Vec<u8>>),
     List(Option<Array>),
 }
 
@@ -266,6 +267,18 @@ pub fn pyarrow_optional(column: &str) -> Array {
         Some(true),
         Some(true),
     ];
+    let binary_values = &[
+        Some(b"aa".to_vec()),
+        None,
+        Some(b"cc".to_vec()),
+        Some(b"dd".to_vec()),
+        None,
+        Some(b"ff".to_vec()),
+        None,
+        None,
+        Some(b"ii".to_vec()),
+        Some(b"jj".to_vec()),
+    ];
 
     match column {
         "int64" => Array::Int64(i64_values.to_vec()),
@@ -274,6 +287,7 @@ pub fn pyarrow_optional(column: &str) -> Array {
         "bool" => Array::Boolean(bool_values.to_vec()),
         "date" => Array::Int64(i64_values.to_vec()),
         "uint32" => Array::Int32(i64_values.iter().map(|i| i.map(|x| x as i32)).collect()),
+        "fixed_binary" => Array::FixedLenBinary(binary_values.to_vec()),
         _ => unreachable!(),
     }
 }
@@ -311,6 +325,7 @@ pub fn pyarrow_required(column: &str) -> Array {
     let bool_values = &[
         true, true, false, false, false, true, true, true, true, true,
     ];
+    let binary_values = &["aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj"];
 
     match column {
         "int64" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
@@ -324,8 +339,8 @@ pub fn pyarrow_required(column: &str) -> Array {
         "bool" => Array::Boolean(bool_values.iter().map(|b| Some(*b)).collect()),
         "date" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
         "uint32" => Array::Int32(i64_values.iter().map(|i| Some(*i as i32)).collect()),
-        "fixed" => Array::Binary(
-            string_values
+        "fixed_binary" => Array::Binary(
+            binary_values
                 .iter()
                 .map(|s| Some(s.as_bytes().to_vec()))
                 .collect(),
@@ -354,10 +369,10 @@ pub fn pyarrow_required_stats(column: &str) -> (Option<i64>, Value, Value) {
         ),
         "date" => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
         "uint32" => (Some(0), Value::Int32(Some(0)), Value::Int32(Some(9))),
-        "fixed" => (
+        "fixed_binary" => (
             Some(4),
-            Value::Binary(Some(b"aa".to_vec())),
-            Value::Binary(Some(b"jj".to_vec())),
+            Value::FixedLenBinary(Some(b"aa".to_vec())),
+            Value::FixedLenBinary(Some(b"jj".to_vec())),
         ),
         _ => unreachable!(),
     }

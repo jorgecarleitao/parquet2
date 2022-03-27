@@ -28,6 +28,11 @@ impl FixedLenByteArrayPageDict {
     pub fn size(&self) -> usize {
         self.size
     }
+
+    #[inline]
+    pub fn value(&self, index: usize) -> &[u8] {
+        &self.values[index * self.size..(index + 1) * self.size]
+    }
 }
 
 impl DictPage for FixedLenByteArrayPageDict {

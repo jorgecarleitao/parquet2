@@ -19,7 +19,7 @@ def case_basic_nullable(size=1):
         pa.field("bool", pa.bool_()),
         pa.field("date", pa.timestamp("ms")),
         pa.field("uint32", pa.uint32()),
-        pa.field("fixed", pa.binary(length=2)),
+        pa.field("fixed_binary", pa.binary(length=2)),
     ]
     schema = pa.schema(fields)
 
@@ -31,7 +31,7 @@ def case_basic_nullable(size=1):
             "bool": boolean * size,
             "date": int64 * size,
             "uint32": int64 * size,
-            "fixed": fixed_binary * size,
+            "fixed_binary": fixed_binary * size,
         },
         schema,
         f"basic_nullable_{size*10}.parquet",
@@ -52,7 +52,7 @@ def case_basic_required(size=1):
         pa.field("bool", pa.bool_(), nullable=False),
         pa.field("date", pa.timestamp("ms"), nullable=False),
         pa.field("uint32", pa.uint32(), nullable=False),
-        pa.field("fixed", pa.binary(length=2), nullable=False),
+        pa.field("fixed_binary", pa.binary(length=2), nullable=False),
     ]
     schema = pa.schema(fields)
 
@@ -64,7 +64,7 @@ def case_basic_required(size=1):
             "bool": boolean * size,
             "date": int64 * size,
             "uint32": int64 * size,
-            "fixed": fixed_binary * size,
+            "fixed_binary": fixed_binary * size,
         },
         schema,
         f"basic_required_{size*10}.parquet",
