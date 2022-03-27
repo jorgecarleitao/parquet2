@@ -10,6 +10,7 @@ def case_basic_nullable(size=1):
     float64 = [0.0, 1.0, None, 3.0, None, 5.0, 6.0, 7.0, None, 9.0]
     string = ["Hello", None, "aa", "", None, "abc", None, None, "def", "aaa"]
     boolean = [True, None, False, False, None, True, None, None, True, True]
+    fixed_binary = [b"aa", None, b"cc", b"dd", None, b"ff", None, None, b"ii", b"jj"]
 
     fields = [
         pa.field("int64", pa.int64()),
@@ -18,6 +19,7 @@ def case_basic_nullable(size=1):
         pa.field("bool", pa.bool_()),
         pa.field("date", pa.timestamp("ms")),
         pa.field("uint32", pa.uint32()),
+        pa.field("fixed", pa.binary(length=2)),
     ]
     schema = pa.schema(fields)
 
@@ -29,6 +31,7 @@ def case_basic_nullable(size=1):
             "bool": boolean * size,
             "date": int64 * size,
             "uint32": int64 * size,
+            "fixed": fixed_binary * size,
         },
         schema,
         f"basic_nullable_{size*10}.parquet",
@@ -40,6 +43,7 @@ def case_basic_required(size=1):
     float64 = [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0]
     string = ["Hello", "bbb", "aa", "", "bbb", "abc", "bbb", "bbb", "def", "aaa"]
     boolean = [True, True, False, False, False, True, True, True, True, True]
+    fixed_binary = [b"aa", b"bb", b"cc", b"dd", b"ee", b"ff", b"gg", b"hh", b"ii", b"jj"]
 
     fields = [
         pa.field("int64", pa.int64(), nullable=False),
@@ -48,6 +52,7 @@ def case_basic_required(size=1):
         pa.field("bool", pa.bool_(), nullable=False),
         pa.field("date", pa.timestamp("ms"), nullable=False),
         pa.field("uint32", pa.uint32(), nullable=False),
+        pa.field("fixed", pa.binary(length=2), nullable=False),
     ]
     schema = pa.schema(fields)
 
@@ -59,6 +64,7 @@ def case_basic_required(size=1):
             "bool": boolean * size,
             "date": int64 * size,
             "uint32": int64 * size,
+            "fixed": fixed_binary * size,
         },
         schema,
         f"basic_required_{size*10}.parquet",

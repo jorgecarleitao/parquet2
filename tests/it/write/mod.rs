@@ -34,11 +34,11 @@ pub fn array_to_page(
 }
 
 fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn Statistics>>)> {
-    let (a, statistics) = super::read::read_column(reader, 0, 0)?;
+    let (a, statistics) = super::read::read_column(reader, 0, "col")?;
     Ok((a, statistics))
 }
 
-fn test_column(column: usize) -> Result<()> {
+fn test_column(column: &str) -> Result<()> {
     let array = alltypes_plain(column);
 
     let options = WriteOptions {
@@ -93,43 +93,43 @@ fn test_column(column: usize) -> Result<()> {
 
 #[test]
 fn int32() -> Result<()> {
-    test_column(0)
+    test_column("id")
 }
 
 #[test]
 #[ignore = "Native boolean writer not yet implemented"]
 fn bool() -> Result<()> {
-    test_column(1)
+    test_column("bool_col")
 }
 
 #[test]
-fn tiny_int() -> Result<()> {
-    test_column(2)
+fn tinyint() -> Result<()> {
+    test_column("tinyint_col")
 }
 
 #[test]
 fn smallint_col() -> Result<()> {
-    test_column(3)
+    test_column("smallint_col")
 }
 
 #[test]
 fn int_col() -> Result<()> {
-    test_column(4)
+    test_column("int_col")
 }
 
 #[test]
 fn bigint_col() -> Result<()> {
-    test_column(5)
+    test_column("bigint_col")
 }
 
 #[test]
-fn float32_col() -> Result<()> {
-    test_column(6)
+fn float_col() -> Result<()> {
+    test_column("float_col")
 }
 
 #[test]
-fn float64_col() -> Result<()> {
-    test_column(7)
+fn double_col() -> Result<()> {
+    test_column("double_col")
 }
 
 #[test]
