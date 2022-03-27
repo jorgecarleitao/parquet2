@@ -8,4 +8,4 @@ pub use binary::*;
 pub use boolean::*;
 pub use hybrid_rle::HybridEncoded;
 pub use native::*;
-pub use utils::HybridDecoderBitmapIter;
+pub use utils::{DefLevelsDecoder, HybridDecoderBitmapIter};

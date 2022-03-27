@@ -70,10 +70,10 @@ pub enum NativePageState<'a, T>
 where
     T: NativeType,
 {
-    Optional(utils::HybridDecoderBitmapIter<'a>, Casted<'a, T>),
+    Optional(utils::DefLevelsDecoder<'a>, Casted<'a, T>),
     Required(Casted<'a, T>),
     RequiredDictionary(Dictionary<'a, T>),
-    OptionalDictionary(utils::HybridDecoderBitmapIter<'a>, Dictionary<'a, T>),
+    OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a, T>),
 }
 
 impl<'a, T: NativeType> NativePageState<'a, T> {
@@ -90,12 +90,12 @@ impl<'a, T: NativeType> NativePageState<'a, T> {
                 let dict = dict.as_any().downcast_ref().unwrap();
 
                 Ok(Self::OptionalDictionary(
-                    utils::try_new_iter(page)?,
+                    utils::DefLevelsDecoder::new(page),
                     Dictionary::new(page, dict),
                 ))
             }
             (Encoding::Plain, _, true) => {
-                let validity = utils::try_new_iter(page)?;
+                let validity = utils::DefLevelsDecoder::new(page);
                 let values = native_cast(page)?;
 
                 Ok(Self::Optional(validity, values))

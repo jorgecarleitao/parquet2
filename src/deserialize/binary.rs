@@ -63,10 +63,10 @@ impl<'a> Dictionary<'a> {
 }
 
 pub enum BinaryPageState<'a> {
-    Optional(utils::HybridDecoderBitmapIter<'a>, BinaryIter<'a>),
+    Optional(utils::DefLevelsDecoder<'a>, BinaryIter<'a>),
     Required(BinaryIter<'a>),
     RequiredDictionary(Dictionary<'a>),
-    OptionalDictionary(utils::HybridDecoderBitmapIter<'a>, Dictionary<'a>),
+    OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a>),
 }
 
 impl<'a> BinaryPageState<'a> {
@@ -83,22 +83,24 @@ impl<'a> BinaryPageState<'a> {
                 let dict = dict.as_any().downcast_ref().unwrap();
 
                 Ok(Self::OptionalDictionary(
-                    utils::try_new_iter(page)?,
+                    utils::DefLevelsDecoder::new(page),
                     Dictionary::new(page, dict),
                 ))
             }
             (Encoding::Plain, _, true) => {
                 let (_, _, values) = split_buffer(page);
 
-                let validity = utils::try_new_iter(page)?;
+                let validity = utils::DefLevelsDecoder::new(page);
                 let values = BinaryIter::new(values, None);
 
                 Ok(Self::Optional(validity, values))
             }
-            (Encoding::Plain, _, false) => Ok(Self::Required(BinaryIter::new(
-                page.buffer(),
-                Some(page.num_values()),
-            ))),
+            (Encoding::Plain, _, false) => {
+                let (_, _, values) = split_buffer(page);
+                let values = BinaryIter::new(values, Some(page.num_values()));
+
+                Ok(Self::Required(values))
+            }
             _ => Err(Error::General(format!(
                 "Viewing page for encoding {:?} for binary type not supported",
                 page.encoding(),

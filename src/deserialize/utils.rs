@@ -1,7 +1,7 @@
 use crate::{
-    encoding::hybrid_rle,
-    error::Error,
+    encoding::hybrid_rle::{self, HybridRleDecoder},
     page::{split_buffer, DataPage},
+    read::levels::get_bit_width,
 };
 
 use super::hybrid_rle::HybridBitmapIter;
@@ -20,20 +20,25 @@ pub(super) fn dict_indices_decoder(page: &DataPage) -> hybrid_rle::HybridRleDeco
 /// Type definition for a [`HybridBitmapIter`]
 pub type HybridDecoderBitmapIter<'a> = HybridBitmapIter<'a, hybrid_rle::Decoder<'a>>;
 
-pub(super) fn try_new_iter(
-    page: &DataPage,
-) -> Result<HybridBitmapIter<'_, hybrid_rle::Decoder<'_>>, Error> {
-    let (_, validity, _) = split_buffer(page);
+#[derive(Debug)]
+pub enum DefLevelsDecoder<'a> {
+    Bitmap(HybridDecoderBitmapIter<'a>),
+    Levels(HybridRleDecoder<'a>, u32),
+}
 
-    if page.descriptor.max_def_level != 1 {
-        return Err(Error::General(
-            "HybridBitmapIter can only be initialized from pages with a maximum definition of 1"
-                .to_string(),
-        ));
+impl<'a> DefLevelsDecoder<'a> {
+    pub fn new(page: &'a DataPage) -> Self {
+        let (_, def_levels, _) = split_buffer(page);
+
+        let max_def_level = page.descriptor.max_def_level;
+        if max_def_level == 1 {
+            let iter = hybrid_rle::Decoder::new(def_levels, 1);
+            let iter = HybridBitmapIter::new(iter, page.num_values());
+            Self::Bitmap(iter)
+        } else {
+            let iter =
+                HybridRleDecoder::new(def_levels, get_bit_width(max_def_level), page.num_values());
+            Self::Levels(iter, max_def_level as u32)
+        }
     }
-
-    let iter = hybrid_rle::Decoder::new(validity, 1);
-    let iter = HybridBitmapIter::new(iter, page.num_values());
-
-    Ok(iter)
 }
