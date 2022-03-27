@@ -53,7 +53,7 @@ where
     }
 }
 
-pub fn deserialize_optional<C: Copy + Clone, I: Iterator<Item = C>>(
+pub fn deserialize_optional<C: Clone, I: Iterator<Item = C>>(
     validity: HybridDecoderBitmapIter,
     mut values: I,
 ) -> Result<Vec<Option<C>>, Error> {
