@@ -317,7 +317,7 @@ impl<'a> Parser<'a> {
             .and_then(|v| repetition_from_str(&v.to_uppercase()))?;
 
         match self.tokenizer.next() {
-            Some(group) if group.to_uppercase() == "GROUP" => self.add_group_type(Some(repetition)),
+            Some(group) if group.to_uppercase() == "GROUP" => self.add_group_type(repetition),
             Some(type_string) => {
                 let physical_type = type_from_str(&type_string.to_uppercase())?;
                 self.add_primitive_type(repetition, physical_type)
@@ -326,7 +326,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn add_group_type(&mut self, repetition: Option<Repetition>) -> Result<ParquetType> {
+    fn add_group_type(&mut self, repetition: Repetition) -> Result<ParquetType> {
         // Parse name of the group type
         let name = self
             .tokenizer
@@ -923,7 +923,7 @@ mod tests {
         let a1 = ParquetType::from_converted(
             "a1".to_string(),
             vec![a2],
-            None,
+            Repetition::Optional,
             Some(GroupConvertedType::List),
             None,
         );
@@ -933,21 +933,21 @@ mod tests {
                 ParquetType::from_physical("b3".to_string(), PhysicalType::Int32),
                 ParquetType::from_physical("b4".to_string(), PhysicalType::Double),
             ],
-            Some(Repetition::Repeated),
+            Repetition::Repeated,
             None,
             None,
         );
         let b1 = ParquetType::from_converted(
             "b1".to_string(),
             vec![b2],
-            None,
+            Repetition::Optional,
             Some(GroupConvertedType::List),
             None,
         );
         let a0 = ParquetType::from_converted(
             "a0".to_string(),
             vec![a1, b1],
-            Some(Repetition::Required),
+            Repetition::Required,
             None,
             None,
         );

@@ -71,7 +71,7 @@ pub fn get_field_columns<'a>(
         .iter()
         .enumerate()
         .filter(move |x| x.1.path_in_schema[0] == field.name())
-        .map(move |x| metadata.row_groups[row_group].column(x.0))
+        .map(move |x| &metadata.row_groups[row_group].columns()[x.0])
 }
 
 /// Returns a [`ColumnIterator`] of column chunks corresponding to `field`.
@@ -260,7 +260,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![];
         let mut iter = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
@@ -279,7 +279,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![0];
         let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
@@ -306,7 +306,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![1];
         let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
@@ -334,7 +334,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![];
         let iter: Vec<_> = get_page_iterator(column_metadata, &mut file, None, buffer)?.collect();
 

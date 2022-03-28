@@ -105,7 +105,7 @@ impl ParquetType {
 
 /// Constructors
 impl ParquetType {
-    pub fn new_root(name: String, fields: Vec<ParquetType>) -> Self {
+    pub(crate) fn new_root(name: String, fields: Vec<ParquetType>) -> Self {
         let field_info = FieldInfo {
             name,
             repetition: Repetition::Optional,
@@ -122,13 +122,13 @@ impl ParquetType {
     pub fn from_converted(
         name: String,
         fields: Vec<ParquetType>,
-        repetition: Option<Repetition>,
+        repetition: Repetition,
         converted_type: Option<GroupConvertedType>,
         id: Option<i32>,
     ) -> Self {
         let field_info = FieldInfo {
             name,
-            repetition: repetition.unwrap_or(Repetition::Optional),
+            repetition,
             id,
         };
 
@@ -140,6 +140,8 @@ impl ParquetType {
         }
     }
 
+    /// # Error
+    /// Errors iff the combination of physical, logical and coverted type is not valid.
     pub fn try_from_primitive(
         name: String,
         physical_type: PhysicalType,
@@ -169,25 +171,25 @@ impl ParquetType {
         ParquetType::PrimitiveType(PrimitiveType::from_physical(name, physical_type))
     }
 
-    pub fn try_from_group(
+    pub fn from_group(
         name: String,
         repetition: Repetition,
         converted_type: Option<GroupConvertedType>,
         logical_type: Option<LogicalType>,
         fields: Vec<ParquetType>,
         id: Option<i32>,
-    ) -> Result<Self> {
+    ) -> Self {
         let field_info = FieldInfo {
             name,
             repetition,
             id,
         };
 
-        Ok(ParquetType::GroupType {
+        ParquetType::GroupType {
             field_info,
             logical_type,
             converted_type,
             fields,
-        })
+        }
     }
 }
