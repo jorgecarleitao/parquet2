@@ -38,12 +38,12 @@ fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn 
     Ok((a, statistics))
 }
 
-fn test_column(column: &str) -> Result<()> {
+fn test_column(column: &str, compression: Compression) -> Result<()> {
     let array = alltypes_plain(column);
 
     let options = WriteOptions {
         write_statistics: true,
-        compression: Compression::Uncompressed,
+        compression,
         version: Version::V1,
     };
 
@@ -93,43 +93,58 @@ fn test_column(column: &str) -> Result<()> {
 
 #[test]
 fn int32() -> Result<()> {
-    test_column("id")
+    test_column("id", Compression::Uncompressed)
+}
+
+#[test]
+fn int32_snappy() -> Result<()> {
+    test_column("id", Compression::Snappy)
+}
+
+#[test]
+fn int32_lz4() -> Result<()> {
+    test_column("id", Compression::Lz4Raw)
+}
+
+#[test]
+fn int32_brotli() -> Result<()> {
+    test_column("id", Compression::Brotli)
 }
 
 #[test]
 #[ignore = "Native boolean writer not yet implemented"]
 fn bool() -> Result<()> {
-    test_column("bool_col")
+    test_column("bool_col", Compression::Uncompressed)
 }
 
 #[test]
 fn tinyint() -> Result<()> {
-    test_column("tinyint_col")
+    test_column("tinyint_col", Compression::Uncompressed)
 }
 
 #[test]
 fn smallint_col() -> Result<()> {
-    test_column("smallint_col")
+    test_column("smallint_col", Compression::Uncompressed)
 }
 
 #[test]
 fn int_col() -> Result<()> {
-    test_column("int_col")
+    test_column("int_col", Compression::Uncompressed)
 }
 
 #[test]
 fn bigint_col() -> Result<()> {
-    test_column("bigint_col")
+    test_column("bigint_col", Compression::Uncompressed)
 }
 
 #[test]
 fn float_col() -> Result<()> {
-    test_column("float_col")
+    test_column("float_col", Compression::Uncompressed)
 }
 
 #[test]
 fn double_col() -> Result<()> {
-    test_column("double_col")
+    test_column("double_col", Compression::Uncompressed)
 }
 
 #[test]
