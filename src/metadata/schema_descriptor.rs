@@ -37,26 +37,20 @@ impl SchemaDescriptor {
         }
     }
 
-    /// Returns [`ColumnDescriptor`] for a field position.
-    pub fn column(&self, i: usize) -> &ColumnDescriptor {
-        &self.leaves[i]
-    }
-
-    /// Returns slice of [`ColumnDescriptor`].
+    /// The [`ColumnDescriptor`] (leafs) of this schema.
+    ///
+    /// Note that, for nested fields, this may contain more entries than the number of fields
+    /// in the file - e.g. a struct field may have two columns.
     pub fn columns(&self) -> &[ColumnDescriptor] {
         &self.leaves
     }
 
-    /// Returns number of leaf-level columns.
-    pub fn num_columns(&self) -> usize {
-        self.leaves.len()
-    }
-
-    /// Returns schema name.
+    /// The schemas' name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// The schemas' fields.
     pub fn fields(&self) -> &[ParquetType] {
         &self.fields
     }
@@ -91,6 +85,7 @@ impl SchemaDescriptor {
         Self::try_from_type(schema)
     }
 
+    /// Creates a schema from
     pub fn try_from_message(message: &str) -> Result<Self> {
         let schema = from_message(message)?;
         Self::try_from_type(schema)

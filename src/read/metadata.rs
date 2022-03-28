@@ -144,7 +144,7 @@ pub(super) fn parse_column_orders(
     // Should always be the case
     assert_eq!(
         orders.len(),
-        schema_descr.num_columns(),
+        schema_descr.columns().len(),
         "Column order length mismatch"
     );
 

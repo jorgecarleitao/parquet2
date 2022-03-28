@@ -9,7 +9,7 @@ use parquet2::error::Result;
 use parquet2::indexes::{BoundaryOrder, Index, NativeIndex, PageIndex, PageLocation};
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::{read_columns_indexes, read_metadata, read_pages_locations};
-use parquet2::schema::types::{PhysicalType, PrimitiveType};
+use parquet2::schema::types::{ParquetType, PhysicalType, PrimitiveType};
 use parquet2::statistics::Statistics;
 use parquet2::write::FileStreamer;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
@@ -60,17 +60,20 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
     };
 
     // prepare schema
-    let a = match array {
-        Array::Int32(_) => "INT32",
-        Array::Int64(_) => "INT64",
-        Array::Int96(_) => "INT96",
-        Array::Float32(_) => "FLOAT",
-        Array::Float64(_) => "DOUBLE",
-        Array::Binary(_) => "BINARY",
+    let type_ = match array {
+        Array::Int32(_) => PhysicalType::Int32,
+        Array::Int64(_) => PhysicalType::Int64,
+        Array::Int96(_) => PhysicalType::Int96,
+        Array::Float32(_) => PhysicalType::Float,
+        Array::Float64(_) => PhysicalType::Double,
+        Array::Binary(_) => PhysicalType::ByteArray,
         _ => todo!(),
     };
-    let schema =
-        SchemaDescriptor::try_from_message(&format!("message schema {{ OPTIONAL {} col; }}", a))?;
+
+    let schema = SchemaDescriptor::new(
+        "schema".to_string(),
+        vec![ParquetType::from_physical("col".to_string(), type_)],
+    );
 
     let a = schema.columns();
 
@@ -183,7 +186,13 @@ fn basic() -> Result<()> {
         version: Version::V1,
     };
 
-    let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
+    let schema = SchemaDescriptor::new(
+        "schema".to_string(),
+        vec![ParquetType::from_physical(
+            "col".to_string(),
+            PhysicalType::Int32,
+        )],
+    );
 
     let pages = DynStreamingIterator::new(Compressor::new_from_vec(
         DynIter::new(std::iter::once(array_to_page_v1(
@@ -229,7 +238,13 @@ fn indexes() -> Result<()> {
         version: Version::V1,
     };
 
-    let schema = SchemaDescriptor::try_from_message("message schema { OPTIONAL INT32 col; }")?;
+    let schema = SchemaDescriptor::new(
+        "schema".to_string(),
+        vec![ParquetType::from_physical(
+            "col".to_string(),
+            PhysicalType::Int32,
+        )],
+    );
 
     let pages = vec![
         array_to_page_v1::<i32>(&array1, &options, &schema.columns()[0].descriptor),
@@ -305,16 +320,19 @@ async fn test_column_async(column: &str) -> Result<()> {
     };
 
     // prepare schema
-    let a = match array {
-        Array::Int32(_) => "INT32",
-        Array::Int64(_) => "INT64",
-        Array::Int96(_) => "INT96",
-        Array::Float32(_) => "FLOAT",
-        Array::Float64(_) => "DOUBLE",
+    let type_ = match array {
+        Array::Int32(_) => PhysicalType::Int32,
+        Array::Int64(_) => PhysicalType::Int64,
+        Array::Int96(_) => PhysicalType::Int96,
+        Array::Float32(_) => PhysicalType::Float,
+        Array::Float64(_) => PhysicalType::Double,
         _ => todo!(),
     };
-    let schema =
-        SchemaDescriptor::try_from_message(&format!("message schema {{ OPTIONAL {} col; }}", a))?;
+
+    let schema = SchemaDescriptor::new(
+        "schema".to_string(),
+        vec![ParquetType::from_physical("col".to_string(), type_)],
+    );
 
     let a = schema.columns();
 

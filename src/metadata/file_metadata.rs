@@ -3,7 +3,7 @@ use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowG
 pub type KeyValue = parquet_format_async_temp::KeyValue;
 
 /// Metadata for a Parquet file.
-// This is almost equal to `parquet_format_async_temp::FileMetaData` but contains the descriptors,
+// This is almost equal to [`parquet_format_async_temp::FileMetaData`] but contains the descriptors,
 // which are crucial to deserialize pages.
 #[derive(Debug, Clone)]
 pub struct FileMetaData {
@@ -77,6 +77,7 @@ impl FileMetaData {
             .unwrap_or(ColumnOrder::Undefined)
     }
 
+    /// Serializes itself to thrift's [`parquet_format_async_temp::FileMetaData`].
     pub fn into_thrift(self) -> parquet_format_async_temp::FileMetaData {
         parquet_format_async_temp::FileMetaData {
             version: self.version,

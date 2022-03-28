@@ -82,39 +82,6 @@ fn is_converted_type(s: &str) -> bool {
     }
 }
 
-fn logical_type_from_str(s: &str) -> Result<Option<LogicalType>> {
-    Ok(Some(match s {
-        // The type is a placeholder that gets updated elsewhere
-        "INTEGER" => LogicalType::INTEGER(IntType {
-            bit_width: 8,
-            is_signed: false,
-        }),
-        "MAP" => LogicalType::MAP(MapType {}),
-        "LIST" => LogicalType::LIST(ListType {}),
-        "ENUM" => LogicalType::ENUM(EnumType {}),
-        "DECIMAL" => LogicalType::DECIMAL(DecimalType {
-            precision: -1,
-            scale: -1,
-        }),
-        "DATE" => LogicalType::DATE(DateType {}),
-        "TIME" => LogicalType::TIME(TimeType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        }),
-        "TIMESTAMP" => LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        }),
-        "STRING" => LogicalType::STRING(StringType {}),
-        "JSON" => LogicalType::JSON(JsonType {}),
-        "BSON" => LogicalType::BSON(BsonType {}),
-        "UUID" => LogicalType::UUID(UUIDType {}),
-        "UNKNOWN" => LogicalType::UNKNOWN(NullType {}),
-        "INTERVAL" => return Err(general_err!("Interval logical type not yet supported")),
-        _ => return Ok(None),
-    }))
-}
-
 fn converted_group_from_str(s: &str) -> Result<ConvertedType> {
     Ok(match s {
         "MAP" => ConvertedType::MAP,

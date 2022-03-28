@@ -126,10 +126,6 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .next()
         .unwrap();
 
-    let expected = metadata.row_groups[0].column(0).compressed_size();
-    let chunk = metadata.row_groups[0].column(0).clone().into_thrift();
-    assert_eq!(chunk.meta_data.unwrap().total_compressed_size, expected);
-
     let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
     let field = &metadata.schema().fields()[field];
 
@@ -166,10 +162,6 @@ pub async fn read_column_async<
         })
         .next()
         .unwrap();
-
-    let expected = metadata.row_groups[0].column(0).compressed_size();
-    let chunk = metadata.row_groups[0].column(0).clone().into_thrift();
-    assert_eq!(chunk.meta_data.unwrap().total_compressed_size, expected);
 
     let pages = get_page_stream(
         &metadata.row_groups[0].columns()[0],

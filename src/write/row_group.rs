@@ -170,7 +170,7 @@ where
     let num_rows = compute_num_rows(&columns)?;
 
     // compute row group stats
-    let file_offest = columns
+    let file_offset = columns
         .get(0)
         .map(|(column_chunk, _)| {
             ColumnOffsetsMetadata::from_column_chunk(column_chunk).calc_row_group_file_offset()
@@ -194,7 +194,7 @@ where
             total_byte_size,
             num_rows: num_rows as i64,
             sorting_columns: None,
-            file_offset: file_offest,
+            file_offset,
             total_compressed_size: Some(total_compressed_size),
             ordinal: None,
         },

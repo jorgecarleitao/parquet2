@@ -1,9 +1,8 @@
 use std::io::Write;
 
-use parquet_format_async_temp::FileMetaData;
-
 use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::FileMetaData;
 use parquet_format_async_temp::RowGroup;
 
 use crate::{
