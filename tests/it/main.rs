@@ -311,6 +311,11 @@ pub fn pyarrow_optional_stats(column: &str) -> (Option<i64>, Value, Value) {
             Value::Boolean(Some(true)),
         ),
         "date" => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+        "fixed_binary" => (
+            Some(3),
+            Value::FixedLenBinary(Some(b"aa".to_vec())),
+            Value::FixedLenBinary(Some(b"jj".to_vec())),
+        ),
         _ => unreachable!(),
     }
 }
@@ -339,7 +344,7 @@ pub fn pyarrow_required(column: &str) -> Array {
         "bool" => Array::Boolean(bool_values.iter().map(|b| Some(*b)).collect()),
         "date" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
         "uint32" => Array::Int32(i64_values.iter().map(|i| Some(*i as i32)).collect()),
-        "fixed_binary" => Array::Binary(
+        "fixed_binary" => Array::FixedLenBinary(
             binary_values
                 .iter()
                 .map(|s| Some(s.as_bytes().to_vec()))

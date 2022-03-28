@@ -47,7 +47,7 @@ pub fn page_to_array(page: &DataPage) -> Result<Array> {
             PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
             PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
             PhysicalType::FixedLenByteArray(_) => {
-                Ok(Array::Binary(fixed_binary::page_to_vec(page)?))
+                Ok(Array::FixedLenBinary(fixed_binary::page_to_vec(page)?))
             }
         },
         _ => match page.dictionary_page() {
@@ -445,6 +445,16 @@ fn pyarrow_v2_non_dict_int64_optional_compressed() -> Result<()> {
 }
 
 #[test]
+fn pyarrow_v1_boolean_optional() -> Result<()> {
+    test_pyarrow_integration("basic", "bool", 1, false, false, "")
+}
+
+#[test]
+fn pyarrow_v1_boolean_required() -> Result<()> {
+    test_pyarrow_integration("basic", "bool", 1, true, false, "")
+}
+
+#[test]
 fn pyarrow_v1_dict_string_required() -> Result<()> {
     test_pyarrow_integration("basic", "string", 1, true, true, "")
 }
@@ -471,17 +481,17 @@ fn pyarrow_v1_dict_fixed_binary_required() -> Result<()> {
 
 #[test]
 fn pyarrow_v1_dict_fixed_binary_optional() -> Result<()> {
-    test_pyarrow_integration("basic", "string", 1, false, true, "")
+    test_pyarrow_integration("basic", "fixed_binary", 1, false, true, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_fixed_binary_required() -> Result<()> {
-    test_pyarrow_integration("basic", "string", 1, true, false, "")
+    test_pyarrow_integration("basic", "fixed_binary", 1, true, false, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_fixed_binary_optional() -> Result<()> {
-    test_pyarrow_integration("basic", "string", 1, false, false, "")
+    test_pyarrow_integration("basic", "fixed_binary", 1, false, false, "")
 }
 
 #[test]

@@ -1,3 +1,4 @@
+mod binary;
 mod primitive;
 
 use std::io::{Cursor, Read, Seek};
@@ -30,6 +31,7 @@ pub fn array_to_page(
         Array::Int96(array) => primitive::array_to_page_v1(array, options, descriptor),
         Array::Float32(array) => primitive::array_to_page_v1(array, options, descriptor),
         Array::Float64(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Binary(array) => binary::array_to_page_v1(array, options, descriptor),
         _ => todo!(),
     }
 }
@@ -64,6 +66,7 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
         Array::Int96(_) => "INT96",
         Array::Float32(_) => "FLOAT",
         Array::Float64(_) => "DOUBLE",
+        Array::Binary(_) => "BINARY",
         _ => todo!(),
     };
     let schema =
@@ -155,6 +158,11 @@ fn float_col() -> Result<()> {
 #[test]
 fn double_col() -> Result<()> {
     test_column("double_col", Compression::Uncompressed)
+}
+
+#[test]
+fn string_col() -> Result<()> {
+    test_column("string_col", Compression::Uncompressed)
 }
 
 #[test]

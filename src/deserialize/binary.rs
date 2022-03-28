@@ -1,47 +1,11 @@
 use crate::{
-    encoding::hybrid_rle,
+    encoding::{hybrid_rle, plain_byte_array::BinaryIter},
     error::Error,
     page::{split_buffer, BinaryPageDict, DataPage},
     parquet_bridge::{Encoding, Repetition},
 };
 
 use super::utils;
-
-#[derive(Debug)]
-pub struct BinaryIter<'a> {
-    values: &'a [u8],
-    length: Option<usize>,
-}
-
-impl<'a> BinaryIter<'a> {
-    pub fn new(values: &'a [u8], length: Option<usize>) -> Self {
-        Self { values, length }
-    }
-}
-
-impl<'a> Iterator for BinaryIter<'a> {
-    type Item = &'a [u8];
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.values.is_empty() {
-            return None;
-        }
-        if let Some(x) = self.length.as_mut() {
-            *x = x.saturating_sub(1)
-        }
-        let length = u32::from_le_bytes(self.values[0..4].try_into().unwrap()) as usize;
-        self.values = &self.values[4..];
-        let result = &self.values[..length];
-        self.values = &self.values[length..];
-        Some(result)
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.length.unwrap_or_default(), self.length)
-    }
-}
 
 #[derive(Debug)]
 pub struct Dictionary<'a> {
