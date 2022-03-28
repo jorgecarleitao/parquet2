@@ -12,11 +12,15 @@ mod utils;
 
 use std::fs::File;
 
+use futures::StreamExt;
+
 use parquet2::error::Error;
 use parquet2::error::Result;
 use parquet2::metadata::ColumnChunkMetaData;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::DataPage;
+use parquet2::read::get_page_stream;
+use parquet2::read::read_metadata_async;
 use parquet2::read::BasicDecompressor;
 use parquet2::read::{get_column_iterator, get_field_columns, read_metadata};
 use parquet2::read::{MutStreamingIterator, State};
@@ -134,6 +138,60 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .collect::<Result<Vec<_>>>()?;
 
     let array = columns_to_array(columns, field)?;
+
+    Ok((array, statistics.pop().unwrap()))
+}
+
+pub async fn read_column_async<
+    R: futures::AsyncRead + futures::AsyncSeek + Send + std::marker::Unpin,
+>(
+    reader: &mut R,
+    row_group: usize,
+    field: &str,
+) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
+    let metadata = read_metadata_async(reader).await?;
+
+    let field = metadata
+        .schema()
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, x)| {
+            println!("{}", x.name());
+            if x.name() == field {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap();
+
+    let expected = metadata.row_groups[0].column(0).compressed_size();
+    let chunk = metadata.row_groups[0].column(0).clone().into_thrift();
+    assert_eq!(chunk.meta_data.unwrap().total_compressed_size, expected);
+
+    let pages = get_page_stream(
+        &metadata.row_groups[0].columns()[0],
+        reader,
+        vec![],
+        Arc::new(|_, _| true),
+    )
+    .await?;
+    let field = &metadata.schema().fields()[field];
+
+    let mut statistics = get_field_columns(&metadata, row_group, field)
+        .map(|column_meta| column_meta.statistics().transpose())
+        .collect::<Result<Vec<_>>>()?;
+
+    let pages = pages.collect::<Vec<_>>().await;
+
+    let mut iterator = BasicDecompressor::new(pages.into_iter(), vec![]);
+
+    let array = iterator
+        .next()?
+        .map(|page| page_to_array(page).unwrap())
+        .unwrap();
 
     Ok((array, statistics.pop().unwrap()))
 }

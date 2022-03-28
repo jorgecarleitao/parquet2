@@ -10,6 +10,7 @@ use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::{read_columns_indexes, read_metadata, read_pages_locations};
 use parquet2::schema::types::{PhysicalType, PrimitiveType};
 use parquet2::statistics::Statistics;
+use parquet2::write::FileStreamer;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
 use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
 
@@ -35,6 +36,15 @@ pub fn array_to_page(
 
 fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn Statistics>>)> {
     let (a, statistics) = super::read::read_column(reader, 0, "col")?;
+    Ok((a, statistics))
+}
+
+async fn read_column_async<
+    R: futures::AsyncRead + futures::AsyncSeek + Send + std::marker::Unpin,
+>(
+    reader: &mut R,
+) -> Result<(Array, Option<Arc<dyn Statistics>>)> {
+    let (a, statistics) = super::read::read_column_async(reader, 0, "col").await?;
     Ok((a, statistics))
 }
 
@@ -275,4 +285,62 @@ fn indexes() -> Result<()> {
     assert_eq!(pages, expected_page_locations);
 
     Ok(())
+}
+
+async fn test_column_async(column: &str) -> Result<()> {
+    let array = alltypes_plain(column);
+
+    let options = WriteOptions {
+        write_statistics: true,
+        compression: Compression::Uncompressed,
+        version: Version::V1,
+    };
+
+    // prepare schema
+    let a = match array {
+        Array::Int32(_) => "INT32",
+        Array::Int64(_) => "INT64",
+        Array::Int96(_) => "INT96",
+        Array::Float32(_) => "FLOAT",
+        Array::Float64(_) => "DOUBLE",
+        _ => todo!(),
+    };
+    let schema =
+        SchemaDescriptor::try_from_message(&format!("message schema {{ OPTIONAL {} col; }}", a))?;
+
+    let a = schema.columns();
+
+    let pages = DynStreamingIterator::new(Compressor::new_from_vec(
+        DynIter::new(std::iter::once(array_to_page(
+            &array,
+            &options,
+            &a[0].descriptor,
+        ))),
+        options.compression,
+        vec![],
+    ));
+    let columns = std::iter::once(Ok(pages));
+
+    let writer = futures::io::Cursor::new(vec![]);
+    let mut writer = FileStreamer::new(writer, schema, options, None);
+
+    writer.start().await?;
+    writer.write(DynIter::new(columns)).await?;
+    let writer = writer.end(None).await?.1;
+
+    let data = writer.into_inner();
+
+    let (result, statistics) = read_column_async(&mut futures::io::Cursor::new(data)).await?;
+    assert_eq!(array, result);
+    let stats = alltypes_statistics(column);
+    assert_eq!(
+        statistics.as_ref().map(|x| x.as_ref()),
+        Some(stats).as_ref().map(|x| x.as_ref())
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn test_async() -> Result<()> {
+    test_column_async("float_col").await
 }
