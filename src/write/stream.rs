@@ -123,7 +123,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
-            self.schema.into_thrift()?,
+            self.schema.into_thrift(),
             num_rows,
             self.row_groups,
             key_value_metadata,

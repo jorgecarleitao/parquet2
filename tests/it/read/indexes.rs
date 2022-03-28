@@ -89,7 +89,11 @@ fn test() -> Result<(), Error> {
         }) as Box<dyn Index>,
         Box::new(ByteIndex {
             primitive_type: PrimitiveType {
-                field_info: FieldInfo::new("string".to_string(), Repetition::Optional, None, false),
+                field_info: FieldInfo {
+                    name: "string".to_string(),
+                    repetition: Repetition::Optional,
+                    id: None,
+                },
                 logical_type: Some(LogicalType::STRING(Default::default())),
                 converted_type: Some(PrimitiveConvertedType::Utf8),
                 physical_type: PhysicalType::ByteArray,

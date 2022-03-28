@@ -61,9 +61,13 @@ impl SchemaDescriptor {
         &self.fields
     }
 
-    pub(crate) fn into_thrift(self) -> Result<Vec<SchemaElement>> {
+    pub(crate) fn into_thrift(self) -> Vec<SchemaElement> {
         ParquetType::GroupType {
-            field_info: FieldInfo::new(self.name, Repetition::Optional, None, true),
+            field_info: FieldInfo {
+                name: self.name,
+                repetition: Repetition::Optional,
+                id: None,
+            },
             logical_type: None,
             converted_type: None,
             fields: self.fields,

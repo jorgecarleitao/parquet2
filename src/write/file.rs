@@ -166,7 +166,7 @@ impl<W: Write> FileWriter<W> {
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
-            self.schema.into_thrift()?,
+            self.schema.into_thrift(),
             num_rows,
             self.row_groups,
             key_value_metadata,
@@ -207,7 +207,7 @@ mod tests {
 
         // write the file
         start_file(&mut writer)?;
-        end_file(&mut writer, metadata.into_thrift()?)?;
+        end_file(&mut writer, metadata.into_thrift())?;
 
         let a = writer.into_inner();
 

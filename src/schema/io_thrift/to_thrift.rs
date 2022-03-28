@@ -1,9 +1,6 @@
 use parquet_format_async_temp::SchemaElement;
 
-use crate::{
-    error::{Error, Result},
-    schema::types::PrimitiveType,
-};
+use crate::schema::types::PrimitiveType;
 
 use super::super::types::{
     group_converted_converted_to, physical_type_to_type, primitive_converted_to_converted,
@@ -12,19 +9,16 @@ use super::super::types::{
 
 impl ParquetType {
     /// Method to convert to Thrift.
-    pub fn to_thrift(&self) -> Result<Vec<SchemaElement>> {
-        if !self.is_root() {
-            return Err(general_err!("Root schema must be Group type"));
-        }
+    pub(crate) fn to_thrift(&self) -> Vec<SchemaElement> {
         let mut elements: Vec<SchemaElement> = Vec::new();
-        to_thrift_helper(self, &mut elements);
-        Ok(elements)
+        to_thrift_helper(self, &mut elements, true);
+        elements
     }
 }
 
 /// Constructs list of `SchemaElement` from the schema using depth-first traversal.
 /// Here we assume that schema is always valid and starts with group type.
-fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
+fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>, is_root: bool) {
     match schema {
         ParquetType::PrimitiveType(PrimitiveType {
             field_info,
@@ -63,7 +57,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
         } => {
             let converted_type = converted_type.as_ref().map(group_converted_converted_to);
 
-            let repetition_type = if field_info.is_root {
+            let repetition_type = if is_root {
                 // https://github.com/apache/parquet-format/blob/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46/src/main/thrift/parquet.thrift#L363
                 None
             } else {
@@ -87,7 +81,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>) {
 
             // Add child elements for a group
             for field in fields {
-                to_thrift_helper(field, elements);
+                to_thrift_helper(field, elements, false);
             }
         }
     }

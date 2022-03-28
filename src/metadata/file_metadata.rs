@@ -1,5 +1,4 @@
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
-use crate::error::Result;
 
 pub type KeyValue = parquet_format_async_temp::KeyValue;
 
@@ -78,10 +77,10 @@ impl FileMetaData {
             .unwrap_or(ColumnOrder::Undefined)
     }
 
-    pub fn into_thrift(self) -> Result<parquet_format_async_temp::FileMetaData> {
-        Ok(parquet_format_async_temp::FileMetaData {
+    pub fn into_thrift(self) -> parquet_format_async_temp::FileMetaData {
+        parquet_format_async_temp::FileMetaData {
             version: self.version,
-            schema: self.schema_descr.into_thrift()?,
+            schema: self.schema_descr.into_thrift(),
             num_rows: self.num_rows as i64,
             row_groups: self
                 .row_groups
@@ -93,6 +92,6 @@ impl FileMetaData {
             column_orders: None, // todo
             encryption_algorithm: None,
             footer_signing_key_metadata: None,
-        })
+        }
     }
 }

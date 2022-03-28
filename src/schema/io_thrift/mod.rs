@@ -12,7 +12,7 @@ mod tests {
 
     fn test_round_trip(message: &str) -> Result<()> {
         let expected_schema = from_message(message)?;
-        let thrift_schema = expected_schema.to_thrift()?;
+        let thrift_schema = expected_schema.to_thrift();
         let thrift_schema = thrift_schema.iter().collect::<Vec<_>>();
         let result_schema = ParquetType::try_from_thrift(&thrift_schema)?;
         assert_eq!(result_schema, expected_schema);
