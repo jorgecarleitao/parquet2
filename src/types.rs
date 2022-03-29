@@ -1,11 +1,9 @@
 use std::convert::TryFrom;
 
-use bytemuck::Pod;
-
 use crate::schema::types::PhysicalType;
 
 /// A physical native representation of a Parquet fixed-sized type.
-pub trait NativeType: std::fmt::Debug + Send + Sync + Pod {
+pub trait NativeType: std::fmt::Debug + Send + Sync + 'static + Copy + Clone {
     type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = std::array::TryFromSliceError>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
@@ -114,11 +112,6 @@ pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
     seconds * NANOS_PER_SECOND + nanoseconds
 }
 
-#[inline]
-pub(super) fn decode<T: NativeType>(values: &[u8]) -> &[T] {
-    bytemuck::cast_slice(values)
-}
-
 /// Returns the ordering of two binary values.
 pub fn ord_binary<'a>(a: &'a [u8], b: &'a [u8]) -> std::cmp::Ordering {
     use std::cmp::Ordering::*;
@@ -136,4 +129,13 @@ pub fn ord_binary<'a>(a: &'a [u8], b: &'a [u8]) -> std::cmp::Ordering {
         }
     }
     Equal
+}
+
+#[inline]
+pub fn decode<T: NativeType>(chunk: &[u8]) -> T {
+    let chunk: <T as NativeType>::Bytes = match chunk.try_into() {
+        Ok(v) => v,
+        Err(_) => panic!(),
+    };
+    T::from_le_bytes(chunk)
 }

@@ -3,21 +3,12 @@ use crate::{
     error::Error,
     page::{split_buffer, DataPage, PrimitivePageDict},
     parquet_bridge::{Encoding, Repetition},
-    types::NativeType,
+    types::{NativeType, decode},
 };
 
 use super::utils;
 
-#[inline]
-pub fn cast_unaligned<T: NativeType>(chunk: &[u8]) -> T {
-    let chunk: <T as NativeType>::Bytes = match chunk.try_into() {
-        Ok(v) => v,
-        Err(_) => panic!(),
-    };
-    T::from_le_bytes(chunk)
-}
-
-pub type Casted<'a, T> = std::iter::Map<std::slice::ChunksExact<'a, u8>, for<'r> fn(&'r [u8]) -> T>;
+pub type Casted<'a, T> = std::iter::Map<std::slice::ChunksExact<'a, u8>, fn(&'a [u8]) -> T>;
 
 pub fn native_cast<T: NativeType>(page: &DataPage) -> Result<Casted<T>, Error> {
     let (_, _, values) = split_buffer(page);
@@ -29,7 +20,7 @@ pub fn native_cast<T: NativeType>(page: &DataPage) -> Result<Casted<T>, Error> {
 
     Ok(values
         .chunks_exact(std::mem::size_of::<T>())
-        .map(cast_unaligned::<T>))
+        .map(decode::<T>))
 }
 
 #[derive(Debug)]
