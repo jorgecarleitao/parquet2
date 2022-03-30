@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::error::Result;
+use crate::error::Error;
 use crate::{encoding::get_length, schema::types::PhysicalType};
 
 use super::DictPage;
@@ -22,6 +22,13 @@ impl BinaryPageDict {
 
     pub fn offsets(&self) -> &[i32] {
         &self.offsets
+    }
+
+    #[inline]
+    pub fn value(&self, index: usize) -> Result<&[u8], Error> {
+        let start: usize = self.offsets[index].try_into()?;
+        let end: usize = self.offsets[(index + 1)].try_into()?;
+        Ok(&self.values[start..end])
     }
 }
 
@@ -53,7 +60,7 @@ fn read_plain(bytes: &[u8], length: usize) -> (Vec<u8>, Vec<i32>) {
     (values, offsets)
 }
 
-pub fn read(buf: &[u8], num_values: usize) -> Result<Arc<dyn DictPage>> {
+pub fn read(buf: &[u8], num_values: usize) -> Result<Arc<dyn DictPage>, Error> {
     let (values, offsets) = read_plain(buf, num_values);
     Ok(Arc::new(BinaryPageDict::new(values, offsets)))
 }

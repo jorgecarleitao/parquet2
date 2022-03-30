@@ -1,9 +1,9 @@
-use std::convert::{TryFrom, TryInto};
+use std::convert::TryFrom;
 
 use crate::schema::types::PhysicalType;
 
 /// A physical native representation of a Parquet fixed-sized type.
-pub trait NativeType: Sized + Copy + std::fmt::Debug + Send + Sync + 'static {
+pub trait NativeType: std::fmt::Debug + Send + Sync + 'static + Copy + Clone {
     type Bytes: AsRef<[u8]> + for<'a> TryFrom<&'a [u8], Error = std::array::TryFromSliceError>;
 
     fn to_le_bytes(&self) -> Self::Bytes;
@@ -99,6 +99,7 @@ impl NativeType for [u32; 3] {
     }
 }
 
+#[inline]
 pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
     const JULIAN_DAY_OF_EPOCH: i64 = 2_440_588;
     const SECONDS_PER_DAY: i64 = 86_400;
@@ -109,6 +110,25 @@ pub fn int96_to_i64_ns(value: [u32; 3]) -> i64 {
     let seconds = (day - JULIAN_DAY_OF_EPOCH) * SECONDS_PER_DAY;
 
     seconds * NANOS_PER_SECOND + nanoseconds
+}
+
+/// Returns the ordering of two binary values.
+pub fn ord_binary<'a>(a: &'a [u8], b: &'a [u8]) -> std::cmp::Ordering {
+    use std::cmp::Ordering::*;
+    match (a.is_empty(), b.is_empty()) {
+        (true, true) => return Equal,
+        (true, false) => return Less,
+        (false, true) => return Greater,
+        (false, false) => {}
+    }
+
+    for (v1, v2) in a.iter().zip(b.iter()) {
+        match v1.cmp(v2) {
+            Equal => continue,
+            other => return other,
+        }
+    }
+    Equal
 }
 
 #[inline]

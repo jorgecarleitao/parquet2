@@ -1,7 +1,7 @@
 use parquet_format_async_temp::SchemaElement;
 
 use crate::{
-    error::ParquetError,
+    error::Error,
     schema::{io_message::from_message, types::ParquetType, Repetition},
 };
 use crate::{error::Result, schema::types::FieldInfo};
@@ -37,33 +37,31 @@ impl SchemaDescriptor {
         }
     }
 
-    /// Returns [`ColumnDescriptor`] for a field position.
-    pub fn column(&self, i: usize) -> &ColumnDescriptor {
-        &self.leaves[i]
-    }
-
-    /// Returns slice of [`ColumnDescriptor`].
+    /// The [`ColumnDescriptor`] (leafs) of this schema.
+    ///
+    /// Note that, for nested fields, this may contain more entries than the number of fields
+    /// in the file - e.g. a struct field may have two columns.
     pub fn columns(&self) -> &[ColumnDescriptor] {
         &self.leaves
     }
 
-    /// Returns number of leaf-level columns.
-    pub fn num_columns(&self) -> usize {
-        self.leaves.len()
-    }
-
-    /// Returns schema name.
+    /// The schemas' name.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// The schemas' fields.
     pub fn fields(&self) -> &[ParquetType] {
         &self.fields
     }
 
-    pub(crate) fn into_thrift(self) -> Result<Vec<SchemaElement>> {
+    pub(crate) fn into_thrift(self) -> Vec<SchemaElement> {
         ParquetType::GroupType {
-            field_info: FieldInfo::new(self.name, Repetition::Optional, None, true),
+            field_info: FieldInfo {
+                name: self.name,
+                repetition: Repetition::Optional,
+                id: None,
+            },
             logical_type: None,
             converted_type: None,
             fields: self.fields,
@@ -76,17 +74,18 @@ impl SchemaDescriptor {
             ParquetType::GroupType {
                 field_info, fields, ..
             } => Ok(Self::new(field_info.name, fields)),
-            _ => Err(ParquetError::OutOfSpec(
+            _ => Err(Error::OutOfSpec(
                 "The parquet schema MUST be a group type".to_string(),
             )),
         }
     }
 
-    pub(crate) fn try_from_thrift(elements: &[&SchemaElement]) -> Result<Self> {
+    pub(crate) fn try_from_thrift(elements: &[SchemaElement]) -> Result<Self> {
         let schema = ParquetType::try_from_thrift(elements)?;
         Self::try_from_type(schema)
     }
 
+    /// Creates a schema from
     pub fn try_from_message(message: &str) -> Result<Self> {
         let schema = from_message(message)?;
         Self::try_from_type(schema)

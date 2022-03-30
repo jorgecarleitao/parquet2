@@ -5,7 +5,7 @@ use parquet_format_async_temp::{ColumnChunk, RowGroup};
 
 use crate::{
     compression::Compression,
-    error::{ParquetError, Result},
+    error::{Error, Result},
     metadata::{ColumnChunkMetaData, ColumnDescriptor},
     page::CompressedPage,
 };
@@ -62,7 +62,7 @@ fn compute_num_rows(columns: &[(ColumnChunk, Vec<PageWriteSpec>)]) -> Result<i64
                 .filter(|x| is_data_page(x))
                 .try_for_each(|spec| {
                     num_rows += spec.num_rows.ok_or_else(|| {
-                        ParquetError::OutOfSpec(
+                        Error::OutOfSpec(
                             "All data pages must declare the number of rows on it".to_string(),
                         )
                     })? as i64;
@@ -87,7 +87,7 @@ pub fn write_row_group<
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
     W: Write,
-    ParquetError: From<E>,
+    Error: From<E>,
     E: std::error::Error,
 {
     let column_iter = descriptors.iter().zip(columns);
@@ -152,7 +152,7 @@ pub async fn write_row_group_async<
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
     W: AsyncWrite + Unpin + Send,
-    ParquetError: From<E>,
+    Error: From<E>,
     E: std::error::Error,
 {
     let column_iter = descriptors.iter().zip(columns);
@@ -170,7 +170,7 @@ where
     let num_rows = compute_num_rows(&columns)?;
 
     // compute row group stats
-    let file_offest = columns
+    let file_offset = columns
         .get(0)
         .map(|(column_chunk, _)| {
             ColumnOffsetsMetadata::from_column_chunk(column_chunk).calc_row_group_file_offset()
@@ -194,7 +194,7 @@ where
             total_byte_size,
             num_rows: num_rows as i64,
             sorting_columns: None,
-            file_offset: file_offest,
+            file_offset,
             total_compressed_size: Some(total_compressed_size),
             ordinal: None,
         },

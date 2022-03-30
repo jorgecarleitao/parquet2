@@ -168,6 +168,7 @@ pub(super) fn build_page<R: Read>(
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 pub(super) enum FinishedPage {
     Data(CompressedDataPage),
     Dict(Arc<dyn DictPage>),

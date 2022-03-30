@@ -6,7 +6,7 @@ use parquet_format_async_temp::{
     thrift::protocol::TCompactInputProtocol, OffsetIndex, PageLocation,
 };
 
-use crate::error::ParquetError;
+use crate::error::Error;
 use crate::indexes::Index;
 use crate::metadata::ColumnChunkMetaData;
 
@@ -16,7 +16,7 @@ fn prepare_read<F: Fn(&ColumnChunk) -> Option<i64>, G: Fn(&ColumnChunk) -> Optio
     chunks: &[ColumnChunkMetaData],
     get_offset: F,
     get_length: G,
-) -> Result<(u64, Vec<usize>), ParquetError> {
+) -> Result<(u64, Vec<usize>), Error> {
     // c1: [start, length]
     // ...
     // cN: [start, length]
@@ -39,27 +39,21 @@ fn prepare_read<F: Fn(&ColumnChunk) -> Option<i64>, G: Fn(&ColumnChunk) -> Optio
         .map(|x| get_length(x.column_chunk()))
         .map(|maybe_length| {
             let index_length = maybe_length.ok_or_else(|| {
-                ParquetError::OutOfSpec(
-                    "The column length must exist if column offset exists".to_string(),
-                )
+                Error::OutOfSpec("The column length must exist if column offset exists".to_string())
             })?;
 
             Ok(index_length.try_into()?)
         })
-        .collect::<Result<Vec<_>, ParquetError>>()?;
+        .collect::<Result<Vec<_>, Error>>()?;
 
     Ok((offset, lengths))
 }
 
-fn prepare_column_index_read(
-    chunks: &[ColumnChunkMetaData],
-) -> Result<(u64, Vec<usize>), ParquetError> {
+fn prepare_column_index_read(chunks: &[ColumnChunkMetaData]) -> Result<(u64, Vec<usize>), Error> {
     prepare_read(chunks, |x| x.column_index_offset, |x| x.column_index_length)
 }
 
-fn prepare_offset_index_read(
-    chunks: &[ColumnChunkMetaData],
-) -> Result<(u64, Vec<usize>), ParquetError> {
+fn prepare_offset_index_read(chunks: &[ColumnChunkMetaData]) -> Result<(u64, Vec<usize>), Error> {
     prepare_read(chunks, |x| x.offset_index_offset, |x| x.offset_index_length)
 }
 
@@ -67,7 +61,7 @@ fn deserialize_column_indexes(
     chunks: &[ColumnChunkMetaData],
     data: &[u8],
     lengths: Vec<usize>,
-) -> Result<Vec<Box<dyn Index>>, ParquetError> {
+) -> Result<Vec<Box<dyn Index>>, Error> {
     let mut start = 0;
     let data = lengths.into_iter().map(|length| {
         let r = &data[start..start + length];
@@ -90,7 +84,7 @@ fn deserialize_column_indexes(
 pub fn read_columns_indexes<R: Read + Seek>(
     reader: &mut R,
     chunks: &[ColumnChunkMetaData],
-) -> Result<Vec<Box<dyn Index>>, ParquetError> {
+) -> Result<Vec<Box<dyn Index>>, Error> {
     let (offset, lengths) = prepare_column_index_read(chunks)?;
 
     let length = lengths.iter().sum::<usize>();
@@ -105,7 +99,7 @@ pub fn read_columns_indexes<R: Read + Seek>(
 fn deserialize_page_locations(
     data: &[u8],
     column_number: usize,
-) -> Result<Vec<Vec<PageLocation>>, ParquetError> {
+) -> Result<Vec<Vec<PageLocation>>, Error> {
     let mut d = Cursor::new(data);
 
     (0..column_number)
@@ -122,7 +116,7 @@ fn deserialize_page_locations(
 pub fn read_pages_locations<R: Read + Seek>(
     reader: &mut R,
     chunks: &[ColumnChunkMetaData],
-) -> Result<Vec<Vec<PageLocation>>, ParquetError> {
+) -> Result<Vec<Vec<PageLocation>>, Error> {
     let (offset, lengths) = prepare_offset_index_read(chunks)?;
 
     let length = lengths.iter().sum::<usize>();

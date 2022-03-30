@@ -8,7 +8,7 @@ pub use encoder::{encode_bool, encode_u32};
 
 use super::bitpacking;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HybridEncoded<'a> {
     /// A bitpacked slice. The consumer must know its bit-width to unpack it.
     Bitpacked(&'a [u8]),

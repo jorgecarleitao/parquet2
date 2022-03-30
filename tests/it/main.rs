@@ -15,6 +15,7 @@ pub enum Array {
     Float64(Vec<Option<f64>>),
     Boolean(Vec<Option<bool>>),
     Binary(Vec<Option<Vec<u8>>>),
+    FixedLenBinary(Vec<Option<Vec<u8>>>),
     List(Vec<Option<Array>>),
     Struct(Vec<Array>, Vec<bool>),
 }
@@ -30,6 +31,7 @@ impl Array {
             Array::Float64(a) => a.len(),
             Array::Boolean(a) => a.len(),
             Array::Binary(a) => a.len(),
+            Array::FixedLenBinary(a) => a.len(),
             Array::List(a) => a.len(),
             Array::Struct(a, _) => a[0].len(),
         }
@@ -52,6 +54,7 @@ pub enum Value {
     Float64(Option<f64>),
     Boolean(Option<bool>),
     Binary(Option<Vec<u8>>),
+    FixedLenBinary(Option<Vec<u8>>),
     List(Option<Array>),
 }
 
@@ -67,58 +70,49 @@ pub fn get_path() -> PathBuf {
     PathBuf::from(dir).join("testing/parquet-testing/data")
 }
 
-pub fn alltypes_plain(column: usize) -> Array {
+pub fn alltypes_plain(column: &str) -> Array {
     match column {
-        0 => {
-            // int32
+        "id" => {
             let expected = vec![4, 5, 6, 7, 2, 3, 0, 1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Int32(expected)
         }
-        1 => {
-            // bool
+        "bool_col" => {
             let expected = vec![true, false, true, false, true, false, true, false];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Boolean(expected)
         }
-        2 => {
-            // tiny_int
+        "tinyint_col" => {
             let expected = vec![0, 1, 0, 1, 0, 1, 0, 1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Int32(expected)
         }
-        3 => {
-            // smallint_col
+        "smallint_col" => {
             let expected = vec![0, 1, 0, 1, 0, 1, 0, 1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Int32(expected)
         }
-        4 => {
-            // int_col
+        "int_col" => {
             let expected = vec![0, 1, 0, 1, 0, 1, 0, 1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Int32(expected)
         }
-        5 => {
-            // bigint_col
+        "bigint_col" => {
             let expected = vec![0, 10, 0, 10, 0, 10, 0, 10];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Int64(expected)
         }
-        6 => {
-            // float32_col
+        "float_col" => {
             let expected = vec![0.0, 1.1, 0.0, 1.1, 0.0, 1.1, 0.0, 1.1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Float32(expected)
         }
-        7 => {
-            // float64_col
+        "double_col" => {
             let expected = vec![0.0, 10.1, 0.0, 10.1, 0.0, 10.1, 0.0, 10.1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Float64(expected)
         }
-        8 => {
-            // date_string_col
+        "date_string_col" => {
             let expected = vec![
                 vec![48, 51, 47, 48, 49, 47, 48, 57],
                 vec![48, 51, 47, 48, 49, 47, 48, 57],
@@ -132,8 +126,7 @@ pub fn alltypes_plain(column: usize) -> Array {
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Binary(expected)
         }
-        9 => {
-            // string_col
+        "string_col" => {
             let expected = vec![
                 vec![48],
                 vec![49],
@@ -147,58 +140,57 @@ pub fn alltypes_plain(column: usize) -> Array {
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Binary(expected)
         }
-        10 => {
-            // timestamp_col
+        "timestamp_col" => {
             todo!()
         }
         _ => unreachable!(),
     }
 }
 
-pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
+pub fn alltypes_statistics(column: &str) -> Arc<dyn Statistics> {
     match column {
-        0 => Arc::new(PrimitiveStatistics::<i32> {
+        "id" => Arc::new(PrimitiveStatistics::<i32> {
             primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0),
             max_value: Some(7),
         }),
-        1 => Arc::new(BooleanStatistics {
+        "bool_col" => Arc::new(BooleanStatistics {
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(false),
             max_value: Some(true),
         }),
-        2 | 3 | 4 => Arc::new(PrimitiveStatistics::<i32> {
+        "tinyint_col" | "smallint_col" | "int_col" => Arc::new(PrimitiveStatistics::<i32> {
             primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0),
             max_value: Some(1),
         }),
-        5 => Arc::new(PrimitiveStatistics::<i64> {
+        "bigint_col" => Arc::new(PrimitiveStatistics::<i64> {
             primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int64),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0),
             max_value: Some(10),
         }),
-        6 => Arc::new(PrimitiveStatistics::<f32> {
+        "float_col" => Arc::new(PrimitiveStatistics::<f32> {
             primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Float),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0.0),
             max_value: Some(1.1),
         }),
-        7 => Arc::new(PrimitiveStatistics::<f64> {
+        "double_col" => Arc::new(PrimitiveStatistics::<f64> {
             primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Double),
             null_count: Some(0),
             distinct_count: None,
             min_value: Some(0.0),
             max_value: Some(10.1),
         }),
-        8 => Arc::new(BinaryStatistics {
+        "date_string_col" => Arc::new(BinaryStatistics {
             primitive_type: PrimitiveType::from_physical(
                 "col".to_string(),
                 PhysicalType::ByteArray,
@@ -208,7 +200,7 @@ pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
             min_value: Some(vec![48, 49, 47, 48, 49, 47, 48, 57]),
             max_value: Some(vec![48, 52, 47, 48, 49, 47, 48, 57]),
         }),
-        9 => Arc::new(BinaryStatistics {
+        "string_col" => Arc::new(BinaryStatistics {
             primitive_type: PrimitiveType::from_physical(
                 "col".to_string(),
                 PhysicalType::ByteArray,
@@ -218,8 +210,7 @@ pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
             min_value: Some(vec![48]),
             max_value: Some(vec![49]),
         }),
-        10 => {
-            // timestamp_col
+        "timestamp_col" => {
             todo!()
         }
         _ => unreachable!(),
@@ -227,7 +218,7 @@ pub fn alltypes_statistics(column: usize) -> Arc<dyn Statistics> {
 }
 
 // these values match the values in `integration`
-pub fn pyarrow_optional(column: usize) -> Array {
+pub fn pyarrow_optional(column: &str) -> Array {
     let i64_values = &[
         Some(0),
         Some(1),
@@ -276,42 +267,61 @@ pub fn pyarrow_optional(column: usize) -> Array {
         Some(true),
         Some(true),
     ];
+    let binary_values = &[
+        Some(b"aa".to_vec()),
+        None,
+        Some(b"cc".to_vec()),
+        Some(b"dd".to_vec()),
+        None,
+        Some(b"ff".to_vec()),
+        None,
+        None,
+        Some(b"ii".to_vec()),
+        Some(b"jj".to_vec()),
+    ];
 
     match column {
-        0 => Array::Int64(i64_values.to_vec()),
-        1 => Array::Float64(f64_values.to_vec()),
-        2 => Array::Binary(string_values.to_vec()),
-        3 => Array::Boolean(bool_values.to_vec()),
-        4 => Array::Int64(i64_values.to_vec()),
+        "int64" => Array::Int64(i64_values.to_vec()),
+        "float64" => Array::Float64(f64_values.to_vec()),
+        "string" => Array::Binary(string_values.to_vec()),
+        "bool" => Array::Boolean(bool_values.to_vec()),
+        "date" => Array::Int64(i64_values.to_vec()),
+        "uint32" => Array::Int32(i64_values.iter().map(|i| i.map(|x| x as i32)).collect()),
+        "fixed_binary" => Array::FixedLenBinary(binary_values.to_vec()),
         _ => unreachable!(),
     }
 }
 
-pub fn pyarrow_optional_stats(column: usize) -> (Option<i64>, Value, Value) {
+pub fn pyarrow_optional_stats(column: &str) -> (Option<i64>, Value, Value) {
     match column {
-        0 => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
-        1 => (
+        "int64" => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+        "float64" => (
             Some(3),
             Value::Float64(Some(0.0)),
             Value::Float64(Some(9.0)),
         ),
-        2 => (
+        "string" => (
             Some(4),
             Value::Binary(Some(b"".to_vec())),
             Value::Binary(Some(b"def".to_vec())),
         ),
-        3 => (
+        "bool" => (
             Some(4),
             Value::Boolean(Some(false)),
             Value::Boolean(Some(true)),
         ),
-        4 => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+        "date" => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+        "fixed_binary" => (
+            Some(3),
+            Value::FixedLenBinary(Some(b"aa".to_vec())),
+            Value::FixedLenBinary(Some(b"jj".to_vec())),
+        ),
         _ => unreachable!(),
     }
 }
 
 // these values match the values in `integration`
-pub fn pyarrow_required(column: usize) -> Array {
+pub fn pyarrow_required(column: &str) -> Array {
     let i64_values = &[0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     let f64_values = &[0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0];
     let string_values = &[
@@ -320,21 +330,22 @@ pub fn pyarrow_required(column: usize) -> Array {
     let bool_values = &[
         true, true, false, false, false, true, true, true, true, true,
     ];
+    let binary_values = &["aa", "bb", "cc", "dd", "ee", "ff", "gg", "hh", "ii", "jj"];
 
     match column {
-        0 => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
-        1 => Array::Float64(f64_values.iter().map(|f| Some(*f)).collect()),
-        2 => Array::Binary(
+        "int64" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
+        "float64" => Array::Float64(f64_values.iter().map(|f| Some(*f)).collect()),
+        "string" => Array::Binary(
             string_values
                 .iter()
                 .map(|s| Some(s.as_bytes().to_vec()))
                 .collect(),
         ),
-        3 => Array::Boolean(bool_values.iter().map(|b| Some(*b)).collect()),
-        4 => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
-        5 => Array::Int32(i64_values.iter().map(|i| Some(*i as i32)).collect()),
-        6 => Array::Binary(
-            string_values
+        "bool" => Array::Boolean(bool_values.iter().map(|b| Some(*b)).collect()),
+        "date" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
+        "uint32" => Array::Int32(i64_values.iter().map(|i| Some(*i as i32)).collect()),
+        "fixed_binary" => Array::FixedLenBinary(
+            binary_values
                 .iter()
                 .map(|s| Some(s.as_bytes().to_vec()))
                 .collect(),
@@ -343,37 +354,37 @@ pub fn pyarrow_required(column: usize) -> Array {
     }
 }
 
-pub fn pyarrow_required_stats(column: usize) -> (Option<i64>, Value, Value) {
+pub fn pyarrow_required_stats(column: &str) -> (Option<i64>, Value, Value) {
     match column {
-        0 => (Some(0), Value::Int64(Some(0)), Value::Int64(Some(9))),
-        1 => (
+        "int64" => (Some(0), Value::Int64(Some(0)), Value::Int64(Some(9))),
+        "float64" => (
             Some(3),
             Value::Float64(Some(0.0)),
             Value::Float64(Some(9.0)),
         ),
-        2 => (
+        "string" => (
             Some(4),
             Value::Binary(Some(b"".to_vec())),
             Value::Binary(Some(b"def".to_vec())),
         ),
-        3 => (
+        "bool" => (
             Some(4),
             Value::Boolean(Some(false)),
             Value::Boolean(Some(true)),
         ),
-        4 => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
-        5 => (Some(0), Value::Int32(Some(0)), Value::Int32(Some(9))),
-        6 => (
+        "date" => (Some(3), Value::Int64(Some(0)), Value::Int64(Some(9))),
+        "uint32" => (Some(0), Value::Int32(Some(0)), Value::Int32(Some(9))),
+        "fixed_binary" => (
             Some(4),
-            Value::Binary(Some(b"".to_vec())),
-            Value::Binary(Some(b"def".to_vec())),
+            Value::FixedLenBinary(Some(b"aa".to_vec())),
+            Value::FixedLenBinary(Some(b"jj".to_vec())),
         ),
         _ => unreachable!(),
     }
 }
 
 // these values match the values in `integration`
-pub fn pyarrow_nested_optional(column: usize) -> Array {
+pub fn pyarrow_nested_optional(column: &str) -> Array {
     //    [[0, 1], None, [2, None, 3], [4, 5, 6], [], [7, 8, 9], None, [10]]
     // def: 3, 3,  0,     3, 2,    3,   3, 3, 3,  1    3  3  3   0      3
     // rep: 0, 1,  0,     0, 1,    1,   0, 1, 1,  0,   0, 1, 1,  0,     0
@@ -389,13 +400,13 @@ pub fn pyarrow_nested_optional(column: usize) -> Array {
     ];
 
     match column {
-        0 => Array::List(data),
+        "list_int64" => Array::List(data),
         _ => unreachable!(),
     }
 }
 
 // these values match the values in `integration`
-pub fn pyarrow_struct_optional(column: usize) -> Array {
+pub fn pyarrow_struct_optional(column: &str) -> Array {
     let validity = vec![false, true, true, true, true, true, true, true, true, true];
 
     let string = vec![
@@ -427,7 +438,7 @@ pub fn pyarrow_struct_optional(column: usize) -> Array {
     ];
 
     match column {
-        0 => {
+        "struct_nullable" => {
             let string = string
                 .iter()
                 .zip(validity.iter())
@@ -443,7 +454,7 @@ pub fn pyarrow_struct_optional(column: usize) -> Array {
                 validity,
             )
         }
-        1 => Array::Struct(
+        "struct_required" => Array::Struct(
             vec![Array::Binary(string), Array::Boolean(boolean)],
             vec![true; validity.len()],
         ),

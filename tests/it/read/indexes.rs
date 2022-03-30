@@ -1,5 +1,5 @@
 use parquet2::{
-    error::ParquetError,
+    error::Error,
     indexes::{
         BooleanIndex, BoundaryOrder, ByteIndex, Index, NativeIndex, PageIndex, PageLocation,
     },
@@ -74,7 +74,7 @@ const FILE: &[u8] = &[
 ];
 
 #[test]
-fn test() -> Result<(), ParquetError> {
+fn test() -> Result<(), Error> {
     let mut reader = std::io::Cursor::new(FILE);
 
     let expected_index = vec![
@@ -89,7 +89,11 @@ fn test() -> Result<(), ParquetError> {
         }) as Box<dyn Index>,
         Box::new(ByteIndex {
             primitive_type: PrimitiveType {
-                field_info: FieldInfo::new("string".to_string(), Repetition::Optional, None, false),
+                field_info: FieldInfo {
+                    name: "string".to_string(),
+                    repetition: Repetition::Optional,
+                    id: None,
+                },
                 logical_type: Some(LogicalType::STRING(Default::default())),
                 converted_type: Some(PrimitiveConvertedType::Utf8),
                 physical_type: PhysicalType::ByteArray,

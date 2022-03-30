@@ -18,7 +18,7 @@ pub use page::{IndexedPageReader, PageFilter, PageReader};
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
-use crate::error::ParquetError;
+use crate::error::Error;
 use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::page::CompressedDataPage;
 use crate::schema::types::ParquetType;
@@ -71,7 +71,7 @@ pub fn get_field_columns<'a>(
         .iter()
         .enumerate()
         .filter(move |x| x.1.path_in_schema[0] == field.name())
-        .map(move |x| metadata.row_groups[row_group].column(x.0))
+        .map(move |x| &metadata.row_groups[row_group].columns()[x.0])
 }
 
 /// Returns a [`ColumnIterator`] of column chunks corresponding to `field`.
@@ -114,7 +114,7 @@ pub trait MutStreamingIterator: Sized {
 
 /// Trait describing a [`MutStreamingIterator`] of column chunks.
 pub trait ColumnChunkIter<I>:
-    MutStreamingIterator<Item = (I, ColumnChunkMetaData), Error = ParquetError>
+    MutStreamingIterator<Item = (I, ColumnChunkMetaData), Error = Error>
 {
     /// The field associated to the set of column chunks this iterator iterates over.
     fn field(&self) -> &ParquetType;
@@ -153,7 +153,7 @@ impl<R: Read + Seek> ColumnIterator<R> {
 
 impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
     type Item = (PageReader<R>, ColumnChunkMetaData);
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(mut self) -> Result<State<Self>> {
         let (reader, buffer) = if let Some((iter, _)) = self.current {
@@ -212,7 +212,7 @@ impl ReadColumnIterator {
 
 impl MutStreamingIterator for ReadColumnIterator {
     type Item = (IntoIter<Result<CompressedDataPage>>, ColumnChunkMetaData);
-    type Error = ParquetError;
+    type Error = Error;
 
     fn advance(mut self) -> Result<State<Self>> {
         if self.chunks.is_empty() {
@@ -260,7 +260,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![];
         let mut iter = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
@@ -279,7 +279,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![0];
         let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
@@ -306,7 +306,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![1];
         let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
@@ -334,7 +334,7 @@ mod tests {
 
         let row_group = 0;
         let column = 0;
-        let column_metadata = metadata.row_groups[row_group].column(column);
+        let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![];
         let iter: Vec<_> = get_page_iterator(column_metadata, &mut file, None, buffer)?.collect();
 

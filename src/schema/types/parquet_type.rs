@@ -17,7 +17,11 @@ pub struct PrimitiveType {
 
 impl PrimitiveType {
     pub fn from_physical(name: String, physical_type: PhysicalType) -> Self {
-        let field_info = FieldInfo::new(name, Repetition::Optional, None, false);
+        let field_info = FieldInfo {
+            name,
+            repetition: Repetition::Optional,
+            id: None,
+        };
         Self {
             field_info,
             converted_type: None,
@@ -55,10 +59,6 @@ impl ParquetType {
     /// Returns this type's field name.
     pub fn name(&self) -> &str {
         &self.get_field_info().name
-    }
-
-    pub fn is_root(&self) -> bool {
-        self.get_field_info().is_root
     }
 
     /// Checks if `sub_type` schema is part of current schema.
@@ -105,8 +105,12 @@ impl ParquetType {
 
 /// Constructors
 impl ParquetType {
-    pub fn new_root(name: String, fields: Vec<ParquetType>) -> Self {
-        let field_info = FieldInfo::new(name, Repetition::Optional, None, true);
+    pub(crate) fn new_root(name: String, fields: Vec<ParquetType>) -> Self {
+        let field_info = FieldInfo {
+            name,
+            repetition: Repetition::Optional,
+            id: None,
+        };
         ParquetType::GroupType {
             field_info,
             fields,
@@ -118,12 +122,16 @@ impl ParquetType {
     pub fn from_converted(
         name: String,
         fields: Vec<ParquetType>,
-        repetition: Option<Repetition>,
+        repetition: Repetition,
         converted_type: Option<GroupConvertedType>,
         id: Option<i32>,
     ) -> Self {
-        let field_info =
-            FieldInfo::new(name, repetition.unwrap_or(Repetition::Optional), id, false);
+        let field_info = FieldInfo {
+            name,
+            repetition,
+            id,
+        };
+
         ParquetType::GroupType {
             field_info,
             fields,
@@ -132,6 +140,8 @@ impl ParquetType {
         }
     }
 
+    /// # Error
+    /// Errors iff the combination of physical, logical and coverted type is not valid.
     pub fn try_from_primitive(
         name: String,
         physical_type: PhysicalType,
@@ -143,7 +153,11 @@ impl ParquetType {
         spec::check_converted_invariants(&physical_type, &converted_type)?;
         spec::check_logical_invariants(&physical_type, &logical_type)?;
 
-        let field_info = FieldInfo::new(name, repetition, id, false);
+        let field_info = FieldInfo {
+            name,
+            repetition,
+            id,
+        };
 
         Ok(ParquetType::PrimitiveType(PrimitiveType {
             field_info,
@@ -157,21 +171,25 @@ impl ParquetType {
         ParquetType::PrimitiveType(PrimitiveType::from_physical(name, physical_type))
     }
 
-    pub fn try_from_group(
+    pub fn from_group(
         name: String,
         repetition: Repetition,
         converted_type: Option<GroupConvertedType>,
         logical_type: Option<LogicalType>,
         fields: Vec<ParquetType>,
         id: Option<i32>,
-    ) -> Result<Self> {
-        let field_info = FieldInfo::new(name, repetition, id, false);
+    ) -> Self {
+        let field_info = FieldInfo {
+            name,
+            repetition,
+            id,
+        };
 
-        Ok(ParquetType::GroupType {
+        ParquetType::GroupType {
             field_info,
             logical_type,
             converted_type,
             fields,
-        })
+        }
     }
 }

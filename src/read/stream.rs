@@ -4,9 +4,9 @@ use futures::{io::Cursor, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 use parquet_format_async_temp::FileMetaData as TFileMetaData;
 
-use super::super::{metadata::*, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
-use super::metadata::{metadata_len, parse_column_orders};
-use crate::error::{ParquetError, Result};
+use super::super::{metadata::FileMetaData, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
+use super::metadata::metadata_len;
+use crate::error::{Error, Result};
 
 async fn stream_len(
     seek: &mut (impl AsyncSeek + std::marker::Unpin),
@@ -57,7 +57,7 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
     }
     let footer_metadata_len = FOOTER_SIZE + metadata_len as u64;
 
-    let t_file_metadata = if footer_metadata_len > file_size {
+    let metadata = if footer_metadata_len > file_size {
         return Err(general_err!(
             "Invalid Parquet file. Metadata start is less than zero ({})",
             file_size as i64 - footer_metadata_len as i64
@@ -82,27 +82,5 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
         TFileMetaData::stream_from_in_protocol(&mut prot).await?
     };
 
-    let schema = t_file_metadata.schema.iter().collect::<Vec<_>>();
-    let schema_descr = SchemaDescriptor::try_from_thrift(&schema)?;
-
-    let row_groups = t_file_metadata
-        .row_groups
-        .into_iter()
-        .map(|rg| RowGroupMetaData::try_from_thrift(&schema_descr, rg))
-        .collect::<Result<Vec<_>>>()?;
-
-    // compute and cache column orders
-    let column_orders = t_file_metadata
-        .column_orders
-        .map(|orders| parse_column_orders(&orders, &schema_descr));
-
-    Ok(FileMetaData::new(
-        t_file_metadata.version,
-        t_file_metadata.num_rows,
-        t_file_metadata.created_by,
-        row_groups,
-        t_file_metadata.key_value_metadata,
-        schema_descr,
-        column_orders,
-    ))
+    FileMetaData::try_from_thrift(metadata)
 }

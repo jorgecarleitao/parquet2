@@ -1,48 +1,57 @@
-pub struct ValuesDef<T, V, D>
-where
-    V: Iterator<Item = T>,
-    D: Iterator<Item = u32>,
-{
-    values: V,
-    def_levels: D,
-    max_def_level: u32,
-}
+use parquet2::{
+    deserialize::{DefLevelsDecoder, HybridDecoderBitmapIter, HybridEncoded},
+    encoding::hybrid_rle::{BitmapIter, HybridRleDecoder},
+    error::Error,
+};
 
-impl<T, V, D> ValuesDef<T, V, D>
-where
-    V: Iterator<Item = T>,
-    D: Iterator<Item = u32>,
-{
-    pub fn new(values: V, def_levels: D, max_def_level: u32) -> Self {
-        Self {
-            values,
-            def_levels,
-            max_def_level,
+pub fn deserialize_optional<C: Clone, I: Iterator<Item = C>>(
+    validity: DefLevelsDecoder,
+    values: I,
+) -> Result<Vec<Option<C>>, Error> {
+    match validity {
+        DefLevelsDecoder::Bitmap(bitmap) => deserialize_bitmap(bitmap, values),
+        DefLevelsDecoder::Levels(levels, max_level) => {
+            deserialize_levels(levels, max_level, values)
         }
     }
 }
 
-impl<T, V, D> Iterator for ValuesDef<T, V, D>
-where
-    V: Iterator<Item = T>,
-    D: Iterator<Item = u32>,
-{
-    type Item = Option<T>;
+fn deserialize_bitmap<C: Clone, I: Iterator<Item = C>>(
+    validity: HybridDecoderBitmapIter,
+    mut values: I,
+) -> Result<Vec<Option<C>>, Error> {
+    let mut deserialized = Vec::with_capacity(validity.len());
 
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.def_levels.next() {
-            Some(def) => {
-                if def == self.max_def_level {
-                    Some(self.values.next())
-                } else {
-                    Some(None)
-                }
+    validity.for_each(|run| match run {
+        HybridEncoded::Bitmap(bitmap, offset, length) => {
+            BitmapIter::new(bitmap, offset, length)
+                .into_iter()
+                .for_each(|x| {
+                    if x {
+                        deserialized.push(values.next())
+                    } else {
+                        deserialized.push(None)
+                    }
+                });
+        }
+        HybridEncoded::Repeated(is_set, length) => {
+            if is_set {
+                deserialized.extend(values.by_ref().take(length).map(Some))
+            } else {
+                deserialized.extend(std::iter::repeat(None).take(length))
             }
-            None => None,
         }
-    }
+    });
+    Ok(deserialized)
+}
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.def_levels.size_hint()
-    }
+fn deserialize_levels<C: Clone, I: Iterator<Item = C>>(
+    levels: HybridRleDecoder,
+    max: u32,
+    mut values: I,
+) -> Result<Vec<Option<C>>, Error> {
+    Ok(levels
+        .into_iter()
+        .map(|x| if x == max { values.next() } else { None })
+        .collect())
 }

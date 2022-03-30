@@ -1,6 +1,6 @@
 use parquet_format_async_temp::PageLocation;
 
-use crate::error::ParquetError;
+use crate::error::Error;
 
 /// An interval
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -22,7 +22,7 @@ impl Interval {
 fn compute_page_row_intervals(
     locations: &[PageLocation],
     num_rows: u64,
-) -> Result<Vec<Interval>, ParquetError> {
+) -> Result<Vec<Interval>, Error> {
     if locations.is_empty() {
         return Ok(vec![]);
     };
@@ -31,7 +31,7 @@ fn compute_page_row_intervals(
         let first = locations.last().unwrap().first_row_index;
         let start = u64::try_from(first)?;
         let length = num_rows - start;
-        Result::<_, ParquetError>::Ok(Interval::new(start, length))
+        Result::<_, Error>::Ok(Interval::new(start, length))
     })();
 
     let pages_lengths = locations
@@ -51,7 +51,7 @@ pub fn compute_rows(
     selected: &[bool],
     locations: &[PageLocation],
     num_rows: u64,
-) -> Result<Vec<Interval>, ParquetError> {
+) -> Result<Vec<Interval>, Error> {
     let page_intervals = compute_page_row_intervals(locations, num_rows)?;
 
     Ok(selected
@@ -118,7 +118,7 @@ pub fn select_pages(
     intervals: &[Interval],
     locations: &[PageLocation],
     num_rows: u64,
-) -> Result<Vec<FilteredPage>, ParquetError> {
+) -> Result<Vec<FilteredPage>, Error> {
     let page_intervals = compute_page_row_intervals(locations, num_rows)?;
 
     page_intervals

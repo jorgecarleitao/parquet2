@@ -2,15 +2,12 @@ use std::io::Cursor;
 
 use parquet_format_async_temp::{thrift::protocol::TCompactInputProtocol, ColumnIndex};
 
-use crate::error::ParquetError;
+use crate::error::Error;
 use crate::schema::types::{PhysicalType, PrimitiveType};
 
 use crate::indexes::{BooleanIndex, ByteIndex, FixedLenByteIndex, Index, NativeIndex};
 
-pub fn deserialize(
-    data: &[u8],
-    primitive_type: PrimitiveType,
-) -> Result<Box<dyn Index>, ParquetError> {
+pub fn deserialize(data: &[u8], primitive_type: PrimitiveType) -> Result<Box<dyn Index>, Error> {
     let mut d = Cursor::new(data);
     let mut prot = TCompactInputProtocol::new(&mut d);
 

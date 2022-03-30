@@ -1,13 +1,12 @@
 use std::io::Write;
 
-use parquet_format_async_temp::FileMetaData;
-
 use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
+use parquet_format_async_temp::FileMetaData;
 use parquet_format_async_temp::RowGroup;
 
 use crate::{
-    error::{ParquetError, Result},
+    error::{Error, Result},
     metadata::SchemaDescriptor,
     FOOTER_SIZE, PARQUET_MAGIC,
 };
@@ -98,11 +97,11 @@ impl<W: Write> FileWriter<W> {
     /// This call is IO-bounded
     pub fn write<E>(&mut self, row_group: RowGroupIter<'_, E>) -> Result<()>
     where
-        ParquetError: From<E>,
+        Error: From<E>,
         E: std::error::Error,
     {
         if self.offset == 0 {
-            return Err(ParquetError::General(
+            return Err(Error::General(
                 "You must call `start` before writing the first row group".to_string(),
             ));
         }
@@ -166,7 +165,7 @@ impl<W: Write> FileWriter<W> {
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
-            self.schema.into_thrift()?,
+            self.schema.into_thrift(),
             num_rows,
             self.row_groups,
             key_value_metadata,
@@ -207,7 +206,7 @@ mod tests {
 
         // write the file
         start_file(&mut writer)?;
-        end_file(&mut writer, metadata.into_thrift()?)?;
+        end_file(&mut writer, metadata.into_thrift())?;
 
         let a = writer.into_inner();
 

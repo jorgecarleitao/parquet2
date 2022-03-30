@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use parquet_format_async_temp::SchemaElement;
 
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 use super::super::types::{
     converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,
@@ -11,7 +11,7 @@ use super::super::types::{
 
 impl ParquetType {
     /// Method to convert from Thrift.
-    pub fn try_from_thrift(elements: &[&SchemaElement]) -> Result<ParquetType> {
+    pub fn try_from_thrift(elements: &[SchemaElement]) -> Result<ParquetType> {
         let mut index = 0;
         let mut schema_nodes = Vec::new();
         while index < elements.len() {
@@ -34,12 +34,12 @@ impl ParquetType {
 /// The first result is the starting index for the next Type after this one. If it is
 /// equal to `elements.len()`, then this Type is the last one.
 /// The second result is the result Type.
-fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usize, ParquetType)> {
+fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize, ParquetType)> {
     // Whether or not the current node is root (message type).
     // There is only one message type node in the schema tree.
     let is_root_node = index == 0;
 
-    let element = elements[index];
+    let element = &elements[index];
     let name = element.name.clone();
     let converted_type = element.converted_type;
     // LogicalType is only present in v2 Parquet files. ConvertedType is always
@@ -95,7 +95,6 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
             Ok((index + 1, tp))
         }
         Some(n) => {
-            let repetition = element.repetition_type.map(|x| x.try_into().unwrap());
             let mut fields = vec![];
             let mut next_index = index + 1;
             for _ in 0..n {
@@ -107,6 +106,14 @@ fn from_thrift_helper(elements: &[&SchemaElement], index: usize) -> Result<(usiz
             let tp = if is_root_node {
                 ParquetType::new_root(name, fields)
             } else {
+                let repetition = if let Some(repetition) = element.repetition_type {
+                    repetition.try_into()?
+                } else {
+                    return Err(Error::OutOfSpec(
+                        "The repetition level of a non-root must be non-null allowed".to_string(),
+                    ));
+                };
+
                 let converted_type = match converted_type {
                     Some(converted_type) => Some(converted_to_group_converted(&converted_type)?),
                     None => None,

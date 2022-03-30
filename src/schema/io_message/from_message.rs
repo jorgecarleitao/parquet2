@@ -47,7 +47,7 @@ use super::super::types::{
     ParquetType,
 };
 use super::super::*;
-use crate::error::{ParquetError, Result};
+use crate::error::{Error, Result};
 
 use parquet_format_async_temp::*;
 
@@ -80,39 +80,6 @@ fn is_converted_type(s: &str) -> bool {
         }
         _ => false,
     }
-}
-
-fn logical_type_from_str(s: &str) -> Result<Option<LogicalType>> {
-    Ok(Some(match s {
-        // The type is a placeholder that gets updated elsewhere
-        "INTEGER" => LogicalType::INTEGER(IntType {
-            bit_width: 8,
-            is_signed: false,
-        }),
-        "MAP" => LogicalType::MAP(MapType {}),
-        "LIST" => LogicalType::LIST(ListType {}),
-        "ENUM" => LogicalType::ENUM(EnumType {}),
-        "DECIMAL" => LogicalType::DECIMAL(DecimalType {
-            precision: -1,
-            scale: -1,
-        }),
-        "DATE" => LogicalType::DATE(DateType {}),
-        "TIME" => LogicalType::TIME(TimeType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        }),
-        "TIMESTAMP" => LogicalType::TIMESTAMP(TimestampType {
-            is_adjusted_to_u_t_c: false,
-            unit: TimeUnit::MILLIS(MilliSeconds {}),
-        }),
-        "STRING" => LogicalType::STRING(StringType {}),
-        "JSON" => LogicalType::JSON(JsonType {}),
-        "BSON" => LogicalType::BSON(BsonType {}),
-        "UUID" => LogicalType::UUID(UUIDType {}),
-        "UNKNOWN" => LogicalType::UNKNOWN(NullType {}),
-        "INTERVAL" => return Err(general_err!("Interval logical type not yet supported")),
-        _ => return Ok(None),
-    }))
 }
 
 fn converted_group_from_str(s: &str) -> Result<ConvertedType> {
@@ -350,7 +317,7 @@ impl<'a> Parser<'a> {
             .and_then(|v| repetition_from_str(&v.to_uppercase()))?;
 
         match self.tokenizer.next() {
-            Some(group) if group.to_uppercase() == "GROUP" => self.add_group_type(Some(repetition)),
+            Some(group) if group.to_uppercase() == "GROUP" => self.add_group_type(repetition),
             Some(type_string) => {
                 let physical_type = type_from_str(&type_string.to_uppercase())?;
                 self.add_primitive_type(repetition, physical_type)
@@ -359,7 +326,7 @@ impl<'a> Parser<'a> {
         }
     }
 
-    fn add_group_type(&mut self, repetition: Option<Repetition>) -> Result<ParquetType> {
+    fn add_group_type(&mut self, repetition: Repetition) -> Result<ParquetType> {
         // Parse name of the group type
         let name = self
             .tokenizer
@@ -956,7 +923,7 @@ mod tests {
         let a1 = ParquetType::from_converted(
             "a1".to_string(),
             vec![a2],
-            None,
+            Repetition::Optional,
             Some(GroupConvertedType::List),
             None,
         );
@@ -966,21 +933,21 @@ mod tests {
                 ParquetType::from_physical("b3".to_string(), PhysicalType::Int32),
                 ParquetType::from_physical("b4".to_string(), PhysicalType::Double),
             ],
-            Some(Repetition::Repeated),
+            Repetition::Repeated,
             None,
             None,
         );
         let b1 = ParquetType::from_converted(
             "b1".to_string(),
             vec![b2],
-            None,
+            Repetition::Optional,
             Some(GroupConvertedType::List),
             None,
         );
         let a0 = ParquetType::from_converted(
             "a0".to_string(),
             vec![a1, b1],
-            Some(Repetition::Required),
+            Repetition::Required,
             None,
             None,
         );

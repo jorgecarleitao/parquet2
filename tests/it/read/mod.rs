@@ -3,6 +3,7 @@
 /// but OTOH it has no external dependencies and is very familiar to Rust developers.
 mod binary;
 mod boolean;
+mod fixed_binary;
 mod indexes;
 mod primitive;
 mod primitive_nested;
@@ -11,11 +12,15 @@ mod utils;
 
 use std::fs::File;
 
-use parquet2::error::ParquetError;
+use futures::StreamExt;
+
+use parquet2::error::Error;
 use parquet2::error::Result;
 use parquet2::metadata::ColumnChunkMetaData;
 use parquet2::page::CompressedDataPage;
 use parquet2::page::DataPage;
+use parquet2::read::get_page_stream;
+use parquet2::read::read_metadata_async;
 use parquet2::read::BasicDecompressor;
 use parquet2::read::{get_column_iterator, get_field_columns, read_metadata};
 use parquet2::read::{MutStreamingIterator, State};
@@ -33,26 +38,17 @@ use super::*;
 pub fn page_to_array(page: &DataPage) -> Result<Array> {
     let physical_type = page.descriptor.primitive_type.physical_type;
     match page.descriptor.max_rep_level {
-        0 => match page.dictionary_page() {
-            Some(_) => match physical_type {
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Float => Ok(Array::Float32(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::Double => Ok(Array::Float64(primitive::page_dict_to_vec(page)?)),
-                PhysicalType::ByteArray => Ok(Array::Binary(binary::page_dict_to_vec(page)?)),
-                _ => todo!(),
-            },
-            None => match physical_type {
-                PhysicalType::Boolean => Ok(Array::Boolean(boolean::page_to_vec(page)?)),
-                PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page)?)),
-                PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page)?)),
-                PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page)?)),
-                PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
-                PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
-                PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
-                _ => todo!(),
-            },
+        0 => match physical_type {
+            PhysicalType::Boolean => Ok(Array::Boolean(boolean::page_to_vec(page)?)),
+            PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page)?)),
+            PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page)?)),
+            PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page)?)),
+            PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
+            PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
+            PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
+            PhysicalType::FixedLenByteArray(_) => {
+                Ok(Array::FixedLenBinary(fixed_binary::page_to_vec(page)?))
+            }
         },
         _ => match page.dictionary_page() {
             None => match physical_type {
@@ -72,7 +68,7 @@ pub fn page_to_array(page: &DataPage) -> Result<Array> {
 pub fn columns_to_array<II, I>(mut columns: I, field: &ParquetType) -> Result<Array>
 where
     II: Iterator<Item = Result<CompressedDataPage>>,
-    I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = ParquetError>,
+    I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = Error>,
 {
     let mut validity = vec![];
     let mut has_filled = false;
@@ -110,13 +106,25 @@ where
 pub fn read_column<R: std::io::Read + std::io::Seek>(
     reader: &mut R,
     row_group: usize,
-    field: usize,
+    field: &str,
 ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
     let metadata = read_metadata(reader)?;
 
-    let expected = metadata.row_groups[0].column(0).compressed_size();
-    let chunk = metadata.row_groups[0].column(0).clone().into_thrift();
-    assert_eq!(chunk.meta_data.unwrap().total_compressed_size, expected);
+    let field = metadata
+        .schema()
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, x)| {
+            println!("{}", x.name());
+            if x.name() == field {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap();
 
     let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
     let field = &metadata.schema().fields()[field];
@@ -130,15 +138,62 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
     Ok((array, statistics.pop().unwrap()))
 }
 
-fn get_column(
-    path: &str,
-    column: usize,
+pub async fn read_column_async<
+    R: futures::AsyncRead + futures::AsyncSeek + Send + std::marker::Unpin,
+>(
+    reader: &mut R,
+    row_group: usize,
+    field: &str,
 ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
+    let metadata = read_metadata_async(reader).await?;
+
+    let field = metadata
+        .schema()
+        .fields()
+        .iter()
+        .enumerate()
+        .filter_map(|(i, x)| {
+            println!("{}", x.name());
+            if x.name() == field {
+                Some(i)
+            } else {
+                None
+            }
+        })
+        .next()
+        .unwrap();
+
+    let pages = get_page_stream(
+        &metadata.row_groups[0].columns()[0],
+        reader,
+        vec![],
+        Arc::new(|_, _| true),
+    )
+    .await?;
+    let field = &metadata.schema().fields()[field];
+
+    let mut statistics = get_field_columns(&metadata, row_group, field)
+        .map(|column_meta| column_meta.statistics().transpose())
+        .collect::<Result<Vec<_>>>()?;
+
+    let pages = pages.collect::<Vec<_>>().await;
+
+    let mut iterator = BasicDecompressor::new(pages.into_iter(), vec![]);
+
+    let array = iterator
+        .next()?
+        .map(|page| page_to_array(page).unwrap())
+        .unwrap();
+
+    Ok((array, statistics.pop().unwrap()))
+}
+
+fn get_column(path: &str, column: &str) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
     let mut file = File::open(path).unwrap();
     read_column(&mut file, 0, column)
 }
 
-fn test_column(column: usize) -> Result<()> {
+fn test_column(column: &str) -> Result<()> {
     let mut path = get_path();
     path.push("alltypes_plain.parquet");
     let path = path.to_str().unwrap();
@@ -151,52 +206,52 @@ fn test_column(column: usize) -> Result<()> {
 
 #[test]
 fn int32() -> Result<()> {
-    test_column(0)
+    test_column("id")
 }
 
 #[test]
 fn bool() -> Result<()> {
-    test_column(1)
+    test_column("bool_col")
 }
 
 #[test]
-fn tiny_int() -> Result<()> {
-    test_column(2)
+fn tinyint_col() -> Result<()> {
+    test_column("tinyint_col")
 }
 
 #[test]
 fn smallint_col() -> Result<()> {
-    test_column(3)
+    test_column("smallint_col")
 }
 
 #[test]
 fn int_col() -> Result<()> {
-    test_column(4)
+    test_column("int_col")
 }
 
 #[test]
 fn bigint_col() -> Result<()> {
-    test_column(5)
+    test_column("bigint_col")
 }
 
 #[test]
-fn float32_col() -> Result<()> {
-    test_column(6)
+fn float_col() -> Result<()> {
+    test_column("float_col")
 }
 
 #[test]
-fn float64_col() -> Result<()> {
-    test_column(7)
+fn double_col() -> Result<()> {
+    test_column("double_col")
 }
 
 #[test]
 fn date_string_col() -> Result<()> {
-    test_column(8)
+    test_column("date_string_col")
 }
 
 #[test]
 fn string_col() -> Result<()> {
-    test_column(9)
+    test_column("string_col")
 }
 
 #[test]
@@ -217,7 +272,7 @@ fn timestamp_col() -> Result<()> {
     ];
 
     let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-    let (array, _) = get_column(path, 10)?;
+    let (array, _) = get_column(path, "timestamp_col")?;
     if let Array::Int96(array) = array {
         let a = array
             .into_iter()
@@ -265,6 +320,12 @@ fn assert_eq_stats(expected: (Option<i64>, Value, Value), stats: &dyn Statistics
             assert_eq!(s.min_value, min);
             assert_eq!(s.max_value, max);
         }
+        (Value::FixedLenBinary(min), Value::FixedLenBinary(max)) => {
+            let s = stats.as_any().downcast_ref::<FixedLenStatistics>().unwrap();
+
+            assert_eq!(s.min_value, min);
+            assert_eq!(s.max_value, max);
+        }
         (Value::Boolean(min), Value::Boolean(max)) => {
             let s = stats.as_any().downcast_ref::<BooleanStatistics>().unwrap();
 
@@ -278,7 +339,7 @@ fn assert_eq_stats(expected: (Option<i64>, Value, Value), stats: &dyn Statistics
 
 fn test_pyarrow_integration(
     file: &str,
-    column: usize,
+    column: &str,
     version: usize,
     required: bool,
     use_dictionary: bool,
@@ -327,100 +388,130 @@ fn test_pyarrow_integration(
 
 #[test]
 fn pyarrow_v1_dict_int64_required() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 1, true, true, "")
+    test_pyarrow_integration("basic", "int64", 1, true, true, "")
 }
 
 #[test]
 fn pyarrow_v1_dict_int64_optional() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 1, false, true, "")
+    test_pyarrow_integration("basic", "int64", 1, false, true, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_int64_required() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 1, true, false, "")
+    test_pyarrow_integration("basic", "int64", 1, true, false, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_int64_optional() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 1, false, false, "")
+    test_pyarrow_integration("basic", "int64", 1, false, false, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_int64_optional_snappy() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 1, false, false, "/snappy")
+    test_pyarrow_integration("basic", "int64", 1, false, false, "/snappy")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_int64_optional_lz4() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 1, false, false, "/lz4")
+    test_pyarrow_integration("basic", "int64", 1, false, false, "/lz4")
 }
 
 #[test]
 fn pyarrow_v2_non_dict_int64_optional() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 2, false, false, "")
+    test_pyarrow_integration("basic", "int64", 2, false, false, "")
 }
 
 #[test]
 fn pyarrow_v2_non_dict_int64_required() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 2, true, false, "")
+    test_pyarrow_integration("basic", "int64", 2, true, false, "")
 }
 
 #[test]
 fn pyarrow_v2_dict_int64_optional() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 2, false, true, "")
+    test_pyarrow_integration("basic", "int64", 2, false, true, "")
 }
 
 #[test]
 fn pyarrow_v2_non_dict_int64_optional_compressed() -> Result<()> {
-    test_pyarrow_integration("basic", 0, 2, false, false, "/snappy")
+    test_pyarrow_integration("basic", "int64", 2, false, false, "/snappy")
+}
+
+#[test]
+fn pyarrow_v1_boolean_optional() -> Result<()> {
+    test_pyarrow_integration("basic", "bool", 1, false, false, "")
+}
+
+#[test]
+fn pyarrow_v1_boolean_required() -> Result<()> {
+    test_pyarrow_integration("basic", "bool", 1, true, false, "")
 }
 
 #[test]
 fn pyarrow_v1_dict_string_required() -> Result<()> {
-    test_pyarrow_integration("basic", 2, 1, true, true, "")
+    test_pyarrow_integration("basic", "string", 1, true, true, "")
 }
 
 #[test]
 fn pyarrow_v1_dict_string_optional() -> Result<()> {
-    test_pyarrow_integration("basic", 2, 1, false, true, "")
+    test_pyarrow_integration("basic", "string", 1, false, true, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_string_required() -> Result<()> {
-    test_pyarrow_integration("basic", 2, 1, true, false, "")
+    test_pyarrow_integration("basic", "string", 1, true, false, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_string_optional() -> Result<()> {
-    test_pyarrow_integration("basic", 2, 1, false, false, "")
+    test_pyarrow_integration("basic", "string", 1, false, false, "")
+}
+
+#[test]
+fn pyarrow_v1_dict_fixed_binary_required() -> Result<()> {
+    test_pyarrow_integration("basic", "fixed_binary", 1, true, true, "")
+}
+
+#[test]
+fn pyarrow_v1_dict_fixed_binary_optional() -> Result<()> {
+    test_pyarrow_integration("basic", "fixed_binary", 1, false, true, "")
+}
+
+#[test]
+fn pyarrow_v1_non_dict_fixed_binary_required() -> Result<()> {
+    test_pyarrow_integration("basic", "fixed_binary", 1, true, false, "")
+}
+
+#[test]
+fn pyarrow_v1_non_dict_fixed_binary_optional() -> Result<()> {
+    test_pyarrow_integration("basic", "fixed_binary", 1, false, false, "")
 }
 
 #[test]
 fn pyarrow_v1_dict_list_optional() -> Result<()> {
-    test_pyarrow_integration("nested", 0, 1, false, true, "")
+    test_pyarrow_integration("nested", "list_int64", 1, false, true, "")
 }
 
 #[test]
 fn pyarrow_v1_non_dict_list_optional() -> Result<()> {
-    test_pyarrow_integration("nested", 0, 1, false, false, "")
+    test_pyarrow_integration("nested", "list_int64", 1, false, false, "")
 }
 
 #[test]
 fn pyarrow_v1_struct_optional() -> Result<()> {
-    test_pyarrow_integration("struct", 0, 1, false, false, "")
+    test_pyarrow_integration("struct", "struct_nullable", 1, false, false, "")
 }
 
 #[test]
 fn pyarrow_v2_struct_optional() -> Result<()> {
-    test_pyarrow_integration("struct", 0, 2, false, false, "")
+    test_pyarrow_integration("struct", "struct_nullable", 2, false, false, "")
 }
 
 #[test]
 fn pyarrow_v1_struct_required() -> Result<()> {
-    test_pyarrow_integration("struct", 1, 1, false, false, "")
+    test_pyarrow_integration("struct", "struct_required", 1, false, false, "")
 }
 
 #[test]
 fn pyarrow_v2_struct_required() -> Result<()> {
-    test_pyarrow_integration("struct", 1, 2, false, false, "")
+    test_pyarrow_integration("struct", "struct_required", 2, false, false, "")
 }

@@ -1,17 +1,19 @@
+use crate::{error::Error, metadata::get_sort_order};
+
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
-use crate::error::Result;
+use parquet_format_async_temp::ColumnOrder as TColumnOrder;
 
 pub type KeyValue = parquet_format_async_temp::KeyValue;
 
 /// Metadata for a Parquet file.
-// This is almost equal to `parquet_format_async_temp::FileMetaData` but contains the descriptors,
+// This is almost equal to [`parquet_format_async_temp::FileMetaData`] but contains the descriptors,
 // which are crucial to deserialize pages.
 #[derive(Debug, Clone)]
 pub struct FileMetaData {
     /// version of this file.
     pub version: i32,
     /// number of rows in the file.
-    pub num_rows: i64,
+    pub num_rows: usize,
     /// String message for application that wrote this file.
     ///
     /// This should have the following format:
@@ -38,27 +40,6 @@ pub struct FileMetaData {
 }
 
 impl FileMetaData {
-    /// Creates new file metadata.
-    pub fn new(
-        version: i32,
-        num_rows: i64,
-        created_by: Option<String>,
-        row_groups: Vec<RowGroupMetaData>,
-        key_value_metadata: Option<Vec<KeyValue>>,
-        schema_descr: SchemaDescriptor,
-        column_orders: Option<Vec<ColumnOrder>>,
-    ) -> Self {
-        FileMetaData {
-            version,
-            num_rows,
-            created_by,
-            row_groups,
-            key_value_metadata,
-            schema_descr,
-            column_orders,
-        }
-    }
-
     /// Returns the ['SchemaDescriptor`] that describes schema of this file.
     pub fn schema(&self) -> &SchemaDescriptor {
         &self.schema_descr
@@ -78,10 +59,38 @@ impl FileMetaData {
             .unwrap_or(ColumnOrder::Undefined)
     }
 
-    pub fn into_thrift(self) -> Result<parquet_format_async_temp::FileMetaData> {
-        Ok(parquet_format_async_temp::FileMetaData {
+    /// Deserializes [`parquet_format_async_temp::FileMetaData`] into this struct
+    pub fn try_from_thrift(
+        metadata: parquet_format_async_temp::FileMetaData,
+    ) -> Result<Self, Error> {
+        let schema_descr = SchemaDescriptor::try_from_thrift(&metadata.schema)?;
+
+        let row_groups = metadata
+            .row_groups
+            .into_iter()
+            .map(|rg| RowGroupMetaData::try_from_thrift(&schema_descr, rg))
+            .collect::<Result<Vec<_>, Error>>()?;
+
+        let column_orders = metadata
+            .column_orders
+            .map(|orders| parse_column_orders(&orders, &schema_descr));
+
+        Ok(FileMetaData {
+            version: metadata.version,
+            num_rows: metadata.num_rows.try_into()?,
+            created_by: metadata.created_by,
+            row_groups,
+            key_value_metadata: metadata.key_value_metadata,
+            schema_descr,
+            column_orders,
+        })
+    }
+
+    /// Serializes itself to thrift's [`parquet_format_async_temp::FileMetaData`].
+    pub fn into_thrift(self) -> parquet_format_async_temp::FileMetaData {
+        parquet_format_async_temp::FileMetaData {
             version: self.version,
-            schema: self.schema_descr.into_thrift()?,
+            schema: self.schema_descr.into_thrift(),
             num_rows: self.num_rows as i64,
             row_groups: self
                 .row_groups
@@ -93,6 +102,28 @@ impl FileMetaData {
             column_orders: None, // todo
             encryption_algorithm: None,
             footer_signing_key_metadata: None,
-        })
+        }
     }
+}
+
+/// Parses [`ColumnOrder`] from Thrift definition.
+fn parse_column_orders(
+    orders: &[TColumnOrder],
+    schema_descr: &SchemaDescriptor,
+) -> Vec<ColumnOrder> {
+    schema_descr
+        .columns()
+        .iter()
+        .zip(orders.iter())
+        .map(|(column, order)| match order {
+            TColumnOrder::TYPEORDER(_) => {
+                let sort_order = get_sort_order(
+                    &column.descriptor.primitive_type.logical_type,
+                    &column.descriptor.primitive_type.converted_type,
+                    &column.descriptor.primitive_type.physical_type,
+                );
+                ColumnOrder::TypeDefinedOrder(sort_order)
+            }
+        })
+        .collect()
 }
