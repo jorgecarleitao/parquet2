@@ -11,10 +11,14 @@ use parquet_format_async_temp::Encoding as ParquetEncoding;
 use parquet_format_async_temp::FieldRepetitionType;
 use parquet_format_async_temp::PageType as ParquetPageType;
 
+/// The repetition of a parquet field
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub enum Repetition {
+    /// When the field has no null values
     Required,
+    /// When the field may have null values
     Optional,
+    /// When the field may be repeated (list field)
     Repeated,
 }
 

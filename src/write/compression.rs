@@ -74,6 +74,13 @@ fn compress_dict(
     ))
 }
 
+/// Compresses an [`EncodedPage`] into a [`CompressedPage`] using `compressed_buffer` as the
+/// intermediary buffer.
+///
+/// `compressed_buffer` is taken by value because it becomes owned by [`CompressedPage`]
+///
+/// # Errors
+/// Errors if the compressor fails
 pub fn compress(
     page: EncodedPage,
     compressed_buffer: Vec<u8>,
@@ -99,10 +106,12 @@ pub struct Compressor<I: Iterator<Item = Result<EncodedPage>>> {
 }
 
 impl<I: Iterator<Item = Result<EncodedPage>>> Compressor<I> {
+    /// Creates a new [`Compressor`]
     pub fn new_from_vec(iter: I, compression: Compression, buffer: Vec<u8>) -> Self {
         Self::new(iter, compression, buffer)
     }
 
+    /// Creates a new [`Compressor`]
     pub fn new(iter: I, compression: Compression, buffer: Vec<u8>) -> Self {
         Self {
             iter,

@@ -104,6 +104,7 @@ pub enum State<T> {
     Finished(Vec<u8>),
 }
 
+/// A special kind of fallible streaming iterator where `advance` consumes the iterator.
 pub trait MutStreamingIterator: Sized {
     type Item;
     type Error;
@@ -132,6 +133,7 @@ pub struct ColumnIterator<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
+    /// Returns a new [`ColumnIterator`]
     pub fn new(
         reader: R,
         field: ParquetType,
@@ -198,6 +200,7 @@ pub struct ReadColumnIterator {
 }
 
 impl ReadColumnIterator {
+    /// Returns a new [`ReadColumnIterator`]
     pub fn new(
         field: ParquetType,
         chunks: Vec<(Vec<Result<CompressedDataPage>>, ColumnChunkMetaData)>,

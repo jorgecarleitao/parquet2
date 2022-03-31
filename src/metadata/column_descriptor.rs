@@ -1,5 +1,7 @@
 use crate::schema::types::{ParquetType, PrimitiveType};
 
+/// A descriptor of a parquet column. It contains the necessary information to deserialize
+/// a parquet column.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Descriptor {
     /// The [`PrimitiveType`] of this column
@@ -17,10 +19,10 @@ pub struct Descriptor {
 /// re-assemble nested data.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ColumnDescriptor {
-    // The descriptor this columns' leaf.
+    /// The descriptor this columns' leaf.
     pub descriptor: Descriptor,
 
-    // The path of this column. For instance, "a.b.c.d".
+    /// The path of this column. For instance, "a.b.c.d".
     pub path_in_schema: Vec<String>,
 
     /// The [`ParquetType`] this descriptor is a leaf of

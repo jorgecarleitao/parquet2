@@ -1,6 +1,8 @@
 use crate::FallibleStreamingIterator;
 
 /// [`DynIter`] is an implementation of a single-threaded, dynamically-typed iterator.
+///
+/// This implementation is object safe.
 pub struct DynIter<'a, V> {
     iter: Box<dyn Iterator<Item = V> + 'a + Send + Sync>,
 }
@@ -17,6 +19,7 @@ impl<'a, V> Iterator for DynIter<'a, V> {
 }
 
 impl<'a, V> DynIter<'a, V> {
+    /// Returns a new [`DynIter`], boxing the incoming iterator
     pub fn new<I>(iter: I) -> Self
     where
         I: Iterator<Item = V> + 'a + Send + Sync,
@@ -50,6 +53,7 @@ impl<'a, V, E> FallibleStreamingIterator for DynStreamingIterator<'a, V, E> {
 }
 
 impl<'a, V, E> DynStreamingIterator<'a, V, E> {
+    /// Returns a new [`DynStreamingIterator`], boxing the incoming iterator
     pub fn new<I>(iter: I) -> Self
     where
         I: FallibleStreamingIterator<Item = V, Error = E> + 'a + Send + Sync,

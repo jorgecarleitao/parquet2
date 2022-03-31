@@ -7,15 +7,21 @@ use super::{
     spec, FieldInfo, GroupConvertedType, LogicalType, PhysicalType, PrimitiveConvertedType,
 };
 
+/// The complete description of a parquet column
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PrimitiveType {
+    /// The fields' generic information
     pub field_info: FieldInfo,
+    /// The optional logical type
     pub logical_type: Option<LogicalType>,
+    /// The optional converted type
     pub converted_type: Option<PrimitiveConvertedType>,
+    /// The physical type
     pub physical_type: PhysicalType,
 }
 
 impl PrimitiveType {
+    /// Helper method to create an optional field with no logical or converted types.
     pub fn from_physical(name: String, physical_type: PhysicalType) -> Self {
         let field_info = FieldInfo {
             name,
@@ -31,10 +37,8 @@ impl PrimitiveType {
     }
 }
 
-/// Representation of a Parquet type.
-/// Used to describe primitive leaf fields and structs, including top-level schema.
-/// Note that the top-level schema type is represented using `GroupType` whose
-/// repetition is `None`.
+/// Representation of a Parquet type describing primitive and nested fields,
+/// including the top-level schema of the parquet file.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ParquetType {
     PrimitiveType(PrimitiveType),
@@ -167,6 +171,8 @@ impl ParquetType {
         }))
     }
 
+    /// Helper method to create a [`ParquetType::PrimitiveType`] optional field
+    /// with no logical or converted types.
     pub fn from_physical(name: String, physical_type: PhysicalType) -> Self {
         ParquetType::PrimitiveType(PrimitiveType::from_physical(name, physical_type))
     }

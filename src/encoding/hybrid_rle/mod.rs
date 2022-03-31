@@ -8,6 +8,7 @@ pub use encoder::{encode_bool, encode_u32};
 
 use super::bitpacking;
 
+/// The two possible states of an RLE-encoded run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HybridEncoded<'a> {
     /// A bitpacked slice. The consumer must know its bit-width to unpack it.
@@ -24,7 +25,7 @@ enum State<'a> {
     Rle(std::iter::Take<std::iter::Repeat<u32>>),
 }
 
-// Decoder of Hybrid-RLE encoded values.
+/// [`Iterator`] of [`u32`] from a byte slice of Hybrid-RLE encoded values
 #[derive(Debug, Clone)]
 pub struct HybridRleDecoder<'a> {
     decoder: Decoder<'a>,
@@ -58,6 +59,7 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
 }
 
 impl<'a> HybridRleDecoder<'a> {
+    /// Returns a new [`HybridRleDecoder`]
     pub fn new(data: &'a [u8], num_bits: u32, num_values: usize) -> Self {
         let mut decoder = Decoder::new(data, num_bits);
         let state = read_next(&mut decoder, num_values);

@@ -32,6 +32,7 @@ pub struct CompressedDataPage {
 }
 
 impl CompressedDataPage {
+    /// Returns a new [`CompressedDataPage`].
     pub fn new(
         header: DataPageHeader,
         buffer: Vec<u8>,

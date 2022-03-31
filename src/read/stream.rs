@@ -23,6 +23,7 @@ async fn stream_len(
     Ok(len)
 }
 
+/// Asynchronously reads the files' metadata
 pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>(
     reader: &mut R,
 ) -> Result<FileMetaData> {
