@@ -1,15 +1,21 @@
 // Bridges structs from thrift-generated code to rust enums.
 use std::convert::TryFrom;
-use std::convert::TryInto;
 
-use crate::error::Error;
 use parquet_format_async_temp::BoundaryOrder as ParquetBoundaryOrder;
 use parquet_format_async_temp::CompressionCodec;
 use parquet_format_async_temp::DataPageHeader;
 use parquet_format_async_temp::DataPageHeaderV2;
+use parquet_format_async_temp::DecimalType;
 use parquet_format_async_temp::Encoding as ParquetEncoding;
 use parquet_format_async_temp::FieldRepetitionType;
+use parquet_format_async_temp::IntType;
+use parquet_format_async_temp::LogicalType as ParquetLogicalType;
 use parquet_format_async_temp::PageType as ParquetPageType;
+use parquet_format_async_temp::TimeType;
+use parquet_format_async_temp::TimeUnit as ParquetTimeUnit;
+use parquet_format_async_temp::TimestampType;
+
+use crate::error::Error;
 
 /// The repetition of a parquet field
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
@@ -270,5 +276,207 @@ impl DataPageHeaderExt for DataPageHeaderV2 {
 
     fn definition_level_encoding(&self) -> Encoding {
         Encoding::Rle
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TimeUnit {
+    Milliseconds,
+    Microseconds,
+    Nanoseconds,
+}
+
+impl From<ParquetTimeUnit> for TimeUnit {
+    fn from(encoding: ParquetTimeUnit) -> Self {
+        match encoding {
+            ParquetTimeUnit::MILLIS(_) => TimeUnit::Milliseconds,
+            ParquetTimeUnit::MICROS(_) => TimeUnit::Microseconds,
+            ParquetTimeUnit::NANOS(_) => TimeUnit::Nanoseconds,
+        }
+    }
+}
+
+impl From<TimeUnit> for ParquetTimeUnit {
+    fn from(unit: TimeUnit) -> Self {
+        match unit {
+            TimeUnit::Milliseconds => ParquetTimeUnit::MILLIS(Default::default()),
+            TimeUnit::Microseconds => ParquetTimeUnit::MICROS(Default::default()),
+            TimeUnit::Nanoseconds => ParquetTimeUnit::NANOS(Default::default()),
+        }
+    }
+}
+
+/// Enum of all valid logical integer types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IntegerType {
+    Int8,
+    Int16,
+    Int32,
+    Int64,
+    UInt8,
+    UInt16,
+    UInt32,
+    UInt64,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PrimitiveLogicalType {
+    String,
+    Enum,
+    Decimal(usize, usize),
+    Date,
+    Time {
+        unit: TimeUnit,
+        is_adjusted_to_utc: bool,
+    },
+    Timestamp {
+        unit: TimeUnit,
+        is_adjusted_to_utc: bool,
+    },
+    Integer(IntegerType),
+    Unknown,
+    Json,
+    Bson,
+    Uuid,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum GroupLogicalType {
+    Map,
+    List,
+}
+
+impl From<GroupLogicalType> for ParquetLogicalType {
+    fn from(type_: GroupLogicalType) -> Self {
+        match type_ {
+            GroupLogicalType::Map => ParquetLogicalType::MAP(Default::default()),
+            GroupLogicalType::List => ParquetLogicalType::LIST(Default::default()),
+        }
+    }
+}
+
+impl From<(i32, bool)> for IntegerType {
+    fn from((bit_width, is_signed): (i32, bool)) -> Self {
+        match (bit_width, is_signed) {
+            (8, true) => IntegerType::Int8,
+            (16, true) => IntegerType::Int16,
+            (32, true) => IntegerType::Int32,
+            (64, true) => IntegerType::Int64,
+            (8, false) => IntegerType::UInt8,
+            (16, false) => IntegerType::UInt16,
+            (32, false) => IntegerType::UInt32,
+            (64, false) => IntegerType::UInt64,
+            // The above are the only possible annotations for parquet's int32. Anything else
+            // is a deviation to the parquet specification and we ignore
+            _ => IntegerType::Int32,
+        }
+    }
+}
+
+impl From<IntegerType> for (usize, bool) {
+    fn from(type_: IntegerType) -> (usize, bool) {
+        match type_ {
+            IntegerType::Int8 => (8, true),
+            IntegerType::Int16 => (16, true),
+            IntegerType::Int32 => (32, true),
+            IntegerType::Int64 => (64, true),
+            IntegerType::UInt8 => (8, false),
+            IntegerType::UInt16 => (16, false),
+            IntegerType::UInt32 => (32, false),
+            IntegerType::UInt64 => (64, false),
+        }
+    }
+}
+
+impl TryFrom<ParquetLogicalType> for PrimitiveLogicalType {
+    type Error = Error;
+
+    fn try_from(type_: ParquetLogicalType) -> Result<Self, Self::Error> {
+        Ok(match type_ {
+            ParquetLogicalType::STRING(_) => PrimitiveLogicalType::String,
+            ParquetLogicalType::ENUM(_) => PrimitiveLogicalType::Enum,
+            ParquetLogicalType::DECIMAL(decimal) => PrimitiveLogicalType::Decimal(
+                decimal.precision.try_into()?,
+                decimal.scale.try_into()?,
+            ),
+            ParquetLogicalType::DATE(_) => PrimitiveLogicalType::Date,
+            ParquetLogicalType::TIME(time) => PrimitiveLogicalType::Time {
+                unit: time.unit.into(),
+                is_adjusted_to_utc: time.is_adjusted_to_u_t_c,
+            },
+            ParquetLogicalType::TIMESTAMP(time) => PrimitiveLogicalType::Timestamp {
+                unit: time.unit.into(),
+                is_adjusted_to_utc: time.is_adjusted_to_u_t_c,
+            },
+            ParquetLogicalType::INTEGER(int) => {
+                PrimitiveLogicalType::Integer((int.bit_width as i32, int.is_signed).into())
+            }
+            ParquetLogicalType::UNKNOWN(_) => PrimitiveLogicalType::Unknown,
+            ParquetLogicalType::JSON(_) => PrimitiveLogicalType::Json,
+            ParquetLogicalType::BSON(_) => PrimitiveLogicalType::Bson,
+            ParquetLogicalType::UUID(_) => PrimitiveLogicalType::Uuid,
+            _ => {
+                return Err(Error::OutOfSpec(
+                    "LogicalType value out of range".to_string(),
+                ))
+            }
+        })
+    }
+}
+
+impl TryFrom<ParquetLogicalType> for GroupLogicalType {
+    type Error = Error;
+
+    fn try_from(type_: ParquetLogicalType) -> Result<Self, Self::Error> {
+        Ok(match type_ {
+            ParquetLogicalType::LIST(_) => GroupLogicalType::List,
+            ParquetLogicalType::MAP(_) => GroupLogicalType::Map,
+            _ => {
+                return Err(Error::OutOfSpec(
+                    "LogicalType value out of range".to_string(),
+                ))
+            }
+        })
+    }
+}
+
+impl From<PrimitiveLogicalType> for ParquetLogicalType {
+    fn from(type_: PrimitiveLogicalType) -> Self {
+        match type_ {
+            PrimitiveLogicalType::String => ParquetLogicalType::STRING(Default::default()),
+            PrimitiveLogicalType::Enum => ParquetLogicalType::ENUM(Default::default()),
+            PrimitiveLogicalType::Decimal(precision, scale) => {
+                ParquetLogicalType::DECIMAL(DecimalType {
+                    precision: precision as i32,
+                    scale: scale as i32,
+                })
+            }
+            PrimitiveLogicalType::Date => ParquetLogicalType::DATE(Default::default()),
+            PrimitiveLogicalType::Time {
+                unit,
+                is_adjusted_to_utc,
+            } => ParquetLogicalType::TIME(TimeType {
+                unit: unit.into(),
+                is_adjusted_to_u_t_c: is_adjusted_to_utc,
+            }),
+            PrimitiveLogicalType::Timestamp {
+                unit,
+                is_adjusted_to_utc,
+            } => ParquetLogicalType::TIMESTAMP(TimestampType {
+                unit: unit.into(),
+                is_adjusted_to_u_t_c: is_adjusted_to_utc,
+            }),
+            PrimitiveLogicalType::Integer(integer) => {
+                let (bit_width, is_signed) = integer.into();
+                ParquetLogicalType::INTEGER(IntType {
+                    bit_width: bit_width as i8,
+                    is_signed,
+                })
+            }
+            PrimitiveLogicalType::Unknown => ParquetLogicalType::UNKNOWN(Default::default()),
+            PrimitiveLogicalType::Json => ParquetLogicalType::JSON(Default::default()),
+            PrimitiveLogicalType::Bson => ParquetLogicalType::BSON(Default::default()),
+            PrimitiveLogicalType::Uuid => ParquetLogicalType::UUID(Default::default()),
+        }
     }
 }

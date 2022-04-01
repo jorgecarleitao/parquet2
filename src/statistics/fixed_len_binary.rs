@@ -33,18 +33,18 @@ impl Statistics for FixedLenStatistics {
 
 pub fn read(
     v: &ParquetStatistics,
-    size: i32,
+    size: usize,
     primitive_type: PrimitiveType,
 ) -> Result<Arc<dyn Statistics>> {
     if let Some(ref v) = v.max_value {
-        if v.len() != size as usize {
+        if v.len() != size {
             return Err(Error::OutOfSpec(
                 "The max_value of statistics MUST be plain encoded".to_string(),
             ));
         }
     };
     if let Some(ref v) = v.min_value {
-        if v.len() != size as usize {
+        if v.len() != size {
             return Err(Error::OutOfSpec(
                 "The min_value of statistics MUST be plain encoded".to_string(),
             ));

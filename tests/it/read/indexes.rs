@@ -5,7 +5,9 @@ use parquet2::{
     },
     read::{read_columns_indexes, read_metadata, read_pages_locations},
     schema::{
-        types::{FieldInfo, LogicalType, PhysicalType, PrimitiveConvertedType, PrimitiveType},
+        types::{
+            FieldInfo, PhysicalType, PrimitiveConvertedType, PrimitiveLogicalType, PrimitiveType,
+        },
         Repetition,
     },
 };
@@ -94,7 +96,7 @@ fn test() -> Result<(), Error> {
                     repetition: Repetition::Optional,
                     id: None,
                 },
-                logical_type: Some(LogicalType::STRING(Default::default())),
+                logical_type: Some(PrimitiveLogicalType::String),
                 converted_type: Some(PrimitiveConvertedType::Utf8),
                 physical_type: PhysicalType::ByteArray,
             },

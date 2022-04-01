@@ -1,6 +1,8 @@
-use super::Type;
-use crate::error::{Error, Result};
+use parquet_format_async_temp::Type;
 
+use crate::error::Error;
+
+/// The set of all physical types representable in Parquet
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PhysicalType {
     Boolean,
@@ -10,36 +12,44 @@ pub enum PhysicalType {
     Float,
     Double,
     ByteArray,
-    FixedLenByteArray(i32),
+    FixedLenByteArray(usize),
 }
 
-pub fn type_to_physical_type(type_: &Type, length: Option<i32>) -> Result<PhysicalType> {
-    Ok(match *type_ {
-        Type::BOOLEAN => PhysicalType::Boolean,
-        Type::INT32 => PhysicalType::Int32,
-        Type::INT64 => PhysicalType::Int64,
-        Type::INT96 => PhysicalType::Int96,
-        Type::FLOAT => PhysicalType::Float,
-        Type::DOUBLE => PhysicalType::Double,
-        Type::BYTE_ARRAY => PhysicalType::ByteArray,
-        Type::FIXED_LEN_BYTE_ARRAY => {
-            let length = length
-                .ok_or_else(|| general_err!("Length must be defined for FixedLenByteArray"))?;
-            PhysicalType::FixedLenByteArray(length)
+impl TryFrom<(Type, Option<i32>)> for PhysicalType {
+    type Error = Error;
+
+    fn try_from((type_, length): (Type, Option<i32>)) -> Result<Self, Self::Error> {
+        Ok(match type_ {
+            Type::BOOLEAN => PhysicalType::Boolean,
+            Type::INT32 => PhysicalType::Int32,
+            Type::INT64 => PhysicalType::Int64,
+            Type::INT96 => PhysicalType::Int96,
+            Type::FLOAT => PhysicalType::Float,
+            Type::DOUBLE => PhysicalType::Double,
+            Type::BYTE_ARRAY => PhysicalType::ByteArray,
+            Type::FIXED_LEN_BYTE_ARRAY => {
+                let length = length
+                    .ok_or_else(|| general_err!("Length must be defined for FixedLenByteArray"))?;
+                PhysicalType::FixedLenByteArray(length.try_into()?)
+            }
+            _ => return Err(general_err!("Type out of length")),
+        })
+    }
+}
+
+impl From<PhysicalType> for (Type, Option<i32>) {
+    fn from(physical_type: PhysicalType) -> Self {
+        match physical_type {
+            PhysicalType::Boolean => (Type::BOOLEAN, None),
+            PhysicalType::Int32 => (Type::INT32, None),
+            PhysicalType::Int64 => (Type::INT64, None),
+            PhysicalType::Int96 => (Type::INT96, None),
+            PhysicalType::Float => (Type::FLOAT, None),
+            PhysicalType::Double => (Type::DOUBLE, None),
+            PhysicalType::ByteArray => (Type::BYTE_ARRAY, None),
+            PhysicalType::FixedLenByteArray(length) => {
+                (Type::FIXED_LEN_BYTE_ARRAY, Some(length as i32))
+            }
         }
-        _ => unreachable!(),
-    })
-}
-
-pub fn physical_type_to_type(physical_type: &PhysicalType) -> (Type, Option<i32>) {
-    match physical_type {
-        PhysicalType::Boolean => (Type::BOOLEAN, None),
-        PhysicalType::Int32 => (Type::INT32, None),
-        PhysicalType::Int64 => (Type::INT64, None),
-        PhysicalType::Int96 => (Type::INT96, None),
-        PhysicalType::Float => (Type::FLOAT, None),
-        PhysicalType::Double => (Type::DOUBLE, None),
-        PhysicalType::ByteArray => (Type::BYTE_ARRAY, None),
-        PhysicalType::FixedLenByteArray(length) => (Type::FIXED_LEN_BYTE_ARRAY, Some(*length)),
     }
 }

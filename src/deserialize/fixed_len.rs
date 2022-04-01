@@ -68,7 +68,7 @@ impl<'a> FixedLenBinaryPageState<'a> {
         let size: usize = if let PhysicalType::FixedLenByteArray(size) =
             page.descriptor.primitive_type.physical_type
         {
-            size.try_into()?
+            size
         } else {
             return Err(Error::General(
                 "FixedLenBinaryPageState must be initialized by pages of FixedLenByteArray"

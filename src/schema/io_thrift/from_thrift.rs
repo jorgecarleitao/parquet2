@@ -1,13 +1,11 @@
-use std::convert::TryInto;
-
 use parquet_format_async_temp::SchemaElement;
 
-use crate::error::{Error, Result};
-
-use super::super::types::{
-    converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,
-    ParquetType,
+use crate::{
+    error::{Error, Result},
+    schema::types::FieldInfo,
 };
+
+use super::super::types::ParquetType;
 
 impl ParquetType {
     /// Method to convert from Thrift.
@@ -42,10 +40,8 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
     let element = &elements[index];
     let name = element.name.clone();
     let converted_type = element.converted_type;
-    // LogicalType is only present in v2 Parquet files. ConvertedType is always
-    // populated, regardless of the version of the file (v1 or v2).
-    let logical_type = &element.logical_type;
-    let field_id = element.field_id;
+
+    let id = element.field_id;
     match element.num_children {
         // From parquet-format:
         //   The children count is used to construct the nested relationship.
@@ -64,11 +60,9 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
             let physical_type = element.type_.ok_or_else(|| {
                 general_err!("Physical type must be defined for a primitive type")
             })?;
-            let length = element.type_length;
-            let physical_type = type_to_physical_type(&physical_type, length)?;
 
-            let converted_type = match converted_type {
-                Some(converted_type) => Some({
+            let converted_type = converted_type
+                .map(|converted_type| {
                     let maybe_decimal = match (element.precision, element.scale) {
                         (Some(precision), Some(scale)) => Some((precision, scale)),
                         (None, None) => None,
@@ -78,18 +72,23 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
                             ))
                         }
                     };
-                    converted_to_primitive_converted(&converted_type, maybe_decimal)?
-                }),
-                None => None,
-            };
+                    (converted_type, maybe_decimal).try_into()
+                })
+                .transpose()?;
+
+            let logical_type = element
+                .logical_type
+                .clone()
+                .map(|x| x.try_into())
+                .transpose()?;
 
             let tp = ParquetType::try_from_primitive(
                 name,
-                physical_type,
+                (physical_type, element.type_length).try_into()?,
                 repetition,
                 converted_type,
-                logical_type.clone(),
-                field_id,
+                logical_type,
+                id,
             )?;
 
             Ok((index + 1, tp))
@@ -110,15 +109,28 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
                     repetition.try_into()?
                 } else {
                     return Err(Error::OutOfSpec(
-                        "The repetition level of a non-root must be non-null allowed".to_string(),
+                        "The repetition level of a non-root must be non-null".to_string(),
                     ));
                 };
 
-                let converted_type = match converted_type {
-                    Some(converted_type) => Some(converted_to_group_converted(&converted_type)?),
-                    None => None,
-                };
-                ParquetType::from_converted(name, fields, repetition, converted_type, field_id)
+                let converted_type = converted_type.map(|x| x.try_into()).transpose()?;
+
+                let logical_type = element
+                    .logical_type
+                    .clone()
+                    .map(|x| x.try_into())
+                    .transpose()?;
+
+                ParquetType::GroupType {
+                    field_info: FieldInfo {
+                        name,
+                        repetition,
+                        id,
+                    },
+                    fields,
+                    converted_type,
+                    logical_type,
+                }
             };
             Ok((next_index, tp))
         }

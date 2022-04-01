@@ -1,11 +1,8 @@
-use parquet_format_async_temp::SchemaElement;
+use parquet_format_async_temp::{ConvertedType, SchemaElement};
 
 use crate::schema::types::PrimitiveType;
 
-use super::super::types::{
-    group_converted_converted_to, physical_type_to_type, primitive_converted_to_converted,
-    ParquetType,
-};
+use super::super::types::ParquetType;
 
 impl ParquetType {
     /// Method to convert to Thrift.
@@ -26,12 +23,10 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>, is_
             converted_type,
             physical_type,
         }) => {
-            let (type_, type_length) = physical_type_to_type(physical_type);
-            let converted_type = converted_type
-                .as_ref()
-                .map(primitive_converted_to_converted);
+            let (type_, type_length) = (*physical_type).into();
             let (converted_type, maybe_decimal) = converted_type
-                .map(|x| (Some(x.0), x.1))
+                .map(|x| x.into())
+                .map(|x: (ConvertedType, Option<(i32, i32)>)| (Some(x.0), x.1))
                 .unwrap_or((None, None));
 
             let element = SchemaElement {
@@ -44,7 +39,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>, is_
                 precision: maybe_decimal.map(|x| x.0),
                 scale: maybe_decimal.map(|x| x.1),
                 field_id: field_info.id,
-                logical_type: logical_type.clone(),
+                logical_type: logical_type.map(|x| x.into()),
             };
 
             elements.push(element);
@@ -55,7 +50,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>, is_
             logical_type,
             converted_type,
         } => {
-            let converted_type = converted_type.as_ref().map(group_converted_converted_to);
+            let converted_type = converted_type.map(|x| x.into());
 
             let repetition_type = if is_root {
                 // https://github.com/apache/parquet-format/blob/7f06e838cbd1b7dbd722ff2580b9c2525e37fc46/src/main/thrift/parquet.thrift#L363
@@ -74,7 +69,7 @@ fn to_thrift_helper(schema: &ParquetType, elements: &mut Vec<SchemaElement>, is_
                 scale: None,
                 precision: None,
                 field_id: field_info.id,
-                logical_type: logical_type.clone(),
+                logical_type: logical_type.map(|x| x.into()),
             };
 
             elements.push(element);

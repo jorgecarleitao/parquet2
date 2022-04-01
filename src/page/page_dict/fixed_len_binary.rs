@@ -49,11 +49,11 @@ fn read_plain(bytes: &[u8], size: usize, length: usize) -> Vec<u8> {
     bytes[..size * length].to_vec()
 }
 
-pub fn read(buf: &[u8], size: i32, num_values: usize) -> Result<Arc<dyn DictPage>> {
-    let values = read_plain(buf, size as usize, num_values);
+pub fn read(buf: &[u8], size: usize, num_values: usize) -> Result<Arc<dyn DictPage>> {
+    let values = read_plain(buf, size, num_values);
     Ok(Arc::new(FixedLenByteArrayPageDict::new(
         values,
         PhysicalType::FixedLenByteArray(size),
-        size as usize,
+        size,
     )))
 }

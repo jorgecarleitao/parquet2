@@ -4,7 +4,8 @@ use std::collections::HashMap;
 
 use super::super::Repetition;
 use super::{
-    spec, FieldInfo, GroupConvertedType, LogicalType, PhysicalType, PrimitiveConvertedType,
+    spec, FieldInfo, GroupConvertedType, GroupLogicalType, PhysicalType, PrimitiveConvertedType,
+    PrimitiveLogicalType,
 };
 
 /// The complete description of a parquet column
@@ -13,7 +14,7 @@ pub struct PrimitiveType {
     /// The fields' generic information
     pub field_info: FieldInfo,
     /// The optional logical type
-    pub logical_type: Option<LogicalType>,
+    pub logical_type: Option<PrimitiveLogicalType>,
     /// The optional converted type
     pub converted_type: Option<PrimitiveConvertedType>,
     /// The physical type
@@ -44,7 +45,7 @@ pub enum ParquetType {
     PrimitiveType(PrimitiveType),
     GroupType {
         field_info: FieldInfo,
-        logical_type: Option<LogicalType>,
+        logical_type: Option<GroupLogicalType>,
         converted_type: Option<GroupConvertedType>,
         fields: Vec<ParquetType>,
     },
@@ -151,7 +152,7 @@ impl ParquetType {
         physical_type: PhysicalType,
         repetition: Repetition,
         converted_type: Option<PrimitiveConvertedType>,
-        logical_type: Option<LogicalType>,
+        logical_type: Option<PrimitiveLogicalType>,
         id: Option<i32>,
     ) -> Result<Self> {
         spec::check_converted_invariants(&physical_type, &converted_type)?;
@@ -181,7 +182,7 @@ impl ParquetType {
         name: String,
         repetition: Repetition,
         converted_type: Option<GroupConvertedType>,
-        logical_type: Option<LogicalType>,
+        logical_type: Option<GroupLogicalType>,
         fields: Vec<ParquetType>,
         id: Option<i32>,
     ) -> Self {

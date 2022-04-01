@@ -1,12 +1,12 @@
 // see https://github.com/apache/parquet-format/blob/master/LogicalTypes.md
 use crate::error::{Error, Result};
 
-use super::{LogicalType, PhysicalType, PrimitiveConvertedType, TimeType, TimeUnit};
+use super::{IntegerType, PhysicalType, PrimitiveConvertedType, PrimitiveLogicalType, TimeUnit};
 
 fn check_decimal_invariants(
     physical_type: &PhysicalType,
-    precision: i32,
-    scale: i32,
+    precision: usize,
+    scale: usize,
 ) -> Result<()> {
     if precision < 1 {
         return Err(general_err!(
@@ -41,7 +41,8 @@ fn check_decimal_invariants(
             }
         }
         PhysicalType::FixedLenByteArray(length) => {
-            let max_precision = (2f64.powi(8 * length - 1) - 1f64).log10().floor() as i32;
+            let max_precision =
+                (2f64.powi(8 * (*length as i32) - 1) - 1f64).log10().floor() as usize;
 
             if precision > max_precision {
                 return Err(general_err!(
@@ -113,49 +114,47 @@ pub fn check_converted_invariants(
 
 pub fn check_logical_invariants(
     physical_type: &PhysicalType,
-    logical_type: &Option<LogicalType>,
+    logical_type: &Option<PrimitiveLogicalType>,
 ) -> Result<()> {
-    use parquet_format_async_temp::LogicalType::*;
     if logical_type.is_none() {
         return Ok(());
     };
-    let logical_type = logical_type.as_ref().unwrap();
+    let logical_type = logical_type.unwrap();
 
     // Check that logical type and physical type are compatible
+    use PrimitiveLogicalType::*;
     match (logical_type, physical_type) {
-        (MAP(_), _) | (LIST(_), _) => {
-            return Err(general_err!(
-                "{:?} cannot be applied to a primitive type",
-                logical_type
-            ));
+        (Enum, PhysicalType::ByteArray) => {}
+        (Decimal(precision, scale), _) => {
+            check_decimal_invariants(physical_type, precision, scale)?;
         }
-        (ENUM(_), PhysicalType::ByteArray) => {}
-        (DECIMAL(t), _) => {
-            check_decimal_invariants(physical_type, t.precision, t.scale)?;
-        }
-        (DATE(_), PhysicalType::Int32) => {}
+        (Date, PhysicalType::Int32) => {}
         (
-            TIME(TimeType {
-                unit: TimeUnit::MILLIS(_),
+            Time {
+                unit: TimeUnit::Milliseconds,
                 ..
-            }),
+            },
             PhysicalType::Int32,
         ) => {}
-        (TIME(t), PhysicalType::Int64) => {
-            if t.unit == TimeUnit::MILLIS(Default::default()) {
+        (Time { unit, .. }, PhysicalType::Int64) => {
+            if unit == TimeUnit::Milliseconds {
                 return Err(general_err!("Cannot use millisecond unit on INT64 type"));
             }
         }
-        (TIMESTAMP(_), PhysicalType::Int64) => {}
-        (INTEGER(t), PhysicalType::Int32) if t.bit_width <= 32 => {}
-        (INTEGER(t), PhysicalType::Int64) if t.bit_width == 64 => {}
+        (Timestamp { .. }, PhysicalType::Int64) => {}
+        (Integer(IntegerType::Int8), PhysicalType::Int32) => {}
+        (Integer(IntegerType::Int16), PhysicalType::Int32) => {}
+        (Integer(IntegerType::Int32), PhysicalType::Int32) => {}
+        (Integer(IntegerType::UInt8), PhysicalType::Int32) => {}
+        (Integer(IntegerType::UInt16), PhysicalType::Int32) => {}
+        (Integer(IntegerType::UInt32), PhysicalType::Int32) => {}
+        (Integer(IntegerType::UInt64), PhysicalType::Int64) => {}
+        (Integer(IntegerType::Int64), PhysicalType::Int64) => {}
         // Null type
-        (UNKNOWN(_), PhysicalType::Int32) => {}
-        (STRING(_), PhysicalType::ByteArray) => {}
-        (JSON(_), PhysicalType::ByteArray) => {}
-        (BSON(_), PhysicalType::ByteArray) => {}
+        (Unknown, PhysicalType::Int32) => {}
+        (String | Json | Bson, PhysicalType::ByteArray) => {}
         // https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#uuid
-        (UUID(_), PhysicalType::FixedLenByteArray(16)) => {}
+        (Uuid, PhysicalType::FixedLenByteArray(16)) => {}
         (a, b) => return Err(general_err!("Cannot annotate {:?} from {:?} fields", a, b)),
     };
     Ok(())
