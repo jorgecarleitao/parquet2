@@ -198,3 +198,40 @@ impl From<PrimitiveConvertedType> for (ConvertedType, Option<(i32, i32)>) {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trip() -> Result<(), Error> {
+        use PrimitiveConvertedType::*;
+        let a = vec![
+            Utf8,
+            Enum,
+            Decimal(3, 1),
+            Date,
+            TimeMillis,
+            TimeMicros,
+            TimestampMillis,
+            TimestampMicros,
+            Uint8,
+            Uint16,
+            Uint32,
+            Uint64,
+            Int8,
+            Int16,
+            Int32,
+            Int64,
+            Json,
+            Bson,
+            Interval,
+        ];
+        for a in a {
+            let (c, d): (ConvertedType, Option<(i32, i32)>) = a.into();
+            let e: PrimitiveConvertedType = (c, d).try_into()?;
+            assert_eq!(e, a);
+        }
+        Ok(())
+    }
+}

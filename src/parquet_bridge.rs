@@ -480,3 +480,72 @@ impl From<PrimitiveLogicalType> for ParquetLogicalType {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trip_primitive() -> Result<(), Error> {
+        use PrimitiveLogicalType::*;
+        let a = vec![
+            String,
+            Enum,
+            Decimal(3, 1),
+            Date,
+            Time {
+                unit: TimeUnit::Milliseconds,
+                is_adjusted_to_utc: true,
+            },
+            Timestamp {
+                unit: TimeUnit::Milliseconds,
+                is_adjusted_to_utc: true,
+            },
+            Integer(IntegerType::Int16),
+            Unknown,
+            Json,
+            Bson,
+            Uuid,
+        ];
+        for a in a {
+            let c: ParquetLogicalType = a.into();
+            let e: PrimitiveLogicalType = c.try_into()?;
+            assert_eq!(e, a);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn round_trip_encoding() -> Result<(), Error> {
+        use Encoding::*;
+        let a = vec![
+            Plain,
+            PlainDictionary,
+            Rle,
+            BitPacked,
+            DeltaBinaryPacked,
+            DeltaLengthByteArray,
+            DeltaByteArray,
+            RleDictionary,
+            ByteStreamSplit,
+        ];
+        for a in a {
+            let c: ParquetEncoding = a.into();
+            let e: Encoding = c.try_into()?;
+            assert_eq!(e, a);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn round_compression() -> Result<(), Error> {
+        use Compression::*;
+        let a = vec![Uncompressed, Snappy, Gzip, Lzo, Brotli, Lz4, Zstd, Lz4Raw];
+        for a in a {
+            let c: CompressionCodec = a.into();
+            let e: Compression = c.try_into()?;
+            assert_eq!(e, a);
+        }
+        Ok(())
+    }
+}
