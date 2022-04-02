@@ -12,8 +12,8 @@ pub struct PrimitiveStatistics<T: types::NativeType> {
     pub primitive_type: PrimitiveType,
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
-    pub max_value: Option<T>,
     pub min_value: Option<T>,
+    pub max_value: Option<T>,
 }
 
 impl<T: types::NativeType> Statistics for PrimitiveStatistics<T> {
