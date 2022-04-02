@@ -5,6 +5,7 @@ use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 
 use crate::compression::Compression;
 use crate::error::Result;
+use crate::indexes::Interval;
 use crate::metadata::{ColumnChunkMetaData, Descriptor};
 
 use crate::page::{
@@ -181,7 +182,7 @@ pub(super) fn finish_page(
     compression: Compression,
     current_dictionary: &Option<Arc<dyn DictPage>>,
     descriptor: &Descriptor,
-    rows: Option<(usize, usize)>,
+    selected_rows: Option<Vec<Interval>>,
 ) -> Result<FinishedPage> {
     let type_ = page_header.type_.try_into()?;
     match type_ {
@@ -207,27 +208,27 @@ pub(super) fn finish_page(
         PageType::DataPage => {
             let header = page_header.data_page_header.unwrap();
 
-            Ok(FinishedPage::Data(CompressedDataPage::new(
+            Ok(FinishedPage::Data(CompressedDataPage::new_read(
                 DataPageHeader::V1(header),
                 std::mem::take(data),
                 compression,
                 page_header.uncompressed_page_size as usize,
                 current_dictionary.clone(),
                 descriptor.clone(),
-                rows,
+                selected_rows,
             )))
         }
         PageType::DataPageV2 => {
             let header = page_header.data_page_header_v2.unwrap();
 
-            Ok(FinishedPage::Data(CompressedDataPage::new(
+            Ok(FinishedPage::Data(CompressedDataPage::new_read(
                 DataPageHeader::V2(header),
                 std::mem::take(data),
                 compression,
                 page_header.uncompressed_page_size as usize,
                 current_dictionary.clone(),
                 descriptor.clone(),
-                rows,
+                selected_rows,
             )))
         }
     }

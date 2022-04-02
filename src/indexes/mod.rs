@@ -76,16 +76,17 @@ mod tests {
         assert_eq!(
             pages,
             vec![
-                FilteredPage::Skip {
+                FilteredPage {
                     start: 100,
                     length: 10,
+                    selected_rows: vec![],
                     num_rows: 5
                 },
-                FilteredPage::Select {
+                FilteredPage {
                     start: 110,
                     length: 20,
-                    rows_offset: 0,
-                    rows_length: 5
+                    selected_rows: vec![Interval::new(0, 5)],
+                    num_rows: 5
                 }
             ]
         );
@@ -114,15 +115,16 @@ mod tests {
         assert_eq!(
             pages,
             vec![
-                FilteredPage::Select {
+                FilteredPage {
                     start: 100,
                     length: 20,
-                    rows_offset: 5,
-                    rows_length: 5
+                    selected_rows: vec![Interval::new(5, 5)],
+                    num_rows: 10,
                 },
-                FilteredPage::Skip {
+                FilteredPage {
                     start: 120,
                     length: 20,
+                    selected_rows: vec![],
                     num_rows: 90
                 },
             ]
@@ -158,21 +160,22 @@ mod tests {
         assert_eq!(
             pages,
             vec![
-                FilteredPage::Select {
+                FilteredPage {
                     start: 100,
                     length: 20,
-                    rows_offset: 5,
-                    rows_length: 5
+                    selected_rows: vec![Interval::new(5, 5)],
+                    num_rows: 10,
                 },
-                FilteredPage::Select {
+                FilteredPage {
                     start: 120,
                     length: 20,
-                    rows_offset: 0,
-                    rows_length: 1
+                    selected_rows: vec![Interval::new(0, 1)],
+                    num_rows: 90,
                 },
-                FilteredPage::Skip {
+                FilteredPage {
                     start: 140,
                     length: 20,
+                    selected_rows: vec![],
                     num_rows: 100
                 },
             ]
@@ -208,20 +211,22 @@ mod tests {
         assert_eq!(
             pages,
             vec![
-                FilteredPage::Select {
+                FilteredPage {
                     start: 100,
                     length: 20,
-                    rows_offset: 0,
-                    rows_length: 1
+                    selected_rows: vec![Interval::new(0, 1)],
+                    num_rows: 10,
                 },
-                FilteredPage::Skip {
+                FilteredPage {
                     start: 120,
                     length: 20,
+                    selected_rows: vec![],
                     num_rows: 90
                 },
-                FilteredPage::Skip {
+                FilteredPage {
                     start: 140,
                     length: 20,
+                    selected_rows: vec![],
                     num_rows: 100
                 },
             ]

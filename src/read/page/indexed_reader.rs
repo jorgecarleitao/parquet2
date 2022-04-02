@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     error::Error,
-    indexes::FilteredPage,
+    indexes::{FilteredPage, Interval},
     metadata::{ColumnChunkMetaData, Descriptor},
     page::{CompressedDataPage, DictPage, ParquetPageHeader},
     parquet_bridge::Compression,
@@ -115,7 +115,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         // the column
         let dictionary = match pages.get(0) {
             Some(page) => {
-                let length = (page.start() - column_start) as usize;
+                let length = (page.start - column_start) as usize;
                 if length > 0 {
                     Some(LazyDict::Range(column_start, length))
                 } else {
@@ -146,7 +146,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         &mut self,
         start: u64,
         length: usize,
-        rows: (usize, usize),
+        selected_rows: Vec<Interval>,
     ) -> Result<FinishedPage, Error> {
         // it will be read - take buffer
         let mut data = std::mem::take(&mut self.data_buffer);
@@ -187,7 +187,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
             self.compression,
             &dict,
             &self.descriptor,
-            Some(rows),
+            Some(selected_rows),
         )
     }
 }
@@ -197,25 +197,19 @@ impl<R: Read + Seek> Iterator for IndexedPageReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(page) = self.pages.pop_front() {
-            match page {
-                FilteredPage::Select {
-                    start,
-                    length,
-                    rows_offset,
-                    rows_length,
-                } => {
-                    let page = match self.read_page(start, length, (rows_offset, rows_length)) {
-                        Err(e) => return Some(Err(e)),
-                        Ok(header) => header,
-                    };
-                    match page {
-                        FinishedPage::Data(page) => Some(Ok(page)),
-                        FinishedPage::Dict(_) => Some(Err(Error::OutOfSpec(
-                            "Dictionary pages cannot be selected via indexes".to_string(),
-                        ))),
-                    }
+            if page.selected_rows.is_empty() {
+                self.next()
+            } else {
+                let page = match self.read_page(page.start, page.length, page.selected_rows) {
+                    Err(e) => return Some(Err(e)),
+                    Ok(header) => header,
+                };
+                match page {
+                    FinishedPage::Data(page) => Some(Ok(page)),
+                    FinishedPage::Dict(_) => Some(Err(Error::OutOfSpec(
+                        "Dictionary pages cannot be selected via indexes".to_string(),
+                    ))),
                 }
-                FilteredPage::Skip { .. } => self.next(),
             }
         } else {
             None

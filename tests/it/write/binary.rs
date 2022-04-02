@@ -84,6 +84,6 @@ pub fn array_to_page_v1(
         buffer,
         None,
         descriptor.clone(),
-        Some((0, array.len())),
+        Some(array.len()),
     )))
 }

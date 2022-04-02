@@ -18,7 +18,7 @@ fn compress_data(
         header,
         dictionary_page,
         descriptor,
-        rows,
+        selected_rows,
     } = page;
     let uncompressed_page_size = buffer.len();
     if compression != Compression::Uncompressed {
@@ -41,14 +41,14 @@ fn compress_data(
     } else {
         std::mem::swap(&mut buffer, &mut compressed_buffer);
     };
-    Ok(CompressedDataPage::new(
+    Ok(CompressedDataPage::new_read(
         header,
         compressed_buffer,
         compression,
         uncompressed_page_size,
         dictionary_page,
         descriptor,
-        rows,
+        selected_rows,
     ))
 }
 
