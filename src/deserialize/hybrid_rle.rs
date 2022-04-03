@@ -47,6 +47,11 @@ impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> HybridBitmapIter<'a,
         self.length - self.consumed
     }
 
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// fetches the next bitmap, optionally limited.
     /// When limited, a run of the hybrid may return an offsetted bitmap
     pub fn limited_next(&mut self, limit: Option<usize>) -> Option<HybridEncoded<'a>> {

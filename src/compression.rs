@@ -1,3 +1,4 @@
+//! Functionality to compress and decompress data according to the parquet specification
 pub use super::parquet_bridge::Compression;
 
 use crate::error::{Error, Result};

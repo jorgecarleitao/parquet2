@@ -1,3 +1,4 @@
+//! Contains [`Error`]
 use std::sync::Arc;
 
 /// List of features whose non-activation may cause a runtime error.
@@ -5,10 +6,15 @@ use std::sync::Arc;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Feature {
+    /// Snappy compression and decompression
     Snappy,
+    /// Brotli compression and decompression
     Brotli,
+    /// Gzip compression and decompression
     Gzip,
+    /// Lz4 raw compression and decompression
     Lz4,
+    /// Zstd compression and decompression
     Zstd,
 }
 
@@ -22,7 +28,7 @@ pub enum Error {
     FeatureNotActive(Feature, String),
     /// When the parquet file is known to be out of spec.
     OutOfSpec(String),
-    // An error originating from a consumer or dependency
+    /// An error originating from a consumer or dependency
     External(String, Arc<dyn std::error::Error + Send + Sync>),
 }
 

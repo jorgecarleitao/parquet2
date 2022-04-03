@@ -3,7 +3,7 @@ use crate::{error::Error, metadata::get_sort_order};
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
 use parquet_format_async_temp::ColumnOrder as TColumnOrder;
 
-pub type KeyValue = parquet_format_async_temp::KeyValue;
+pub use parquet_format_async_temp::KeyValue;
 
 /// Metadata for a Parquet file.
 // This is almost equal to [`parquet_format_async_temp::FileMetaData`] but contains the descriptors,

@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::sync::Arc;
 
 use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Encoding};

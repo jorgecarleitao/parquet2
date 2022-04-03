@@ -1,8 +1,3 @@
-//pub use parquet_format_async_temp::FieldRepetitionType as Repetition;
-pub use parquet_format_async_temp::{
-    DecimalType, IntType, LogicalType, TimeType, TimeUnit, TimestampType, Type,
-};
-
 mod spec;
 
 mod physical_type;
@@ -16,3 +11,5 @@ pub use converted_type::*;
 
 mod parquet_type;
 pub use parquet_type::*;
+
+pub use crate::parquet_bridge::{GroupLogicalType, IntegerType, PrimitiveLogicalType, TimeUnit};

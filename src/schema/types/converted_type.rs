@@ -1,7 +1,7 @@
-use crate::error::{Error, Result};
+use crate::error::Error;
 use parquet_format_async_temp::ConvertedType;
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PrimitiveConvertedType {
     Utf8,
     /// an enum is converted into a binary field
@@ -19,7 +19,7 @@ pub enum PrimitiveConvertedType {
     /// would have precision 3 (3 total digits) and scale 2 (the decimal point is
     /// 2 digits over).
     // (precision, scale)
-    Decimal(i32, i32),
+    Decimal(usize, usize),
     /// A Date
     ///
     /// Stored as days since Unix epoch, encoded as the INT32 physical type.
@@ -88,7 +88,7 @@ pub enum PrimitiveConvertedType {
     Interval,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum GroupConvertedType {
     /// a map is converted as an optional field containing a repeated key/value pair
     Map,
@@ -99,93 +99,139 @@ pub enum GroupConvertedType {
     List,
 }
 
-pub fn converted_to_primitive_converted(
-    ty: &ConvertedType,
-    maybe_decimal: Option<(i32, i32)>,
-) -> Result<PrimitiveConvertedType> {
-    use PrimitiveConvertedType::*;
-    Ok(match *ty {
-        ConvertedType::UTF8 => Utf8,
-        ConvertedType::ENUM => Enum,
-        ConvertedType::DECIMAL => {
-            if let Some(maybe_decimal) = maybe_decimal {
-                Decimal(maybe_decimal.0, maybe_decimal.1)
-            } else {
-                return Err(general_err!("Decimal requires a precision and scale"));
+impl TryFrom<(ConvertedType, Option<(i32, i32)>)> for PrimitiveConvertedType {
+    type Error = Error;
+
+    fn try_from(
+        (ty, maybe_decimal): (ConvertedType, Option<(i32, i32)>),
+    ) -> Result<Self, Self::Error> {
+        use PrimitiveConvertedType::*;
+        Ok(match ty {
+            ConvertedType::UTF8 => Utf8,
+            ConvertedType::ENUM => Enum,
+            ConvertedType::DECIMAL => {
+                if let Some((precision, scale)) = maybe_decimal {
+                    Decimal(precision.try_into()?, scale.try_into()?)
+                } else {
+                    return Err(general_err!("Decimal requires a precision and scale"));
+                }
             }
-        }
-        ConvertedType::DATE => Date,
-        ConvertedType::TIME_MILLIS => TimeMillis,
-        ConvertedType::TIME_MICROS => TimeMicros,
-        ConvertedType::TIMESTAMP_MILLIS => TimestampMillis,
-        ConvertedType::TIMESTAMP_MICROS => TimestampMicros,
-        ConvertedType::UINT_8 => Uint8,
-        ConvertedType::UINT_16 => Uint16,
-        ConvertedType::UINT_32 => Uint32,
-        ConvertedType::UINT_64 => Uint64,
-        ConvertedType::INT_8 => Int8,
-        ConvertedType::INT_16 => Int16,
-        ConvertedType::INT_32 => Int32,
-        ConvertedType::INT_64 => Int64,
-        ConvertedType::JSON => Json,
-        ConvertedType::BSON => Bson,
-        ConvertedType::INTERVAL => Interval,
-        _ => {
-            return Err(general_err!(
-                "Converted type \"{:?}\" cannot be applied to a primitive type",
-                ty
-            ))
-        }
-    })
-}
-
-pub fn converted_to_group_converted(ty: &ConvertedType) -> Result<GroupConvertedType> {
-    use GroupConvertedType::*;
-    Ok(match *ty {
-        ConvertedType::MAP => Map,
-        ConvertedType::LIST => List,
-        ConvertedType::MAP_KEY_VALUE => MapKeyValue,
-        _ => {
-            return Err(general_err!(
-                "Converted type \"{:?}\" cannot be applied to a primitive type",
-                ty
-            ))
-        }
-    })
-}
-
-pub fn primitive_converted_to_converted(
-    ty: &PrimitiveConvertedType,
-) -> (ConvertedType, Option<(i32, i32)>) {
-    use PrimitiveConvertedType::*;
-    match ty {
-        Utf8 => (ConvertedType::UTF8, None),
-        Enum => (ConvertedType::ENUM, None),
-        Decimal(precision, scale) => (ConvertedType::DECIMAL, Some((*precision, *scale))),
-        Date => (ConvertedType::DATE, None),
-        TimeMillis => (ConvertedType::TIME_MILLIS, None),
-        TimeMicros => (ConvertedType::TIME_MICROS, None),
-        TimestampMillis => (ConvertedType::TIMESTAMP_MILLIS, None),
-        TimestampMicros => (ConvertedType::TIMESTAMP_MICROS, None),
-        Uint8 => (ConvertedType::UINT_8, None),
-        Uint16 => (ConvertedType::UINT_16, None),
-        Uint32 => (ConvertedType::UINT_32, None),
-        Uint64 => (ConvertedType::UINT_64, None),
-        Int8 => (ConvertedType::INT_8, None),
-        Int16 => (ConvertedType::INT_16, None),
-        Int32 => (ConvertedType::INT_32, None),
-        Int64 => (ConvertedType::INT_64, None),
-        Json => (ConvertedType::JSON, None),
-        Bson => (ConvertedType::BSON, None),
-        Interval => (ConvertedType::INTERVAL, None),
+            ConvertedType::DATE => Date,
+            ConvertedType::TIME_MILLIS => TimeMillis,
+            ConvertedType::TIME_MICROS => TimeMicros,
+            ConvertedType::TIMESTAMP_MILLIS => TimestampMillis,
+            ConvertedType::TIMESTAMP_MICROS => TimestampMicros,
+            ConvertedType::UINT_8 => Uint8,
+            ConvertedType::UINT_16 => Uint16,
+            ConvertedType::UINT_32 => Uint32,
+            ConvertedType::UINT_64 => Uint64,
+            ConvertedType::INT_8 => Int8,
+            ConvertedType::INT_16 => Int16,
+            ConvertedType::INT_32 => Int32,
+            ConvertedType::INT_64 => Int64,
+            ConvertedType::JSON => Json,
+            ConvertedType::BSON => Bson,
+            ConvertedType::INTERVAL => Interval,
+            _ => {
+                return Err(general_err!(
+                    "Converted type \"{:?}\" cannot be applied to a primitive type",
+                    ty
+                ))
+            }
+        })
     }
 }
 
-pub fn group_converted_converted_to(ty: &GroupConvertedType) -> ConvertedType {
-    use GroupConvertedType::*;
-    match ty {
-        Map => ConvertedType::MAP,
-        List => ConvertedType::LIST,
-        MapKeyValue => ConvertedType::MAP_KEY_VALUE,
+impl TryFrom<ConvertedType> for GroupConvertedType {
+    type Error = Error;
+
+    fn try_from(type_: ConvertedType) -> Result<Self, Self::Error> {
+        Ok(match type_ {
+            ConvertedType::LIST => GroupConvertedType::List,
+            ConvertedType::MAP => GroupConvertedType::Map,
+            ConvertedType::MAP_KEY_VALUE => GroupConvertedType::MapKeyValue,
+            _ => {
+                return Err(Error::OutOfSpec(
+                    "LogicalType value out of range".to_string(),
+                ))
+            }
+        })
+    }
+}
+
+impl From<GroupConvertedType> for ConvertedType {
+    fn from(type_: GroupConvertedType) -> Self {
+        match type_ {
+            GroupConvertedType::Map => ConvertedType::MAP,
+            GroupConvertedType::List => ConvertedType::LIST,
+            GroupConvertedType::MapKeyValue => ConvertedType::MAP_KEY_VALUE,
+        }
+    }
+}
+
+impl From<PrimitiveConvertedType> for (ConvertedType, Option<(i32, i32)>) {
+    fn from(ty: PrimitiveConvertedType) -> Self {
+        use PrimitiveConvertedType::*;
+        match ty {
+            Utf8 => (ConvertedType::UTF8, None),
+            Enum => (ConvertedType::ENUM, None),
+            Decimal(precision, scale) => (
+                ConvertedType::DECIMAL,
+                Some((precision as i32, scale as i32)),
+            ),
+            Date => (ConvertedType::DATE, None),
+            TimeMillis => (ConvertedType::TIME_MILLIS, None),
+            TimeMicros => (ConvertedType::TIME_MICROS, None),
+            TimestampMillis => (ConvertedType::TIMESTAMP_MILLIS, None),
+            TimestampMicros => (ConvertedType::TIMESTAMP_MICROS, None),
+            Uint8 => (ConvertedType::UINT_8, None),
+            Uint16 => (ConvertedType::UINT_16, None),
+            Uint32 => (ConvertedType::UINT_32, None),
+            Uint64 => (ConvertedType::UINT_64, None),
+            Int8 => (ConvertedType::INT_8, None),
+            Int16 => (ConvertedType::INT_16, None),
+            Int32 => (ConvertedType::INT_32, None),
+            Int64 => (ConvertedType::INT_64, None),
+            Json => (ConvertedType::JSON, None),
+            Bson => (ConvertedType::BSON, None),
+            Interval => (ConvertedType::INTERVAL, None),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn round_trip() -> Result<(), Error> {
+        use PrimitiveConvertedType::*;
+        let a = vec![
+            Utf8,
+            Enum,
+            Decimal(3, 1),
+            Date,
+            TimeMillis,
+            TimeMicros,
+            TimestampMillis,
+            TimestampMicros,
+            Uint8,
+            Uint16,
+            Uint32,
+            Uint64,
+            Int8,
+            Int16,
+            Int32,
+            Int64,
+            Json,
+            Bson,
+            Interval,
+        ];
+        for a in a {
+            let (c, d): (ConvertedType, Option<(i32, i32)>) = a.into();
+            let e: PrimitiveConvertedType = (c, d).try_into()?;
+            assert_eq!(e, a);
+        }
+        Ok(())
     }
 }

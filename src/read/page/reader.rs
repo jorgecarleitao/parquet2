@@ -67,6 +67,7 @@ impl<R: Read> PageReader<R> {
         }
     }
 
+    /// Returns the reader and this Readers' interval buffer
     pub fn into_inner(self) -> (R, Vec<u8>) {
         (self.reader, self.buffer)
     }

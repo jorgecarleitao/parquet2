@@ -1,12 +1,11 @@
 use std::collections::HashSet;
-use std::convert::TryInto;
 use std::io::Write;
 
 use futures::AsyncWrite;
 use parquet_format_async_temp::thrift::protocol::{
     TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
 };
-use parquet_format_async_temp::{ColumnChunk, ColumnMetaData};
+use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Type};
 
 use crate::statistics::serialize_statistics;
 use crate::FallibleStreamingIterator;
@@ -16,7 +15,6 @@ use crate::{
     error::{Error, Result},
     metadata::ColumnDescriptor,
     page::{CompressedPage, PageType},
-    schema::types::physical_type_to_type,
 };
 
 use super::page::{write_page, write_page_async, PageWriteSpec};
@@ -163,7 +161,7 @@ fn build_column_chunk(
     let statistics = reduce(&statistics)?;
     let statistics = statistics.map(|x| serialize_statistics(x.as_ref()));
 
-    let type_ = physical_type_to_type(&descriptor.descriptor.primitive_type.physical_type).0;
+    let (type_, _): (Type, Option<i32>) = descriptor.descriptor.primitive_type.physical_type.into();
 
     let metadata = ColumnMetaData {
         type_,

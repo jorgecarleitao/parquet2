@@ -20,9 +20,14 @@ pub(super) fn dict_indices_decoder(page: &DataPage) -> hybrid_rle::HybridRleDeco
 /// Type definition for a [`HybridBitmapIter`]
 pub type HybridDecoderBitmapIter<'a> = HybridBitmapIter<'a, hybrid_rle::Decoder<'a>>;
 
+/// Decoder of definition levels.
 #[derive(Debug)]
 pub enum DefLevelsDecoder<'a> {
+    /// When the maximum definition level is 1, the definition levels are RLE-encoded and
+    /// the bitpacked runs are bitmaps. This variant contains [`HybridDecoderBitmapIter`]
+    /// that decodes the runs, but not the individual values
     Bitmap(HybridDecoderBitmapIter<'a>),
+    /// When the maximum definition level is 1,
     Levels(HybridRleDecoder<'a>, u32),
 }
 

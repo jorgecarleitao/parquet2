@@ -1,6 +1,6 @@
-use parquet_format_async_temp::LogicalType;
-
-use crate::schema::types::{PhysicalType, PrimitiveConvertedType};
+use crate::schema::types::{
+    IntegerType, PhysicalType, PrimitiveConvertedType, PrimitiveLogicalType,
+};
 
 /// Sort order for page and column statistics.
 ///
@@ -22,7 +22,7 @@ pub enum SortOrder {
 
 /// Returns sort order for a physical/logical type.
 pub fn get_sort_order(
-    logical_type: &Option<LogicalType>,
+    logical_type: &Option<PrimitiveLogicalType>,
     converted_type: &Option<PrimitiveConvertedType>,
     physical_type: &PhysicalType,
 ) -> SortOrder {
@@ -35,22 +35,23 @@ pub fn get_sort_order(
     get_physical_sort_order(physical_type)
 }
 
-fn get_logical_sort_order(logical_type: &LogicalType) -> SortOrder {
+fn get_logical_sort_order(logical_type: &PrimitiveLogicalType) -> SortOrder {
     // TODO: Should this take converted and logical type, for compatibility?
-    use LogicalType::*;
+    use PrimitiveLogicalType::*;
     match logical_type {
-        STRING(_) | ENUM(_) | JSON(_) | BSON(_) => SortOrder::Unsigned,
-        INTEGER(t) => match t.is_signed {
-            true => SortOrder::Signed,
-            false => SortOrder::Unsigned,
+        String | Enum | Json | Bson => SortOrder::Unsigned,
+        Integer(t) => match t {
+            IntegerType::Int8 | IntegerType::Int16 | IntegerType::Int32 | IntegerType::Int64 => {
+                SortOrder::Signed
+            }
+            _ => SortOrder::Unsigned,
         },
-        MAP(_) | LIST(_) => SortOrder::Undefined,
-        DECIMAL(_) => SortOrder::Signed,
-        DATE(_) => SortOrder::Signed,
-        TIME(_) => SortOrder::Signed,
-        TIMESTAMP(_) => SortOrder::Signed,
-        UNKNOWN(_) => SortOrder::Undefined,
-        UUID(_) => SortOrder::Unsigned,
+        Decimal(_, _) => SortOrder::Signed,
+        Date => SortOrder::Signed,
+        Time { .. } => SortOrder::Signed,
+        Timestamp { .. } => SortOrder::Signed,
+        Unknown => SortOrder::Undefined,
+        Uuid => SortOrder::Unsigned,
     }
 }
 

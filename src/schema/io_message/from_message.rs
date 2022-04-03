@@ -42,14 +42,13 @@
 //! println!("{:?}", schema);
 //! ```
 
-use super::super::types::{
-    converted_to_group_converted, converted_to_primitive_converted, type_to_physical_type,
-    ParquetType,
-};
+use parquet_format_async_temp::Type;
+use types::PrimitiveLogicalType;
+
+use super::super::types::{ParquetType, TimeUnit};
 use super::super::*;
 use crate::error::{Error, Result};
-
-use parquet_format_async_temp::*;
+use crate::schema::types::{GroupConvertedType, PrimitiveConvertedType};
 
 fn is_logical_type(s: &str) -> bool {
     matches!(
@@ -82,36 +81,37 @@ fn is_converted_type(s: &str) -> bool {
     }
 }
 
-fn converted_group_from_str(s: &str) -> Result<ConvertedType> {
+fn converted_group_from_str(s: &str) -> Result<GroupConvertedType> {
     Ok(match s {
-        "MAP" => ConvertedType::MAP,
-        "MAP_KEY_VALUE" => ConvertedType::MAP_KEY_VALUE,
-        "LIST" => ConvertedType::LIST,
+        "MAP" => GroupConvertedType::Map,
+        "MAP_KEY_VALUE" => GroupConvertedType::MapKeyValue,
+        "LIST" => GroupConvertedType::List,
         other => return Err(general_err!("Invalid converted type {}", other)),
     })
 }
 
-fn converted_primitive_from_str(s: &str) -> Option<ConvertedType> {
+fn converted_primitive_from_str(s: &str) -> Option<PrimitiveConvertedType> {
+    use PrimitiveConvertedType::*;
     Some(match s {
-        "UTF8" => ConvertedType::UTF8,
-        "ENUM" => ConvertedType::ENUM,
-        "DECIMAL" => ConvertedType::DECIMAL,
-        "DATE" => ConvertedType::DATE,
-        "TIME_MILLIS" => ConvertedType::TIME_MILLIS,
-        "TIME_MICROS" => ConvertedType::TIME_MICROS,
-        "TIMESTAMP_MILLIS" => ConvertedType::TIMESTAMP_MILLIS,
-        "TIMESTAMP_MICROS" => ConvertedType::TIMESTAMP_MICROS,
-        "UINT_8" => ConvertedType::UINT_8,
-        "UINT_16" => ConvertedType::UINT_16,
-        "UINT_32" => ConvertedType::UINT_32,
-        "UINT_64" => ConvertedType::UINT_64,
-        "INT_8" => ConvertedType::INT_8,
-        "INT_16" => ConvertedType::INT_16,
-        "INT_32" => ConvertedType::INT_32,
-        "INT_64" => ConvertedType::INT_64,
-        "JSON" => ConvertedType::JSON,
-        "BSON" => ConvertedType::BSON,
-        "INTERVAL" => ConvertedType::INTERVAL,
+        "UTF8" => Utf8,
+        "ENUM" => Enum,
+        "DECIMAL" => Decimal(0, 0),
+        "DATE" => Date,
+        "TIME_MILLIS" => TimeMillis,
+        "TIME_MICROS" => TimeMicros,
+        "TIMESTAMP_MILLIS" => TimestampMillis,
+        "TIMESTAMP_MICROS" => TimestampMicros,
+        "UINT_8" => Uint8,
+        "UINT_16" => Uint16,
+        "UINT_32" => Uint32,
+        "UINT_64" => Uint64,
+        "INT_8" => Int8,
+        "INT_16" => Int16,
+        "INT_32" => Int32,
+        "INT_64" => Int64,
+        "JSON" => Json,
+        "BSON" => Bson,
+        "INTERVAL" => Interval,
         _ => return None,
     })
 }
@@ -268,9 +268,9 @@ fn parse_timeunit(
     value
         .ok_or_else(|| general_err!(not_found_msg))
         .and_then(|v| match v.to_uppercase().as_str() {
-            "MILLIS" => Ok(TimeUnit::MILLIS(Default::default())),
-            "MICROS" => Ok(TimeUnit::MICROS(Default::default())),
-            "NANOS" => Ok(TimeUnit::NANOS(Default::default())),
+            "MILLIS" => Ok(TimeUnit::Milliseconds),
+            "MICROS" => Ok(TimeUnit::Microseconds),
+            "NANOS" => Ok(TimeUnit::Nanoseconds),
             _ => Err(general_err!(parse_fail_msg)),
         })
 }
@@ -341,7 +341,6 @@ impl<'a> Parser<'a> {
                 .ok_or_else(|| general_err!("Expected converted type, found None"))
                 .and_then(|v| converted_group_from_str(&v.to_uppercase()))?;
             assert_token(self.tokenizer.next(), ")")?;
-            let converted_type = converted_to_group_converted(&converted_type)?;
             Some(converted_type)
         } else {
             self.tokenizer.backtrack();
@@ -419,15 +418,12 @@ impl<'a> Parser<'a> {
             };
 
             // converted type decimal
-            let (converted_type, maybe_decimal) = match converted_type {
-                Some(parquet_format_async_temp::ConvertedType::DECIMAL) => {
-                    self.parse_converted_decimal()?
+            let converted_type = match converted_type {
+                Some(PrimitiveConvertedType::Decimal(_, _)) => {
+                    Some(self.parse_converted_decimal()?)
                 }
-                other => (other, None),
+                other => other,
             };
-            let converted_type = converted_type
-                .map(|x| converted_to_primitive_converted(&x, maybe_decimal))
-                .transpose()?;
 
             assert_token(self.tokenizer.next(), ")")?;
             (converted_type, logical_type)
@@ -445,11 +441,9 @@ impl<'a> Parser<'a> {
         };
         assert_token(self.tokenizer.next(), ";")?;
 
-        let physical_type = type_to_physical_type(&physical_type, length)?;
-
         ParquetType::try_from_primitive(
             name.to_string(),
-            physical_type,
+            (physical_type, length).try_into()?,
             repetition,
             converted_type,
             logical_type,
@@ -457,7 +451,7 @@ impl<'a> Parser<'a> {
         )
     }
 
-    fn parse_converted_decimal(&mut self) -> Result<(Option<ConvertedType>, Option<(i32, i32)>)> {
+    fn parse_converted_decimal(&mut self) -> Result<PrimitiveConvertedType> {
         assert_token(self.tokenizer.next(), "(")?;
         // Parse precision
         let precision = parse_i32(
@@ -480,18 +474,16 @@ impl<'a> Parser<'a> {
         };
 
         assert_token(self.tokenizer.next(), ")")?;
-        Ok((
-            Some(parquet_format_async_temp::ConvertedType::DECIMAL),
-            Some((precision, scale)),
+        Ok(PrimitiveConvertedType::Decimal(
+            precision.try_into()?,
+            scale.try_into()?,
         ))
     }
 
-    fn parse_logical_type(&mut self, tpe: &str) -> Result<LogicalType> {
+    fn parse_logical_type(&mut self, tpe: &str) -> Result<PrimitiveLogicalType> {
         Ok(match tpe {
-            "MAP" => LogicalType::MAP(MapType {}),
-            "LIST" => LogicalType::LIST(ListType {}),
-            "ENUM" => LogicalType::ENUM(EnumType {}),
-            "DATE" => LogicalType::DATE(DateType {}),
+            "ENUM" => PrimitiveLogicalType::Enum,
+            "DATE" => PrimitiveLogicalType::Date,
             "DECIMAL" => {
                 let (precision, scale) = if let Some("(") = self.tokenizer.next() {
                     let precision = parse_i32(
@@ -513,18 +505,18 @@ impl<'a> Parser<'a> {
                     (precision, scale)
                 } else {
                     self.tokenizer.backtrack();
-                    (-1, -1)
+                    (0, 0)
                 };
-                LogicalType::DECIMAL(DecimalType { scale, precision })
+                PrimitiveLogicalType::Decimal(precision.try_into()?, scale.try_into()?)
             }
             "TIME" => {
-                let (unit, is_adjusted_to_u_t_c) = if let Some("(") = self.tokenizer.next() {
+                let (unit, is_adjusted_to_utc) = if let Some("(") = self.tokenizer.next() {
                     let unit = parse_timeunit(
                         self.tokenizer.next(),
                         "Invalid timeunit found",
                         "Failed to parse timeunit for TIME type",
                     )?;
-                    let is_adjusted_to_u_t_c = if let Some(",") = self.tokenizer.next() {
+                    let is_adjusted_to_utc = if let Some(",") = self.tokenizer.next() {
                         parse_bool(
                             self.tokenizer.next(),
                             "Invalid boolean found",
@@ -535,24 +527,24 @@ impl<'a> Parser<'a> {
                         false
                     };
                     assert_token(self.tokenizer.next(), ")")?;
-                    (unit, is_adjusted_to_u_t_c)
+                    (unit, is_adjusted_to_utc)
                 } else {
                     self.tokenizer.backtrack();
-                    (TimeUnit::MILLIS(MilliSeconds {}), false)
+                    (TimeUnit::Milliseconds, false)
                 };
-                LogicalType::TIME(TimeType {
-                    is_adjusted_to_u_t_c,
+                PrimitiveLogicalType::Time {
+                    is_adjusted_to_utc,
                     unit,
-                })
+                }
             }
             "TIMESTAMP" => {
-                let (unit, is_adjusted_to_u_t_c) = if let Some("(") = self.tokenizer.next() {
+                let (unit, is_adjusted_to_utc) = if let Some("(") = self.tokenizer.next() {
                     let unit = parse_timeunit(
                         self.tokenizer.next(),
                         "Invalid timeunit found",
                         "Failed to parse timeunit for TIMESTAMP type",
                     )?;
-                    let is_adjusted_to_u_t_c = if let Some(",") = self.tokenizer.next() {
+                    let is_adjusted_to_utc = if let Some(",") = self.tokenizer.next() {
                         parse_bool(
                             self.tokenizer.next(),
                             "Invalid boolean found",
@@ -564,15 +556,15 @@ impl<'a> Parser<'a> {
                         false
                     };
                     assert_token(self.tokenizer.next(), ")")?;
-                    (unit, is_adjusted_to_u_t_c)
+                    (unit, is_adjusted_to_utc)
                 } else {
                     self.tokenizer.backtrack();
-                    (TimeUnit::MILLIS(MilliSeconds {}), false)
+                    (TimeUnit::Milliseconds, false)
                 };
-                LogicalType::TIMESTAMP(TimestampType {
-                    is_adjusted_to_u_t_c,
+                PrimitiveLogicalType::Timestamp {
+                    is_adjusted_to_utc,
                     unit,
-                })
+                }
             }
             "INTEGER" => {
                 let (bit_width, is_signed) = if let Some("(") = self.tokenizer.next() {
@@ -580,7 +572,7 @@ impl<'a> Parser<'a> {
                         self.tokenizer.next(),
                         "Invalid bit_width found",
                         "Failed to parse bit_width for INTEGER type",
-                    )? as i8;
+                    )?;
                     let is_signed = if let Some(",") = self.tokenizer.next() {
                         parse_bool(
                             self.tokenizer.next(),
@@ -599,16 +591,13 @@ impl<'a> Parser<'a> {
                     self.tokenizer.backtrack();
                     return Err(general_err!("INTEGER requires width and sign"));
                 };
-                LogicalType::INTEGER(IntType {
-                    bit_width,
-                    is_signed,
-                })
+                PrimitiveLogicalType::Integer((bit_width, is_signed).into())
             }
-            "STRING" => LogicalType::STRING(StringType {}),
-            "JSON" => LogicalType::JSON(JsonType {}),
-            "BSON" => LogicalType::BSON(BsonType {}),
-            "UUID" => LogicalType::UUID(UUIDType {}),
-            "UNKNOWN" => LogicalType::UNKNOWN(NullType {}),
+            "STRING" => PrimitiveLogicalType::String,
+            "JSON" => PrimitiveLogicalType::Json,
+            "BSON" => PrimitiveLogicalType::Bson,
+            "UUID" => PrimitiveLogicalType::Uuid,
+            "UNKNOWN" => PrimitiveLogicalType::Unknown,
             "INTERVAL" => return Err(general_err!("Interval logical type not yet supported")),
             _ => unreachable!(),
         })
@@ -617,6 +606,8 @@ impl<'a> Parser<'a> {
 
 #[cfg(test)]
 mod tests {
+    use types::{IntegerType, PrimitiveLogicalType};
+
     use super::*;
     use crate::schema::types::{GroupConvertedType, PhysicalType, PrimitiveConvertedType};
 
@@ -862,10 +853,7 @@ mod tests {
                 PhysicalType::FixedLenByteArray(5),
                 Repetition::Optional,
                 None,
-                Some(LogicalType::DECIMAL(DecimalType {
-                    precision: 9,
-                    scale: 3,
-                })),
+                Some(PrimitiveLogicalType::Decimal(9, 3)),
                 None,
             )?,
             ParquetType::try_from_primitive(
@@ -873,10 +861,7 @@ mod tests {
                 PhysicalType::FixedLenByteArray(16),
                 Repetition::Optional,
                 None,
-                Some(LogicalType::DECIMAL(DecimalType {
-                    precision: 38,
-                    scale: 18,
-                })),
+                Some(PrimitiveLogicalType::Decimal(38, 18)),
                 None,
             )?,
         ];
@@ -1014,7 +999,7 @@ mod tests {
             PhysicalType::Int32,
             Repetition::Optional,
             None,
-            Some(LogicalType::DATE(Default::default())),
+            Some(PrimitiveLogicalType::Date),
             None,
         )?;
         let f6 = ParquetType::try_from_primitive(
@@ -1060,10 +1045,7 @@ mod tests {
             PhysicalType::Int32,
             Repetition::Required,
             None,
-            Some(LogicalType::INTEGER(IntType {
-                bit_width: 8,
-                is_signed: true,
-            })),
+            Some(PrimitiveLogicalType::Integer(IntegerType::Int8)),
             None,
         )?;
         let f2 = ParquetType::try_from_primitive(
@@ -1071,10 +1053,7 @@ mod tests {
             PhysicalType::Int32,
             Repetition::Required,
             None,
-            Some(LogicalType::INTEGER(IntType {
-                bit_width: 16,
-                is_signed: false,
-            })),
+            Some(PrimitiveLogicalType::Integer(IntegerType::UInt16)),
             None,
         )?;
         let f3 = ParquetType::try_from_primitive(
@@ -1098,7 +1077,7 @@ mod tests {
             PhysicalType::Int32,
             Repetition::Optional,
             None,
-            Some(LogicalType::DATE(Default::default())),
+            Some(PrimitiveLogicalType::Date),
             None,
         )?;
         let f6 = ParquetType::try_from_primitive(
@@ -1106,10 +1085,10 @@ mod tests {
             PhysicalType::Int32,
             Repetition::Optional,
             None,
-            Some(LogicalType::TIME(TimeType {
-                is_adjusted_to_u_t_c: false,
-                unit: TimeUnit::MILLIS(Default::default()),
-            })),
+            Some(PrimitiveLogicalType::Time {
+                is_adjusted_to_utc: false,
+                unit: TimeUnit::Milliseconds,
+            }),
             None,
         )?;
         let f7 = ParquetType::try_from_primitive(
@@ -1117,10 +1096,10 @@ mod tests {
             PhysicalType::Int64,
             Repetition::Optional,
             None,
-            Some(LogicalType::TIME(TimeType {
-                is_adjusted_to_u_t_c: true,
-                unit: TimeUnit::MICROS(Default::default()),
-            })),
+            Some(PrimitiveLogicalType::Time {
+                is_adjusted_to_utc: true,
+                unit: TimeUnit::Microseconds,
+            }),
             None,
         )?;
         let f8 = ParquetType::try_from_primitive(
@@ -1128,10 +1107,10 @@ mod tests {
             PhysicalType::Int64,
             Repetition::Optional,
             None,
-            Some(LogicalType::TIMESTAMP(TimestampType {
-                is_adjusted_to_u_t_c: true,
-                unit: TimeUnit::MILLIS(Default::default()),
-            })),
+            Some(PrimitiveLogicalType::Timestamp {
+                is_adjusted_to_utc: true,
+                unit: TimeUnit::Milliseconds,
+            }),
             None,
         )?;
         let f9 = ParquetType::try_from_primitive(
@@ -1139,10 +1118,10 @@ mod tests {
             PhysicalType::Int64,
             Repetition::Optional,
             None,
-            Some(LogicalType::TIMESTAMP(TimestampType {
-                is_adjusted_to_u_t_c: false,
-                unit: TimeUnit::NANOS(Default::default()),
-            })),
+            Some(PrimitiveLogicalType::Timestamp {
+                is_adjusted_to_utc: false,
+                unit: TimeUnit::Nanoseconds,
+            }),
             None,
         )?;
 
@@ -1151,7 +1130,7 @@ mod tests {
             PhysicalType::ByteArray,
             Repetition::Optional,
             None,
-            Some(LogicalType::STRING(Default::default())),
+            Some(PrimitiveLogicalType::String),
             None,
         )?;
 

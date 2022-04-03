@@ -14,7 +14,7 @@ pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::read_metadata;
 #[cfg(feature = "stream")]
 pub use page::get_page_stream;
-pub use page::{IndexedPageReader, PageFilter, PageReader};
+pub use page::{IndexedPageReader, PageFilter, PageIterator, PageReader};
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
@@ -104,6 +104,7 @@ pub enum State<T> {
     Finished(Vec<u8>),
 }
 
+/// A special kind of fallible streaming iterator where `advance` consumes the iterator.
 pub trait MutStreamingIterator: Sized {
     type Item;
     type Error;
@@ -132,6 +133,7 @@ pub struct ColumnIterator<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
+    /// Returns a new [`ColumnIterator`]
     pub fn new(
         reader: R,
         field: ParquetType,
@@ -198,6 +200,7 @@ pub struct ReadColumnIterator {
 }
 
 impl ReadColumnIterator {
+    /// Returns a new [`ReadColumnIterator`]
     pub fn new(
         field: ParquetType,
         chunks: Vec<(Vec<Result<CompressedDataPage>>, ColumnChunkMetaData)>,
