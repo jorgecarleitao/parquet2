@@ -5,6 +5,26 @@ use crate::schema::types::PhysicalType;
 use crate::statistics::*;
 use crate::types::NativeType;
 
+#[inline]
+fn reduce_single<T, F: Fn(T, T) -> T>(lhs: Option<T>, rhs: Option<T>, op: F) -> Option<T> {
+    match (lhs, rhs) {
+        (None, None) => None,
+        (Some(x), None) => Some(x),
+        (None, Some(x)) => Some(x),
+        (Some(x), Some(y)) => Some(op(x, y)),
+    }
+}
+
+#[inline]
+fn reduce_vec8(lhs: Option<Vec<u8>>, rhs: &Option<Vec<u8>>, max: bool) -> Option<Vec<u8>> {
+    match (lhs, rhs) {
+        (None, None) => None,
+        (Some(x), None) => Some(x),
+        (None, Some(x)) => Some(x.clone()),
+        (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), max)),
+    }
+}
+
 pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn Statistics>>> {
     if stats.is_empty() {
         return Ok(None);
@@ -63,24 +83,9 @@ pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn S
 fn reduce_binary<'a, I: Iterator<Item = &'a BinaryStatistics>>(mut stats: I) -> BinaryStatistics {
     let initial = stats.next().unwrap().clone();
     stats.fold(initial, |mut acc, new| {
-        acc.min_value = match (acc.min_value, &new.min_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(x.clone()),
-            (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), false)),
-        };
-        acc.max_value = match (acc.max_value, &new.max_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(x.clone()),
-            (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), true)),
-        };
-        acc.null_count = match (acc.null_count, &new.null_count) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(x + *y),
-        };
+        acc.min_value = reduce_vec8(acc.min_value, &new.min_value, false);
+        acc.max_value = reduce_vec8(acc.max_value, &new.max_value, true);
+        acc.null_count = reduce_single(acc.null_count, new.null_count, |x, y| x + y);
         acc.distinct_count = None;
         acc
     })
@@ -91,24 +96,9 @@ fn reduce_fix_len_binary<'a, I: Iterator<Item = &'a FixedLenStatistics>>(
 ) -> FixedLenStatistics {
     let initial = stats.next().unwrap().clone();
     stats.fold(initial, |mut acc, new| {
-        acc.min_value = match (acc.min_value, &new.min_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(x.clone()),
-            (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), false)),
-        };
-        acc.max_value = match (acc.max_value, &new.max_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(x.clone()),
-            (Some(x), Some(y)) => Some(ord_binary(x, y.clone(), true)),
-        };
-        acc.null_count = match (acc.null_count, &new.null_count) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(x + *y),
-        };
+        acc.min_value = reduce_vec8(acc.min_value, &new.min_value, false);
+        acc.max_value = reduce_vec8(acc.max_value, &new.max_value, true);
+        acc.null_count = reduce_single(acc.null_count, new.null_count, |x, y| x + y);
         acc.distinct_count = None;
         acc
     })
@@ -142,24 +132,17 @@ fn reduce_boolean<'a, I: Iterator<Item = &'a BooleanStatistics>>(
 ) -> BooleanStatistics {
     let initial = stats.next().unwrap().clone();
     stats.fold(initial, |mut acc, new| {
-        acc.min_value = match (acc.min_value, &new.min_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(if x & !(*y) { *y } else { x }),
-        };
-        acc.max_value = match (acc.max_value, &new.max_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(if x & !(*y) { x } else { *y }),
-        };
-        acc.null_count = match (acc.null_count, &new.null_count) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(x + *y),
-        };
+        acc.min_value = reduce_single(
+            acc.min_value,
+            new.min_value,
+            |x, y| if x & !(y) { y } else { x },
+        );
+        acc.max_value = reduce_single(
+            acc.max_value,
+            new.max_value,
+            |x, y| if x & !(y) { x } else { y },
+        );
+        acc.null_count = reduce_single(acc.null_count, new.null_count, |x, y| x + y);
         acc.distinct_count = None;
         acc
     })
@@ -174,25 +157,142 @@ fn reduce_primitive<
 ) -> PrimitiveStatistics<T> {
     let initial = stats.next().unwrap().clone();
     stats.fold(initial, |mut acc, new| {
-        acc.min_value = match (acc.min_value, &new.min_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(if x > *y { *y } else { x }),
-        };
-        acc.max_value = match (acc.max_value, &new.max_value) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(if x < *y { x } else { *y }),
-        };
-        acc.null_count = match (acc.null_count, &new.null_count) {
-            (None, None) => None,
-            (Some(x), None) => Some(x),
-            (None, Some(x)) => Some(*x),
-            (Some(x), Some(y)) => Some(x + *y),
-        };
+        acc.min_value = reduce_single(
+            acc.min_value,
+            new.min_value,
+            |x, y| if x > y { y } else { x },
+        );
+        acc.max_value = reduce_single(
+            acc.max_value,
+            new.max_value,
+            |x, y| if x < y { x } else { y },
+        );
+        acc.null_count = reduce_single(acc.null_count, new.null_count, |x, y| x + y);
         acc.distinct_count = None;
         acc
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::schema::types::PrimitiveType;
+
+    use super::*;
+
+    #[test]
+    fn binary() -> Result<()> {
+        let iter = vec![
+            BinaryStatistics {
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::ByteArray,
+                ),
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![1, 2]),
+                max_value: Some(vec![3, 4]),
+            },
+            BinaryStatistics {
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::ByteArray,
+                ),
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![4, 5]),
+                max_value: None,
+            },
+        ];
+        let a = reduce_binary(iter.iter());
+
+        assert_eq!(
+            a,
+            BinaryStatistics {
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::ByteArray,
+                ),
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![1, 2]),
+                max_value: Some(vec![3, 4]),
+            },
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn fixed_len_binary() -> Result<()> {
+        let iter = vec![
+            FixedLenStatistics {
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::FixedLenByteArray(2),
+                ),
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![1, 2]),
+                max_value: Some(vec![3, 4]),
+            },
+            FixedLenStatistics {
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::FixedLenByteArray(2),
+                ),
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![4, 5]),
+                max_value: None,
+            },
+        ];
+        let a = reduce_fix_len_binary(iter.iter());
+
+        assert_eq!(
+            a,
+            FixedLenStatistics {
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::FixedLenByteArray(2),
+                ),
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(vec![1, 2]),
+                max_value: Some(vec![3, 4]),
+            },
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn boolean() -> Result<()> {
+        let iter = vec![
+            BooleanStatistics {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(false),
+                max_value: Some(false),
+            },
+            BooleanStatistics {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(true),
+                max_value: Some(true),
+            },
+        ];
+        let a = reduce_boolean(iter.iter());
+
+        assert_eq!(
+            a,
+            BooleanStatistics {
+                null_count: Some(0),
+                distinct_count: None,
+                min_value: Some(false),
+                max_value: Some(true),
+            },
+        );
+
+        Ok(())
+    }
 }
