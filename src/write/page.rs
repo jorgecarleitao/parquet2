@@ -53,7 +53,7 @@ pub fn write_page<W: Write>(
     compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
     let num_values = compressed_page.num_values();
-    let rows = compressed_page.rows();
+    let selected_rows = compressed_page.selected_rows();
 
     let header = match &compressed_page {
         CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),
@@ -85,7 +85,7 @@ pub fn write_page<W: Write>(
         offset,
         bytes_written,
         statistics,
-        num_rows: rows.map(|x| x.1),
+        num_rows: selected_rows.map(|x| x.last().unwrap().length),
         num_values,
     })
 }
@@ -96,7 +96,7 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
     compressed_page: &CompressedPage,
 ) -> Result<PageWriteSpec> {
     let num_values = compressed_page.num_values();
-    let rows = compressed_page.rows();
+    let selected_rows = compressed_page.selected_rows();
 
     let header = match &compressed_page {
         CompressedPage::Data(compressed_page) => assemble_data_page_header(compressed_page),
@@ -128,7 +128,7 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
         offset,
         bytes_written,
         statistics,
-        num_rows: rows.map(|x| x.1),
+        num_rows: selected_rows.map(|x| x.last().unwrap().length),
         num_values,
     })
 }

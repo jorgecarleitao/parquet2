@@ -7,6 +7,7 @@ pub use parquet_format_async_temp::{
     DataPageHeader as DataPageHeaderV1, DataPageHeaderV2, PageHeader as ParquetPageHeader,
 };
 
+use crate::indexes::Interval;
 pub use crate::parquet_bridge::{DataPageHeaderExt, PageType};
 
 use crate::compression::Compression;
@@ -28,7 +29,7 @@ pub struct CompressedDataPage {
     pub(crate) descriptor: Descriptor,
 
     // The offset and length in rows
-    pub(crate) rows: Option<(usize, usize)>,
+    pub(crate) selected_rows: Option<Vec<Interval>>,
 }
 
 impl CompressedDataPage {
@@ -40,7 +41,28 @@ impl CompressedDataPage {
         uncompressed_page_size: usize,
         dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
-        rows: Option<(usize, usize)>,
+        rows: Option<usize>,
+    ) -> Self {
+        Self::new_read(
+            header,
+            buffer,
+            compression,
+            uncompressed_page_size,
+            dictionary_page,
+            descriptor,
+            rows.map(|x| vec![Interval::new(0, x)]),
+        )
+    }
+
+    /// Returns a new [`CompressedDataPage`].
+    pub(crate) fn new_read(
+        header: DataPageHeader,
+        buffer: Vec<u8>,
+        compression: Compression,
+        uncompressed_page_size: usize,
+        dictionary_page: Option<Arc<dyn DictPage>>,
+        descriptor: Descriptor,
+        selected_rows: Option<Vec<Interval>>,
     ) -> Self {
         Self {
             header,
@@ -49,7 +71,7 @@ impl CompressedDataPage {
             uncompressed_page_size,
             dictionary_page,
             descriptor,
-            rows,
+            selected_rows,
         }
     }
 
@@ -74,8 +96,8 @@ impl CompressedDataPage {
 
     /// the rows to be selected by this page.
     /// When `None`, all rows are to be considered.
-    pub fn rows(&self) -> Option<(usize, usize)> {
-        self.rows
+    pub fn selected_rows(&self) -> Option<&[Interval]> {
+        self.selected_rows.as_deref()
     }
 
     pub fn num_values(&self) -> usize {
@@ -120,7 +142,7 @@ pub struct DataPage {
     pub(super) buffer: Vec<u8>,
     pub(super) dictionary_page: Option<Arc<dyn DictPage>>,
     pub descriptor: Descriptor,
-    pub rows: Option<(usize, usize)>,
+    pub selected_rows: Option<Vec<Interval>>,
 }
 
 impl DataPage {
@@ -129,14 +151,30 @@ impl DataPage {
         buffer: Vec<u8>,
         dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
-        rows: Option<(usize, usize)>,
+        rows: Option<usize>,
+    ) -> Self {
+        Self::new_read(
+            header,
+            buffer,
+            dictionary_page,
+            descriptor,
+            rows.map(|x| vec![Interval::new(0, x)]),
+        )
+    }
+
+    pub(crate) fn new_read(
+        header: DataPageHeader,
+        buffer: Vec<u8>,
+        dictionary_page: Option<Arc<dyn DictPage>>,
+        descriptor: Descriptor,
+        selected_rows: Option<Vec<Interval>>,
     ) -> Self {
         Self {
             header,
             buffer,
             dictionary_page,
             descriptor,
-            rows,
+            selected_rows,
         }
     }
 
@@ -154,8 +192,8 @@ impl DataPage {
 
     /// the rows to be selected by this page.
     /// When `None`, all rows are to be considered.
-    pub fn rows(&self) -> Option<(usize, usize)> {
-        self.rows
+    pub fn selected_rows(&self) -> Option<&[Interval]> {
+        self.selected_rows.as_deref()
     }
 
     /// Returns a mutable reference to the internal buffer.
@@ -246,9 +284,9 @@ impl CompressedPage {
         }
     }
 
-    pub(crate) fn rows(&self) -> Option<(usize, usize)> {
+    pub(crate) fn selected_rows(&self) -> Option<&[Interval]> {
         match self {
-            CompressedPage::Data(page) => page.rows,
+            CompressedPage::Data(page) => page.selected_rows(),
             CompressedPage::Dict(_) => None,
         }
     }

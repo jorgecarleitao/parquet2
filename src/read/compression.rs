@@ -85,12 +85,12 @@ pub fn decompress(
     buffer: &mut Vec<u8>,
 ) -> Result<DataPage> {
     decompress_buffer(&mut compressed_page, buffer)?;
-    Ok(DataPage::new(
+    Ok(DataPage::new_read(
         compressed_page.header,
         std::mem::take(buffer),
         compressed_page.dictionary_page,
         compressed_page.descriptor,
-        compressed_page.rows,
+        compressed_page.selected_rows,
     ))
 }
 
@@ -101,12 +101,12 @@ fn decompress_reuse<P: PageIterator>(
 ) -> Result<(DataPage, bool)> {
     let was_decompressed = decompress_buffer(&mut compressed_page, buffer)?;
 
-    let new_page = DataPage::new(
+    let new_page = DataPage::new_read(
         compressed_page.header,
         std::mem::take(buffer),
         compressed_page.dictionary_page,
         compressed_page.descriptor,
-        compressed_page.rows,
+        compressed_page.selected_rows,
     );
 
     if was_decompressed {

@@ -10,4 +10,4 @@ pub use boolean::*;
 pub use fixed_len::*;
 pub use hybrid_rle::*;
 pub use native::*;
-pub use utils::{DefLevelsDecoder, HybridDecoderBitmapIter};
+pub use utils::{DefLevelsDecoder, OptionalValues, SliceFilteredIter};
