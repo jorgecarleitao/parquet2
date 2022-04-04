@@ -23,8 +23,8 @@ fn deserialize_bitmap<C: Clone, I: Iterator<Item = C>>(
     let mut deserialized = Vec::with_capacity(validity.len());
 
     validity.for_each(|run| match run {
-        HybridEncoded::Bitmap(bitmap, offset, length) => {
-            BitmapIter::new(bitmap, offset, length)
+        HybridEncoded::Bitmap(bitmap, length) => {
+            BitmapIter::new(bitmap, 0, length)
                 .into_iter()
                 .for_each(|x| {
                     if x {

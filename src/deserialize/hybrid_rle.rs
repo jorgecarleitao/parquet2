@@ -4,10 +4,26 @@ use crate::encoding::hybrid_rle::{self, BitmapIter};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HybridEncoded<'a> {
     /// a bitmap
-    Bitmap(&'a [u8], usize, usize),
+    Bitmap(&'a [u8], usize),
     /// A repeated item. The first attribute corresponds to whether the value is set
     /// the second attribute corresponds to the number of repetitions.
     Repeated(bool, usize),
+}
+
+impl<'a> HybridEncoded<'a> {
+    /// Returns the length of the run in number of items
+    #[inline]
+    pub fn len(&self) -> usize {
+        match self {
+            HybridEncoded::Bitmap(_, length) => *length,
+            HybridEncoded::Repeated(_, length) => *length,
+        }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
 }
 
 pub trait HybridRleRunsIterator<'a>: Iterator<Item = HybridEncoded<'a>> {
@@ -20,30 +36,18 @@ pub trait HybridRleRunsIterator<'a>: Iterator<Item = HybridEncoded<'a>> {
 #[derive(Debug, Clone)]
 pub struct HybridRleIter<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> {
     iter: I,
-    current: Option<hybrid_rle::HybridEncoded<'a>>,
-    // invariants:
-    // * run_offset < length
-    // * consumed < length
-    // how many items have been taken on the current encoded run.
-    // 0 implies we need to advance the decoder
-    run_offset: usize,
-    // how many items have been consumed from the encoder
-    consumed: usize,
-    // how many items the page has
     length: usize,
+    consumed: usize,
 }
 
 impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> HybridRleIter<'a, I> {
     /// Returns a new [`HybridRleIter`]
     #[inline]
-    pub fn new(mut iter: I, length: usize) -> Self {
-        let current = iter.next();
+    pub fn new(iter: I, length: usize) -> Self {
         Self {
             iter,
-            current,
-            run_offset: 0,
-            consumed: 0,
             length,
+            consumed: 0,
         }
     }
 
@@ -56,71 +60,6 @@ impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> HybridRleIter<'a, I>
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
-    }
-
-    /// fetches the next bitmap, optionally limited.
-    /// When limited, a run may return an offsetted bitmap
-    pub fn limited_next(&mut self, limit: Option<usize>) -> Option<HybridEncoded<'a>> {
-        if self.consumed == self.length {
-            return None;
-        };
-        let run = if let Some(run) = &self.current {
-            run
-        } else {
-            // case where the decoder has no more items, likely because the parquet file is wrong
-            return None;
-        };
-        let result = match run {
-            hybrid_rle::HybridEncoded::Bitpacked(pack) => {
-                // a pack has at most `pack.len() * 8` bits
-                // during execution, we may end in the middle of a pack (run_offset != 0)
-                // the remaining items in the pack is given by a combination
-                // of the page length, the offset in the pack, and where we are in the page
-                let pack_size = pack.len() * 8 - self.run_offset;
-                let remaining = self.len();
-                let length = pack_size.min(remaining);
-
-                let additional = if let Some(limit) = limit {
-                    length.min(limit)
-                } else {
-                    length
-                };
-
-                let result = HybridEncoded::Bitmap(pack, self.run_offset, additional);
-
-                if additional == length {
-                    self.run_offset = 0;
-                    self.current = self.iter.next();
-                } else {
-                    self.run_offset += additional;
-                };
-                self.consumed += additional;
-                result
-            }
-            hybrid_rle::HybridEncoded::Rle(value, length) => {
-                let is_set = value[0] == 1;
-                let length = length - self.run_offset;
-
-                // the number of elements that will be consumed in this (run, iteration)
-                let additional = if let Some(limit) = limit {
-                    length.min(limit)
-                } else {
-                    length
-                };
-
-                let result = HybridEncoded::Repeated(is_set, additional);
-
-                if additional == length {
-                    self.run_offset = 0;
-                    self.current = self.iter.next();
-                } else {
-                    self.run_offset += additional;
-                };
-                self.consumed += additional;
-                result
-            }
-        };
-        Some(result)
     }
 }
 
@@ -137,7 +76,30 @@ impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> Iterator for HybridR
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.limited_next(None)
+        if self.consumed == self.length {
+            return None;
+        };
+        let run = self.iter.next()?;
+
+        Some(match run {
+            hybrid_rle::HybridEncoded::Bitpacked(pack) => {
+                // a pack has at most `pack.len() * 8` bits
+                let pack_size = pack.len() * 8;
+
+                let additional = pack_size.min(self.len());
+
+                self.consumed += additional;
+                HybridEncoded::Bitmap(pack, additional)
+            }
+            hybrid_rle::HybridEncoded::Rle(value, length) => {
+                let is_set = value[0] == 1;
+
+                let additional = length.min(self.len());
+
+                self.consumed += additional;
+                HybridEncoded::Repeated(is_set, additional)
+            }
+        })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -193,8 +155,8 @@ impl<'a, I: HybridRleRunsIterator<'a>> Iterator for HybridRleBooleanIter<'a, I> 
             }
         } else if let Some(run) = self.iter.next() {
             self.current_run = Some(match run {
-                HybridEncoded::Bitmap(bitmap, offset, length) => {
-                    HybridBooleanState::Bitmap(BitmapIter::new(bitmap, offset, length))
+                HybridEncoded::Bitmap(bitmap, length) => {
+                    HybridBooleanState::Bitmap(BitmapIter::new(bitmap, 0, length))
                 }
                 HybridEncoded::Repeated(value, length) => {
                     HybridBooleanState::Repeated(value, length)
