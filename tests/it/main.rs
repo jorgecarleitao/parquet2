@@ -77,6 +77,11 @@ pub fn alltypes_plain(column: &str) -> Array {
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
             Array::Int32(expected)
         }
+        "id-short-array" => {
+            let expected = vec![4];
+            let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
+            Array::Int32(expected)
+        }
         "bool_col" => {
             let expected = vec![true, false, true, false, true, false, true, false];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
@@ -155,6 +160,13 @@ pub fn alltypes_statistics(column: &str) -> Arc<dyn Statistics> {
             distinct_count: None,
             min_value: Some(0),
             max_value: Some(7),
+        }),
+        "id-short-array" => Arc::new(PrimitiveStatistics::<i32> {
+            primitive_type: PrimitiveType::from_physical("col".to_string(), PhysicalType::Int32),
+            null_count: Some(0),
+            distinct_count: None,
+            min_value: Some(4),
+            max_value: Some(4),
         }),
         "bool_col" => Arc::new(BooleanStatistics {
             null_count: Some(0),

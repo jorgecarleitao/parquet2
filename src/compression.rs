@@ -65,8 +65,8 @@ pub fn compress(
         #[cfg(feature = "lz4")]
         Compression::Lz4Raw => {
             let output_buf_len = output_buf.len();
-            let required_len = input_buf.len();
-            output_buf.resize(output_buf_len + required_len, 0);
+            let required_len = lz4::block::compress_bound(input_buf.len())?;
+            output_buf.resize(required_len, 0);
             let size = lz4::block::compress_to_buffer(
                 input_buf,
                 None,
