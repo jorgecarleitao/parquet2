@@ -123,6 +123,11 @@ fn int32_lz4() -> Result<()> {
 }
 
 #[test]
+fn int32_lz4_short_i32_array() -> Result<()> {
+    test_column("id-short-array", Compression::Lz4Raw)
+}
+
+#[test]
 fn int32_brotli() -> Result<()> {
     test_column("id", Compression::Brotli)
 }
