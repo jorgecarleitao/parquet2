@@ -59,7 +59,7 @@ pub enum Compression {
     Lzo,
     Brotli,
     Lz4,
-    Zstd,
+    Zstd(Option<ZstdLevel>),
     Lz4Raw,
 }
 
@@ -74,7 +74,7 @@ impl TryFrom<CompressionCodec> for Compression {
             CompressionCodec::LZO => Compression::Lzo,
             CompressionCodec::BROTLI => Compression::Brotli,
             CompressionCodec::LZ4 => Compression::Lz4,
-            CompressionCodec::ZSTD => Compression::Zstd,
+            CompressionCodec::ZSTD => Compression::Zstd(None),
             CompressionCodec::LZ4_RAW => Compression::Lz4Raw,
             _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
         })
@@ -90,9 +90,42 @@ impl From<Compression> for CompressionCodec {
             Compression::Lzo => CompressionCodec::LZO,
             Compression::Brotli => CompressionCodec::BROTLI,
             Compression::Lz4 => CompressionCodec::LZ4,
-            Compression::Zstd => CompressionCodec::ZSTD,
+            Compression::Zstd(_) => CompressionCodec::ZSTD,
             Compression::Lz4Raw => CompressionCodec::LZ4_RAW,
         }
+    }
+}
+
+/// Represents a valid zstd compression level.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub struct ZstdLevel(i32);
+
+impl ZstdLevel {
+    /// Attempts to create a zstd compression level from a given compression level.
+    ///
+    /// Compression levels must be valid (i.e. be acceptable for [`zstd::compression_level_range`])
+    pub fn try_new(level: i32) -> Result<Self, Error> {
+        let compression_range = zstd::compression_level_range();
+        if compression_range.contains(&level) {
+            Ok(Self(level))
+        } else {
+            Err(Error::General(format!(
+                "valid compression range {}..={} exceeded.",
+                compression_range.start(),
+                compression_range.end()
+            )))
+        }
+    }
+
+    /// Returns the zstd compression level.
+    pub fn compression_level(&self) -> i32 {
+        self.0
+    }
+}
+
+impl Default for ZstdLevel {
+    fn default() -> Self {
+        Self(zstd::DEFAULT_COMPRESSION_LEVEL)
     }
 }
 
@@ -540,7 +573,16 @@ mod tests {
     #[test]
     fn round_compression() -> Result<(), Error> {
         use Compression::*;
-        let a = vec![Uncompressed, Snappy, Gzip, Lzo, Brotli, Lz4, Zstd, Lz4Raw];
+        let a = vec![
+            Uncompressed,
+            Snappy,
+            Gzip,
+            Lzo,
+            Brotli,
+            Lz4,
+            Zstd(None),
+            Lz4Raw,
+        ];
         for a in a {
             let c: CompressionCodec = a.into();
             let e: Compression = c.try_into()?;
