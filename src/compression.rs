@@ -1,5 +1,5 @@
 //! Functionality to compress and decompress data according to the parquet specification
-pub use super::parquet_bridge::Compression;
+pub use super::parquet_bridge::{Compression, ZstdLevel};
 
 use crate::error::{Error, Result};
 
@@ -82,12 +82,13 @@ pub fn compress(
             "compress to lz4".to_string(),
         )),
         #[cfg(feature = "zstd")]
-        Compression::Zstd => {
+        Compression::Zstd(level) => {
             use std::io::Write;
-            /// Compression level (1-21) for ZSTD. Choose 1 here for better compression speed.
-            const ZSTD_COMPRESSION_LEVEL: i32 = 1;
+            let level = level
+                .map(|v| v.compression_level())
+                .unwrap_or(zstd::DEFAULT_COMPRESSION_LEVEL);
 
-            let mut encoder = zstd::Encoder::new(output_buf, ZSTD_COMPRESSION_LEVEL)?;
+            let mut encoder = zstd::Encoder::new(output_buf, level)?;
             encoder.write_all(input_buf)?;
             match encoder.finish() {
                 Ok(_) => Ok(()),
@@ -165,7 +166,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             "decompress with lz4".to_string(),
         )),
         #[cfg(feature = "zstd")]
-        Compression::Zstd => {
+        Compression::Zstd(_) => {
             use std::io::Read;
             let mut decoder = zstd::Decoder::new(input_buf)?;
             decoder.read_exact(output_buf).map_err(|e| e.into())
@@ -233,7 +234,16 @@ mod tests {
     }
 
     #[test]
-    fn test_codec_zstd() {
-        test_codec(Compression::Zstd);
+    fn test_codec_zstd_default() {
+        test_codec(Compression::Zstd(None));
+    }
+
+    #[test]
+    fn test_codec_zstd_low_compression() {
+        test_codec(Compression::Zstd(Some(ZstdLevel::try_new(1).unwrap())));
+    }
+    #[test]
+    fn test_codec_zstd_high_compression() {
+        test_codec(Compression::Zstd(Some(ZstdLevel::try_new(21).unwrap())));
     }
 }
