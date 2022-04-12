@@ -24,6 +24,8 @@ jobs:
           deactivate
       - name: Run
         run: cargo test
+      - name: Run lz4-flex
+        run: cargo test --no-default-features --features lz4_flex,bloom_filter,stream,snappy,brotli,zstd,gzip
 
   clippy:
     name: Clippy

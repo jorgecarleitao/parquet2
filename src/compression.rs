@@ -64,11 +64,13 @@ pub fn compress(
         )),
         #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
         Compression::Lz4Raw => {
+            let output_buf_len = output_buf.len();
             let required_len = lz4_flex::block::get_maximum_output_size(input_buf.len());
-            output_buf.resize(required_len, 0);
+            output_buf.resize(output_buf_len + required_len, 0);
 
-            let compressed_size = lz4_flex::block::compress_into(input_buf, output_buf).unwrap();
-            output_buf.truncate(compressed_size);
+            let compressed_size =
+                lz4_flex::block::compress_into(input_buf, &mut output_buf[output_buf_len..])?;
+            output_buf.truncate(output_buf_len + compressed_size);
             Ok(())
         }
         #[cfg(feature = "lz4")]
@@ -163,10 +165,9 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             "decompress with snappy".to_string(),
         )),
         #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
-        Compression::Lz4Raw => {
-            lz4_flex::block::decompress_into(input_buf, output_buf).unwrap();
-            Ok(())
-        }
+        Compression::Lz4Raw => lz4_flex::block::decompress_into(input_buf, output_buf)
+            .map(|_| {})
+            .map_err(|e| e.into()),
         #[cfg(feature = "lz4")]
         Compression::Lz4Raw => {
             lz4::block::decompress_to_buffer(input_buf, Some(output_buf.len() as i32), output_buf)
