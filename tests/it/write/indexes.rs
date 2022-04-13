@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use parquet2::compression::Compression;
+use parquet2::compression::CompressionEncode;
 use parquet2::error::Result;
 use parquet2::indexes::{
     select_pages, BoundaryOrder, Index, Interval, NativeIndex, PageIndex, PageLocation,
@@ -25,7 +25,7 @@ fn write_file() -> Result<Vec<u8>> {
 
     let options = WriteOptions {
         write_statistics: true,
-        compression: Compression::Uncompressed,
+        compression: CompressionEncode::Uncompressed,
         version: Version::V1,
     };
 

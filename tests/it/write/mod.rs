@@ -50,7 +50,7 @@ async fn read_column_async<
     Ok((a, statistics))
 }
 
-fn test_column(column: &str, compression: Compression) -> Result<()> {
+fn test_column(column: &str, compression: CompressionEncode) -> Result<()> {
     let array = alltypes_plain(column);
 
     let options = WriteOptions {
@@ -109,68 +109,68 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
 
 #[test]
 fn int32() -> Result<()> {
-    test_column("id", Compression::Uncompressed)
+    test_column("id", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn int32_snappy() -> Result<()> {
-    test_column("id", Compression::Snappy)
+    test_column("id", CompressionEncode::Snappy)
 }
 
 #[test]
 fn int32_lz4() -> Result<()> {
-    test_column("id", Compression::Lz4Raw)
+    test_column("id", CompressionEncode::Lz4Raw)
 }
 
 #[test]
 fn int32_lz4_short_i32_array() -> Result<()> {
-    test_column("id-short-array", Compression::Lz4Raw)
+    test_column("id-short-array", CompressionEncode::Lz4Raw)
 }
 
 #[test]
 fn int32_brotli() -> Result<()> {
-    test_column("id", Compression::Brotli)
+    test_column("id", CompressionEncode::Brotli)
 }
 
 #[test]
 #[ignore = "Native boolean writer not yet implemented"]
 fn bool() -> Result<()> {
-    test_column("bool_col", Compression::Uncompressed)
+    test_column("bool_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn tinyint() -> Result<()> {
-    test_column("tinyint_col", Compression::Uncompressed)
+    test_column("tinyint_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn smallint_col() -> Result<()> {
-    test_column("smallint_col", Compression::Uncompressed)
+    test_column("smallint_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn int_col() -> Result<()> {
-    test_column("int_col", Compression::Uncompressed)
+    test_column("int_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn bigint_col() -> Result<()> {
-    test_column("bigint_col", Compression::Uncompressed)
+    test_column("bigint_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn float_col() -> Result<()> {
-    test_column("float_col", Compression::Uncompressed)
+    test_column("float_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn double_col() -> Result<()> {
-    test_column("double_col", Compression::Uncompressed)
+    test_column("double_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
 fn string_col() -> Result<()> {
-    test_column("string_col", Compression::Uncompressed)
+    test_column("string_col", CompressionEncode::Uncompressed)
 }
 
 #[test]
@@ -187,7 +187,7 @@ fn basic() -> Result<()> {
 
     let options = WriteOptions {
         write_statistics: false,
-        compression: Compression::Uncompressed,
+        compression: CompressionEncode::Uncompressed,
         version: Version::V1,
     };
 
@@ -237,7 +237,7 @@ async fn test_column_async(column: &str) -> Result<()> {
 
     let options = WriteOptions {
         write_statistics: true,
-        compression: Compression::Uncompressed,
+        compression: CompressionEncode::Uncompressed,
         version: Version::V1,
     };
 

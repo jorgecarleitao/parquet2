@@ -4,7 +4,7 @@ use futures::AsyncWrite;
 use parquet_format_async_temp::{ColumnChunk, RowGroup};
 
 use crate::{
-    compression::Compression,
+    compression::CompressionEncode,
     error::{Error, Result},
     metadata::{ColumnChunkMetaData, ColumnDescriptor},
     page::CompressedPage,
@@ -81,7 +81,7 @@ pub fn write_row_group<
     writer: &mut W,
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
-    compression: Compression,
+    compression: CompressionEncode,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
     ordinal: usize,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
@@ -147,7 +147,7 @@ pub async fn write_row_group_async<
     writer: &mut W,
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
-    compression: Compression,
+    compression: CompressionEncode,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where

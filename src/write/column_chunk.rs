@@ -10,7 +10,7 @@ use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Type};
 use crate::statistics::serialize_statistics;
 use crate::FallibleStreamingIterator;
 use crate::{
-    compression::Compression,
+    compression::CompressionEncode,
     encoding::Encoding,
     error::{Error, Result},
     metadata::ColumnDescriptor,
@@ -25,7 +25,7 @@ pub fn write_column_chunk<'a, W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
-    compression: Compression,
+    compression: CompressionEncode,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
@@ -63,7 +63,7 @@ pub async fn write_column_chunk_async<W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
-    compression: Compression,
+    compression: CompressionEncode,
     mut compressed_pages: DynStreamingIterator<'_, CompressedPage, E>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
@@ -99,7 +99,7 @@ where
 fn build_column_chunk(
     specs: &[PageWriteSpec],
     descriptor: &ColumnDescriptor,
-    compression: Compression,
+    compression: CompressionEncode,
 ) -> Result<ColumnChunk> {
     // compute stats to build header at the end of the chunk
 
