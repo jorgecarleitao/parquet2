@@ -10,7 +10,7 @@ use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Type};
 use crate::statistics::serialize_statistics;
 use crate::FallibleStreamingIterator;
 use crate::{
-    compression::Compression,
+    compression::CompressionEncode,
     encoding::Encoding,
     error::{Error, Result},
     metadata::ColumnDescriptor,
@@ -25,6 +25,7 @@ pub fn write_column_chunk<'a, W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
+    compression: CompressionEncode,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
@@ -112,7 +113,7 @@ fn build_column_chunk(
     let compression = compression
         .into_iter()
         .next()
-        .unwrap_or(Compression::Uncompressed);
+        .unwrap_or(CompressionEncode::Uncompressed);
 
     // SPEC: the total compressed size is the total compressed size of each page + the header size
     let total_compressed_size = specs

@@ -51,6 +51,7 @@ impl From<Repetition> for FieldRepetitionType {
     }
 }
 
+/// Defines the compression settings when reading a parquet file
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub enum Compression {
     Uncompressed,
@@ -59,7 +60,7 @@ pub enum Compression {
     Lzo,
     Brotli,
     Lz4,
-    Zstd(Option<ZstdLevel>),
+    Zstd,
     Lz4Raw,
 }
 
@@ -74,7 +75,7 @@ impl TryFrom<CompressionCodec> for Compression {
             CompressionCodec::LZO => Compression::Lzo,
             CompressionCodec::BROTLI => Compression::Brotli,
             CompressionCodec::LZ4 => Compression::Lz4,
-            CompressionCodec::ZSTD => Compression::Zstd(None),
+            CompressionCodec::ZSTD => Compression::Zstd,
             CompressionCodec::LZ4_RAW => Compression::Lz4Raw,
             _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
         })
@@ -90,8 +91,51 @@ impl From<Compression> for CompressionCodec {
             Compression::Lzo => CompressionCodec::LZO,
             Compression::Brotli => CompressionCodec::BROTLI,
             Compression::Lz4 => CompressionCodec::LZ4,
-            Compression::Zstd(_) => CompressionCodec::ZSTD,
+            Compression::Zstd => CompressionCodec::ZSTD,
             Compression::Lz4Raw => CompressionCodec::LZ4_RAW,
+        }
+    }
+}
+
+/// Defines the compression settings for writing a parquet file.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub enum CompressionEncode {
+    Uncompressed,
+    Snappy,
+    Gzip,
+    Lzo,
+    Brotli,
+    Lz4,
+    Zstd(Option<ZstdLevel>),
+    Lz4Raw,
+}
+
+impl From<CompressionEncode> for Compression {
+    fn from(value: CompressionEncode) -> Self {
+        match value {
+            CompressionEncode::Uncompressed => Compression::Uncompressed,
+            CompressionEncode::Snappy => Compression::Snappy,
+            CompressionEncode::Gzip => Compression::Gzip,
+            CompressionEncode::Lzo => Compression::Lzo,
+            CompressionEncode::Brotli => Compression::Brotli,
+            CompressionEncode::Lz4 => Compression::Lz4,
+            CompressionEncode::Zstd(_) => Compression::Zstd,
+            CompressionEncode::Lz4Raw => Compression::Lz4Raw,
+        }
+    }
+}
+
+impl From<CompressionEncode> for CompressionCodec {
+    fn from(codec: CompressionEncode) -> Self {
+        match codec {
+            CompressionEncode::Uncompressed => CompressionCodec::UNCOMPRESSED,
+            CompressionEncode::Snappy => CompressionCodec::SNAPPY,
+            CompressionEncode::Gzip => CompressionCodec::GZIP,
+            CompressionEncode::Lzo => CompressionCodec::LZO,
+            CompressionEncode::Brotli => CompressionCodec::BROTLI,
+            CompressionEncode::Lz4 => CompressionCodec::LZ4,
+            CompressionEncode::Zstd(_) => CompressionCodec::ZSTD,
+            CompressionEncode::Lz4Raw => CompressionCodec::LZ4_RAW,
         }
     }
 }
@@ -104,6 +148,7 @@ impl ZstdLevel {
     /// Attempts to create a zstd compression level from a given compression level.
     ///
     /// Compression levels must be valid (i.e. be acceptable for [`zstd::compression_level_range`])
+    #[cfg(feature = "zstd")]
     pub fn try_new(level: i32) -> Result<Self, Error> {
         let compression_range = zstd::compression_level_range();
         if compression_range.contains(&level) {
@@ -123,6 +168,7 @@ impl ZstdLevel {
     }
 }
 
+#[cfg(feature = "zstd")]
 impl Default for ZstdLevel {
     fn default() -> Self {
         Self(zstd::DEFAULT_COMPRESSION_LEVEL)
@@ -571,18 +617,9 @@ mod tests {
     }
 
     #[test]
-    fn round_compression() -> Result<(), Error> {
+    fn round_compression_decode() -> Result<(), Error> {
         use Compression::*;
-        let a = vec![
-            Uncompressed,
-            Snappy,
-            Gzip,
-            Lzo,
-            Brotli,
-            Lz4,
-            Zstd(None),
-            Lz4Raw,
-        ];
+        let a = vec![Uncompressed, Snappy, Gzip, Lzo, Brotli, Lz4, Zstd, Lz4Raw];
         for a in a {
             let c: CompressionCodec = a.into();
             let e: Compression = c.try_into()?;
