@@ -127,7 +127,7 @@ impl<W: Write> FileWriter<W> {
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
         if self.options.write_statistics {
-            // write column indexes
+            // write column indexes (require page statistics)
             self.row_groups
                 .iter_mut()
                 .zip(self.page_specs.iter())
@@ -144,24 +144,26 @@ impl<W: Write> FileWriter<W> {
                     )?;
                     Result::Ok(())
                 })?;
-
-            // write offset index
-            self.row_groups
-                .iter_mut()
-                .zip(self.page_specs.iter())
-                .try_for_each(|(group, pages)| {
-                    group.columns.iter_mut().zip(pages.iter()).try_for_each(
-                        |(column, pages)| {
-                            let offset = self.offset;
-                            column.offset_index_offset = Some(offset as i64);
-                            self.offset += write_offset_index(&mut self.writer, pages)?;
-                            column.offset_index_length = Some((self.offset - offset) as i32);
-                            Result::Ok(())
-                        },
-                    )?;
-                    Result::Ok(())
-                })?;
         };
+
+        // write offset index
+        self.row_groups
+            .iter_mut()
+            .zip(self.page_specs.iter())
+            .try_for_each(|(group, pages)| {
+                group
+                    .columns
+                    .iter_mut()
+                    .zip(pages.iter())
+                    .try_for_each(|(column, pages)| {
+                        let offset = self.offset;
+                        column.offset_index_offset = Some(offset as i64);
+                        self.offset += write_offset_index(&mut self.writer, pages)?;
+                        column.offset_index_length = Some((self.offset - offset) as i32);
+                        Result::Ok(())
+                    })?;
+                Result::Ok(())
+            })?;
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
