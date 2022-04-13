@@ -25,7 +25,6 @@ pub fn write_column_chunk<'a, W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
-    compression: Compression,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
@@ -45,7 +44,7 @@ where
     }
     let mut bytes_written = offset - initial;
 
-    let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
+    let column_chunk = build_column_chunk(&specs, descriptor)?;
 
     // write metadata
     let mut protocol = TCompactOutputProtocol::new(writer);
@@ -63,7 +62,6 @@ pub async fn write_column_chunk_async<W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
-    compression: Compression,
     mut compressed_pages: DynStreamingIterator<'_, CompressedPage, E>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
@@ -81,7 +79,7 @@ where
     }
     let mut bytes_written = offset - initial;
 
-    let column_chunk = build_column_chunk(&specs, descriptor, compression)?;
+    let column_chunk = build_column_chunk(&specs, descriptor)?;
 
     // write metadata
     let mut protocol = TCompactOutputStreamProtocol::new(writer);
@@ -99,9 +97,22 @@ where
 fn build_column_chunk(
     specs: &[PageWriteSpec],
     descriptor: &ColumnDescriptor,
-    compression: Compression,
 ) -> Result<ColumnChunk> {
     // compute stats to build header at the end of the chunk
+
+    let compression = specs
+        .iter()
+        .map(|spec| spec.compression)
+        .collect::<HashSet<_>>();
+    if compression.len() > 1 {
+        return Err(crate::error::Error::OutOfSpec(
+            "All pages within a column chunk must be compressed with the same codec".to_string(),
+        ));
+    }
+    let compression = compression
+        .into_iter()
+        .next()
+        .unwrap_or(Compression::Uncompressed);
 
     // SPEC: the total compressed size is the total compressed size of each page + the header size
     let total_compressed_size = specs

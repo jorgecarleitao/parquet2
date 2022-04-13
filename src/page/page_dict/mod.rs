@@ -36,17 +36,24 @@ impl EncodedDictPage {
 #[derive(Debug)]
 pub struct CompressedDictPage {
     pub(crate) buffer: Vec<u8>,
+    compression: Compression,
     pub(crate) num_values: usize,
     pub(crate) uncompressed_page_size: usize,
 }
 
 impl CompressedDictPage {
-    pub fn new(buffer: Vec<u8>, uncompressed_page_size: usize, num_values: usize) -> Self {
+    pub fn new(buffer: Vec<u8>, compression: Compression, uncompressed_page_size: usize, num_values: usize) -> Self {
         Self {
             buffer,
+            compression,
             uncompressed_page_size,
             num_values,
         }
+    }
+
+    /// The compression of the data in this page.
+    pub fn compression(&self) -> Compression {
+        self.compression
     }
 }
 

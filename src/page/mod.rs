@@ -277,6 +277,13 @@ impl CompressedPage {
         }
     }
 
+    pub(crate) fn compression(&self) -> Compression {
+        match self {
+            CompressedPage::Data(page) => page.compression(),
+            CompressedPage::Dict(page) => page.compression(),
+        }
+    }
+
     pub(crate) fn num_values(&self) -> usize {
         match self {
             CompressedPage::Data(page) => page.num_values(),
