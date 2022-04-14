@@ -54,9 +54,9 @@ fn write_file() -> Result<Vec<u8>> {
 
     writer.start()?;
     writer.write(DynIter::new(columns))?;
-    let writer = writer.end(None)?.1;
+    writer.end(None)?;
 
-    Ok(writer.into_inner())
+    Ok(writer.into_inner().into_inner())
 }
 
 #[test]

@@ -93,9 +93,9 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
 
     writer.start()?;
     writer.write(DynIter::new(columns))?;
-    let writer = writer.end(None)?.1;
+    writer.end(None)?;
 
-    let data = writer.into_inner();
+    let data = writer.into_inner().into_inner();
 
     let (result, statistics) = read_column(&mut Cursor::new(data))?;
     assert_eq!(array, result);
@@ -215,9 +215,9 @@ fn basic() -> Result<()> {
 
     writer.start()?;
     writer.write(DynIter::new(columns))?;
-    let writer = writer.end(None)?.1;
+    writer.end(None)?;
 
-    let data = writer.into_inner();
+    let data = writer.into_inner().into_inner();
     let mut reader = Cursor::new(data);
 
     let metadata = read_metadata(&mut reader)?;
