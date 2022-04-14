@@ -25,7 +25,6 @@ fn write_file() -> Result<Vec<u8>> {
 
     let options = WriteOptions {
         write_statistics: true,
-        compression: Compression::Uncompressed,
         version: Version::V1,
     };
 
@@ -44,7 +43,7 @@ fn write_file() -> Result<Vec<u8>> {
 
     let pages = DynStreamingIterator::new(Compressor::new(
         DynIter::new(pages.into_iter()),
-        options.compression,
+        Compression::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));

@@ -55,7 +55,6 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
 
     let options = WriteOptions {
         write_statistics: true,
-        compression,
         version: Version::V1,
     };
 
@@ -83,7 +82,7 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
             &options,
             &a[0].descriptor,
         ))),
-        options.compression,
+        compression,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));
@@ -187,7 +186,6 @@ fn basic() -> Result<()> {
 
     let options = WriteOptions {
         write_statistics: false,
-        compression: Compression::Uncompressed,
         version: Version::V1,
     };
 
@@ -205,7 +203,7 @@ fn basic() -> Result<()> {
             &options,
             &schema.columns()[0].descriptor,
         ))),
-        options.compression,
+        Compression::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));
@@ -237,7 +235,6 @@ async fn test_column_async(column: &str) -> Result<()> {
 
     let options = WriteOptions {
         write_statistics: true,
-        compression: Compression::Uncompressed,
         version: Version::V1,
     };
 
@@ -264,7 +261,7 @@ async fn test_column_async(column: &str) -> Result<()> {
             &options,
             &a[0].descriptor,
         ))),
-        options.compression,
+        Compression::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));

@@ -20,7 +20,6 @@ pub use file::FileWriter;
 
 pub use row_group::ColumnOffsetsMetadata;
 
-use crate::compression::Compression;
 use crate::page::CompressedPage;
 
 pub type RowGroupIter<'a, E> =
@@ -31,8 +30,6 @@ pub type RowGroupIter<'a, E> =
 pub struct WriteOptions {
     /// Whether to write statistics, including indexes
     pub write_statistics: bool,
-    /// Whether to use compression
-    pub compression: Compression,
     /// Which Parquet version to use
     pub version: Version,
 }

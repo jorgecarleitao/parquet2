@@ -4,7 +4,6 @@ use futures::AsyncWrite;
 use parquet_format_async_temp::{ColumnChunk, RowGroup};
 
 use crate::{
-    compression::Compression,
     error::{Error, Result},
     metadata::{ColumnChunkMetaData, ColumnDescriptor},
     page::CompressedPage,
@@ -81,7 +80,6 @@ pub fn write_row_group<
     writer: &mut W,
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
-    compression: Compression,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
     ordinal: usize,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
@@ -96,7 +94,7 @@ where
     let columns = column_iter
         .map(|(descriptor, page_iter)| {
             let (column, page_specs, size) =
-                write_column_chunk(writer, offset, descriptor, compression, page_iter?)?;
+                write_column_chunk(writer, offset, descriptor, page_iter?)?;
             offset += size;
             Ok((column, page_specs))
         })
@@ -147,7 +145,6 @@ pub async fn write_row_group_async<
     writer: &mut W,
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
-    compression: Compression,
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
@@ -161,7 +158,7 @@ where
     let mut columns = vec![];
     for (descriptor, page_iter) in column_iter {
         let (column, page_specs, size) =
-            write_column_chunk_async(writer, offset, descriptor, compression, page_iter?).await?;
+            write_column_chunk_async(writer, offset, descriptor, page_iter?).await?;
         offset += size;
         columns.push((column, page_specs));
     }

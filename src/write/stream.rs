@@ -106,7 +106,6 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             &mut self.writer,
             self.offset,
             self.schema.columns(),
-            self.options.compression,
             row_group,
         )
         .await?;

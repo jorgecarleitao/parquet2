@@ -8,6 +8,7 @@ use parquet_format_async_temp::thrift::protocol::{
 };
 use parquet_format_async_temp::{DictionaryPageHeader, Encoding, PageType};
 
+use crate::compression::Compression;
 use crate::error::{Error, Result};
 use crate::page::{
     CompressedDataPage, CompressedDictPage, CompressedPage, DataPageHeader, ParquetPageHeader,
@@ -44,6 +45,7 @@ pub struct PageWriteSpec {
     pub header_size: u64,
     pub offset: u64,
     pub bytes_written: u64,
+    pub compression: Compression,
     pub statistics: Option<Arc<dyn Statistics>>,
 }
 
@@ -84,6 +86,7 @@ pub fn write_page<W: Write>(
         header_size,
         offset,
         bytes_written,
+        compression: compressed_page.compression(),
         statistics,
         num_rows: selected_rows.map(|x| x.last().unwrap().length),
         num_values,
@@ -127,6 +130,7 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
         header_size,
         offset,
         bytes_written,
+        compression: compressed_page.compression(),
         statistics,
         num_rows: selected_rows.map(|x| x.last().unwrap().length),
         num_values,
@@ -210,21 +214,23 @@ mod tests {
 
     #[test]
     fn dict_too_large() {
-        let page = CompressedDictPage {
-            buffer: vec![],
-            uncompressed_page_size: i32::MAX as usize + 1,
-            num_values: 100,
-        };
+        let page = CompressedDictPage::new(
+            vec![],
+            Compression::Uncompressed,
+            i32::MAX as usize + 1,
+            100,
+        );
         assert!(assemble_dict_page_header(&page).is_err());
     }
 
     #[test]
     fn dict_too_many_values() {
-        let page = CompressedDictPage {
-            buffer: vec![],
-            uncompressed_page_size: 0,
-            num_values: i32::MAX as usize + 1,
-        };
+        let page = CompressedDictPage::new(
+            vec![],
+            Compression::Uncompressed,
+            0,
+            i32::MAX as usize + 1,
+        );
         assert!(assemble_dict_page_header(&page).is_err());
     }
 }
