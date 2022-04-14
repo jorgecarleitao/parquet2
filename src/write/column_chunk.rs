@@ -129,7 +129,7 @@ fn build_column_chunk(
             }
         })
         .sum();
-    let encodings = specs
+    let mut encodings = specs
         .iter()
         .flat_map(|spec| {
             let type_ = spec.header.type_.try_into().unwrap();
@@ -155,7 +155,10 @@ fn build_column_chunk(
         })
         .collect::<HashSet<_>>() // unique
         .into_iter() // to vec
-        .collect();
+        .collect::<Vec<_>>();
+
+    // Sort the encodings to have deterministic metadata
+    encodings.sort();
 
     let statistics = specs.iter().map(|x| &x.statistics).collect::<Vec<_>>();
     let statistics = reduce(&statistics)?;
