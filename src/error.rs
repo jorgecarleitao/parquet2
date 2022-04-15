@@ -64,6 +64,20 @@ impl From<snap::Error> for Error {
     }
 }
 
+#[cfg(feature = "lz4_flex")]
+impl From<lz4_flex::block::DecompressError> for Error {
+    fn from(e: lz4_flex::block::DecompressError) -> Error {
+        Error::General(format!("underlying lz4_flex error: {}", e))
+    }
+}
+
+#[cfg(feature = "lz4_flex")]
+impl From<lz4_flex::block::CompressError> for Error {
+    fn from(e: lz4_flex::block::CompressError) -> Error {
+        Error::General(format!("underlying lz4_flex error: {}", e))
+    }
+}
+
 impl From<parquet_format_async_temp::thrift::Error> for Error {
     fn from(e: parquet_format_async_temp::thrift::Error) -> Error {
         Error::General(format!("underlying thrift error: {}", e))
