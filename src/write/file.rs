@@ -119,9 +119,8 @@ impl<W: Write> FileWriter<W> {
         Ok(())
     }
 
-    /// Writes the footer of the parquet file. Returns the total size of the file and the
-    /// underlying writer.
-    pub fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
+    /// Writes the footer of the parquet file. Returns the total size of the file.
+    pub fn end(&mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
@@ -166,18 +165,23 @@ impl<W: Write> FileWriter<W> {
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
-            self.schema.into_thrift(),
+            self.schema.clone().into_thrift(),
             num_rows,
-            self.row_groups,
+            self.row_groups.clone(),
             key_value_metadata,
-            self.created_by,
+            self.created_by.clone(),
             None,
             None,
             None,
         );
 
         let len = end_file(&mut self.writer, metadata)?;
-        Ok((self.offset + len, self.writer))
+        Ok(self.offset + len)
+    }
+
+    /// Returns the underlying writer.
+    pub fn into_inner(self) -> W {
+        self.writer
     }
 }
 
