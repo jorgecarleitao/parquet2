@@ -1,5 +1,50 @@
 # Changelog
 
+## [v0.11.0](https://github.com/jorgecarleitao/parquet2/tree/v0.11.0) (2022-04-15)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.10.3...v0.11.0)
+
+**Breaking changes:**
+
+- Renamed `ParquetError` to `Error` [\#109](https://github.com/jorgecarleitao/parquet2/issues/109)
+- Made `.end` not consume the parquet `FileWriter` [\#127](https://github.com/jorgecarleitao/parquet2/pull/127) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Removed `compression` from `WriteOptions` [\#125](https://github.com/jorgecarleitao/parquet2/pull/125) ([kornholi](https://github.com/kornholi))
+- Simplified API and converted some panics on read to errors [\#112](https://github.com/jorgecarleitao/parquet2/pull/112) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Improved typing to reduce clones and use of unwraps [\#106](https://github.com/jorgecarleitao/parquet2/pull/106) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Simplified `PageIterator` [\#103](https://github.com/jorgecarleitao/parquet2/pull/103) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**New features:**
+
+- Added support for page-level filter pushdown \(indexes\) [\#102](https://github.com/jorgecarleitao/parquet2/issues/102)
+- Added support for bloom filters [\#98](https://github.com/jorgecarleitao/parquet2/issues/98)
+- Added optional support for LZ4 via LZ4-flex crate \(thus enabling wasm\) [\#124](https://github.com/jorgecarleitao/parquet2/pull/124) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Added support for page-level filter pushdown \(column and offset indexes\) [\#107](https://github.com/jorgecarleitao/parquet2/pull/107) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Added support to read column and page indexes [\#100](https://github.com/jorgecarleitao/parquet2/pull/100) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- Fixed minimum version for LZ4 [\#122](https://github.com/jorgecarleitao/parquet2/pull/122) ([kornholi](https://github.com/kornholi))
+- Fixed Lz4Raw compression error \(if input is tiny\)  [\#118](https://github.com/jorgecarleitao/parquet2/pull/118) ([dantengsky](https://github.com/dantengsky))
+- Fixed LZ4 [\#95](https://github.com/jorgecarleitao/parquet2/pull/95) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Made offsets be always written [\#123](https://github.com/jorgecarleitao/parquet2/pull/123) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Added specialized deserialization of one-level filtered pages [\#120](https://github.com/jorgecarleitao/parquet2/pull/120) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Added support to read and use bloom filters [\#99](https://github.com/jorgecarleitao/parquet2/pull/99) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Added `ordinal` and `total_compressed_size` to column meta [\#96](https://github.com/jorgecarleitao/parquet2/pull/96) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Added non-consuming function to get values of delta-decoder [\#94](https://github.com/jorgecarleitao/parquet2/pull/94) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Disabled bitpacking default-features and upgraded to edition 2021 [\#93](https://github.com/jorgecarleitao/parquet2/pull/93) ([light4](https://github.com/light4))
+
+**Documentation updates:**
+
+- Fix deployment of guide [\#115](https://github.com/jorgecarleitao/parquet2/pull/115) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Testing updates:**
+
+- Added tests for reducing statistics [\#116](https://github.com/jorgecarleitao/parquet2/pull/116) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Simplified tests [\#104](https://github.com/jorgecarleitao/parquet2/pull/104) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.10.3](https://github.com/jorgecarleitao/parquet2/tree/v0.10.3) (2022-03-03)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.10.2...v0.10.3)
