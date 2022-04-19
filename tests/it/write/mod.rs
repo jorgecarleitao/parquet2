@@ -5,7 +5,7 @@ mod primitive;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
-use parquet2::compression::Compression;
+use parquet2::compression::CompressionOptions;
 use parquet2::error::Result;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::read_metadata;
@@ -50,7 +50,7 @@ async fn read_column_async<
     Ok((a, statistics))
 }
 
-fn test_column(column: &str, compression: Compression) -> Result<()> {
+fn test_column(column: &str, compression: CompressionOptions) -> Result<()> {
     let array = alltypes_plain(column);
 
     let options = WriteOptions {
@@ -108,68 +108,68 @@ fn test_column(column: &str, compression: Compression) -> Result<()> {
 
 #[test]
 fn int32() -> Result<()> {
-    test_column("id", Compression::Uncompressed)
+    test_column("id", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn int32_snappy() -> Result<()> {
-    test_column("id", Compression::Snappy)
+    test_column("id", CompressionOptions::Snappy)
 }
 
 #[test]
 fn int32_lz4() -> Result<()> {
-    test_column("id", Compression::Lz4Raw)
+    test_column("id", CompressionOptions::Lz4Raw)
 }
 
 #[test]
 fn int32_lz4_short_i32_array() -> Result<()> {
-    test_column("id-short-array", Compression::Lz4Raw)
+    test_column("id-short-array", CompressionOptions::Lz4Raw)
 }
 
 #[test]
 fn int32_brotli() -> Result<()> {
-    test_column("id", Compression::Brotli)
+    test_column("id", CompressionOptions::Brotli)
 }
 
 #[test]
 #[ignore = "Native boolean writer not yet implemented"]
 fn bool() -> Result<()> {
-    test_column("bool_col", Compression::Uncompressed)
+    test_column("bool_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn tinyint() -> Result<()> {
-    test_column("tinyint_col", Compression::Uncompressed)
+    test_column("tinyint_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn smallint_col() -> Result<()> {
-    test_column("smallint_col", Compression::Uncompressed)
+    test_column("smallint_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn int_col() -> Result<()> {
-    test_column("int_col", Compression::Uncompressed)
+    test_column("int_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn bigint_col() -> Result<()> {
-    test_column("bigint_col", Compression::Uncompressed)
+    test_column("bigint_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn float_col() -> Result<()> {
-    test_column("float_col", Compression::Uncompressed)
+    test_column("float_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn double_col() -> Result<()> {
-    test_column("double_col", Compression::Uncompressed)
+    test_column("double_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
 fn string_col() -> Result<()> {
-    test_column("string_col", Compression::Uncompressed)
+    test_column("string_col", CompressionOptions::Uncompressed)
 }
 
 #[test]
@@ -203,7 +203,7 @@ fn basic() -> Result<()> {
             &options,
             &schema.columns()[0].descriptor,
         ))),
-        Compression::Uncompressed,
+        CompressionOptions::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));
@@ -261,7 +261,7 @@ async fn test_column_async(column: &str) -> Result<()> {
             &options,
             &a[0].descriptor,
         ))),
-        Compression::Uncompressed,
+        CompressionOptions::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));

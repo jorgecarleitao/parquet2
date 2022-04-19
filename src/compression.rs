@@ -1,5 +1,5 @@
 //! Functionality to compress and decompress data according to the parquet specification
-pub use super::parquet_bridge::Compression;
+pub use super::parquet_bridge::{Compression, CompressionOptions, ZstdLevel};
 
 use crate::error::{Error, Result};
 
@@ -8,13 +8,13 @@ use crate::error::{Error, Result};
 /// Note that you'll need to call `clear()` before reusing the same `output_buf`
 /// across different `compress` calls.
 pub fn compress(
-    compression: Compression,
+    compression: CompressionOptions,
     input_buf: &[u8],
     output_buf: &mut Vec<u8>,
 ) -> Result<()> {
     match compression {
         #[cfg(feature = "brotli")]
-        Compression::Brotli => {
+        CompressionOptions::Brotli => {
             use std::io::Write;
             const BROTLI_DEFAULT_BUFFER_SIZE: usize = 4096;
             const BROTLI_DEFAULT_COMPRESSION_QUALITY: u32 = 1; // supported levels 0-9
@@ -30,24 +30,24 @@ pub fn compress(
             encoder.flush().map_err(|e| e.into())
         }
         #[cfg(not(feature = "brotli"))]
-        Compression::Brotli => Err(Error::FeatureNotActive(
+        CompressionOptions::Brotli => Err(Error::FeatureNotActive(
             crate::error::Feature::Brotli,
             "compress to brotli".to_string(),
         )),
         #[cfg(feature = "gzip")]
-        Compression::Gzip => {
+        CompressionOptions::Gzip => {
             use std::io::Write;
             let mut encoder = flate2::write::GzEncoder::new(output_buf, Default::default());
             encoder.write_all(input_buf)?;
             encoder.try_finish().map_err(|e| e.into())
         }
         #[cfg(not(feature = "gzip"))]
-        Compression::Gzip => Err(Error::FeatureNotActive(
+        CompressionOptions::Gzip => Err(Error::FeatureNotActive(
             crate::error::Feature::Gzip,
             "compress to gzip".to_string(),
         )),
         #[cfg(feature = "snappy")]
-        Compression::Snappy => {
+        CompressionOptions::Snappy => {
             use snap::raw::{max_compress_len, Encoder};
 
             let output_buf_len = output_buf.len();
@@ -58,12 +58,12 @@ pub fn compress(
             Ok(())
         }
         #[cfg(not(feature = "snappy"))]
-        Compression::Snappy => Err(Error::FeatureNotActive(
+        CompressionOptions::Snappy => Err(Error::FeatureNotActive(
             crate::error::Feature::Snappy,
             "compress to snappy".to_string(),
         )),
         #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
-        Compression::Lz4Raw => {
+        CompressionOptions::Lz4Raw => {
             let output_buf_len = output_buf.len();
             let required_len = lz4_flex::block::get_maximum_output_size(input_buf.len());
             output_buf.resize(output_buf_len + required_len, 0);
@@ -74,7 +74,7 @@ pub fn compress(
             Ok(())
         }
         #[cfg(feature = "lz4")]
-        Compression::Lz4Raw => {
+        CompressionOptions::Lz4Raw => {
             let output_buf_len = output_buf.len();
             let required_len = lz4::block::compress_bound(input_buf.len())?;
             output_buf.resize(required_len, 0);
@@ -88,17 +88,18 @@ pub fn compress(
             Ok(())
         }
         #[cfg(all(not(feature = "lz4"), not(feature = "lz4_flex")))]
-        Compression::Lz4Raw => Err(Error::FeatureNotActive(
+        CompressionOptions::Lz4Raw => Err(Error::FeatureNotActive(
             crate::error::Feature::Lz4,
             "compress to lz4".to_string(),
         )),
         #[cfg(feature = "zstd")]
-        Compression::Zstd => {
+        CompressionOptions::Zstd(level) => {
             use std::io::Write;
-            /// Compression level (1-21) for ZSTD. Choose 1 here for better compression speed.
-            const ZSTD_COMPRESSION_LEVEL: i32 = 1;
+            let level = level
+                .map(|v| v.compression_level())
+                .unwrap_or(zstd::DEFAULT_COMPRESSION_LEVEL);
 
-            let mut encoder = zstd::Encoder::new(output_buf, ZSTD_COMPRESSION_LEVEL)?;
+            let mut encoder = zstd::Encoder::new(output_buf, level)?;
             encoder.write_all(input_buf)?;
             match encoder.finish() {
                 Ok(_) => Ok(()),
@@ -106,11 +107,11 @@ pub fn compress(
             }
         }
         #[cfg(not(feature = "zstd"))]
-        Compression::Zstd => Err(Error::FeatureNotActive(
+        CompressionOptions::Zstd(_) => Err(Error::FeatureNotActive(
             crate::error::Feature::Zstd,
             "compress to zstd".to_string(),
         )),
-        Compression::Uncompressed => {
+        CompressionOptions::Uncompressed => {
             Err(general_err!("Compressing without compression is not valid"))
         }
         _ => Err(general_err!(
@@ -204,7 +205,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
 mod tests {
     use super::*;
 
-    fn test_roundtrip(c: Compression, data: &[u8]) {
+    fn test_roundtrip(c: CompressionOptions, data: &[u8]) {
         let offset = 2;
 
         // Compress to a buffer that already has data is possible
@@ -215,11 +216,12 @@ mod tests {
         assert!(compressed.len() - 2 < data.len());
 
         let mut decompressed = vec![0; data.len()];
-        decompress(c, &compressed[offset..], &mut decompressed).expect("Error when decompressing");
+        decompress(c.into(), &compressed[offset..], &mut decompressed)
+            .expect("Error when decompressing");
         assert_eq!(data, decompressed.as_slice());
     }
 
-    fn test_codec(c: Compression) {
+    fn test_codec(c: CompressionOptions) {
         let sizes = vec![10000, 100000];
         for size in sizes {
             let data = (0..size).map(|x| (x % 255) as u8).collect::<Vec<_>>();
@@ -229,26 +231,42 @@ mod tests {
 
     #[test]
     fn test_codec_snappy() {
-        test_codec(Compression::Snappy);
+        test_codec(CompressionOptions::Snappy);
     }
 
     #[test]
     fn test_codec_gzip() {
-        test_codec(Compression::Gzip);
+        test_codec(CompressionOptions::Gzip);
     }
 
     #[test]
     fn test_codec_brotli() {
-        test_codec(Compression::Brotli);
+        test_codec(CompressionOptions::Brotli);
     }
 
     #[test]
     fn test_codec_lz4() {
-        test_codec(Compression::Lz4Raw);
+        test_codec(CompressionOptions::Lz4Raw);
     }
 
     #[test]
-    fn test_codec_zstd() {
-        test_codec(Compression::Zstd);
+    fn test_codec_zstd_default() {
+        test_codec(CompressionOptions::Zstd(None));
+    }
+
+    #[cfg(feature = "zstd")]
+    #[test]
+    fn test_codec_zstd_low_compression() {
+        test_codec(CompressionOptions::Zstd(Some(
+            ZstdLevel::try_new(1).unwrap(),
+        )));
+    }
+
+    #[cfg(feature = "zstd")]
+    #[test]
+    fn test_codec_zstd_high_compression() {
+        test_codec(CompressionOptions::Zstd(Some(
+            ZstdLevel::try_new(21).unwrap(),
+        )));
     }
 }
