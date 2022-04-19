@@ -203,7 +203,7 @@ fn basic() -> Result<()> {
             &options,
             &schema.columns()[0].descriptor,
         ))),
-        Compression::Uncompressed,
+        CompressionEncode::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));
@@ -261,7 +261,7 @@ async fn test_column_async(column: &str) -> Result<()> {
             &options,
             &a[0].descriptor,
         ))),
-        Compression::Uncompressed,
+        CompressionEncode::Uncompressed,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));

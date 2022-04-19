@@ -42,7 +42,12 @@ pub struct CompressedDictPage {
 }
 
 impl CompressedDictPage {
-    pub fn new(buffer: Vec<u8>, compression: Compression, uncompressed_page_size: usize, num_values: usize) -> Self {
+    pub fn new(
+        buffer: Vec<u8>,
+        compression: Compression,
+        uncompressed_page_size: usize,
+        num_values: usize,
+    ) -> Self {
         Self {
             buffer,
             compression,

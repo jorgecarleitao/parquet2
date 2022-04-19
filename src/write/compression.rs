@@ -69,7 +69,7 @@ fn compress_dict(
     }
     Ok(CompressedDictPage::new(
         compressed_buffer,
-        compression,
+        compression.into(),
         uncompressed_page_size,
         num_values,
     ))
