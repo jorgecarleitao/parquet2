@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.12.0](https://github.com/jorgecarleitao/parquet2/tree/v0.12.0) (2022-04-22)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.11.0...v0.12.0)
+
+**Breaking changes:**
+
+- Add `CompressionOptions`, which allows for zstd compression levels. [\#128](https://github.com/jorgecarleitao/parquet2/pull/128) ([TurnOfACard](https://github.com/TurnOfACard))
+
+**Enhancements:**
+
+- Improved performance of RLE decoding \(-18%\) [\#130](https://github.com/jorgecarleitao/parquet2/pull/130) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Improved perf of bitpacking decoding \(3.5x\) [\#129](https://github.com/jorgecarleitao/parquet2/pull/129) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.11.0](https://github.com/jorgecarleitao/parquet2/tree/v0.11.0) (2022-04-15)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.10.3...v0.11.0)

@@ -1,9 +1,12 @@
 [package]
 name = "parquet2"
-version = "0.11.0"
+version = "0.12.0"
 license = "Apache-2.0"
 description = "Safe implementation of parquet IO."
 authors = ["Jorge C. Leitao <jorgecarleitao@gmail.com", "Apache Arrow <dev@arrow.apache.org>"]
+keywords = [ "analytics", "parquet" ]
+homepage = "https://github.com/jorgecarleitao/parquet2"
+repository = "https://github.com/jorgecarleitao/parquet2"
 readme = "README.md"
 edition = "2021"
 
