@@ -30,6 +30,7 @@ xxhash-rust = { version="0.8.3", optional = true, features = ["xxh64"] }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt"] }
+criterion = "0.3"
 
 [features]
 default = ["snappy", "gzip", "lz4", "zstd", "brotli", "stream", "bloom_filter"]
@@ -37,3 +38,7 @@ snappy = ["snap"]
 gzip = ["flate2"]
 stream = ["futures", "async-stream"]
 bloom_filter = ["xxhash-rust"]
+
+[[bench]]
+name = "decode_bitpacking"
+harness = false
