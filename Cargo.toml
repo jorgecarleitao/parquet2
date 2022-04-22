@@ -42,3 +42,7 @@ bloom_filter = ["xxhash-rust"]
 [[bench]]
 name = "decode_bitpacking"
 harness = false
+
+[[bench]]
+name = "decode_rle"
+harness = false
