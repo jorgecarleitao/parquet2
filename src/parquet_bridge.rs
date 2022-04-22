@@ -96,6 +96,84 @@ impl From<Compression> for CompressionCodec {
     }
 }
 
+/// Defines the compression settings for writing a parquet file.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub enum CompressionOptions {
+    Uncompressed,
+    Snappy,
+    Gzip,
+    Lzo,
+    Brotli,
+    Lz4,
+    Zstd(Option<ZstdLevel>),
+    Lz4Raw,
+}
+
+impl From<CompressionOptions> for Compression {
+    fn from(value: CompressionOptions) -> Self {
+        match value {
+            CompressionOptions::Uncompressed => Compression::Uncompressed,
+            CompressionOptions::Snappy => Compression::Snappy,
+            CompressionOptions::Gzip => Compression::Gzip,
+            CompressionOptions::Lzo => Compression::Lzo,
+            CompressionOptions::Brotli => Compression::Brotli,
+            CompressionOptions::Lz4 => Compression::Lz4,
+            CompressionOptions::Zstd(_) => Compression::Zstd,
+            CompressionOptions::Lz4Raw => Compression::Lz4Raw,
+        }
+    }
+}
+
+impl From<CompressionOptions> for CompressionCodec {
+    fn from(codec: CompressionOptions) -> Self {
+        match codec {
+            CompressionOptions::Uncompressed => CompressionCodec::UNCOMPRESSED,
+            CompressionOptions::Snappy => CompressionCodec::SNAPPY,
+            CompressionOptions::Gzip => CompressionCodec::GZIP,
+            CompressionOptions::Lzo => CompressionCodec::LZO,
+            CompressionOptions::Brotli => CompressionCodec::BROTLI,
+            CompressionOptions::Lz4 => CompressionCodec::LZ4,
+            CompressionOptions::Zstd(_) => CompressionCodec::ZSTD,
+            CompressionOptions::Lz4Raw => CompressionCodec::LZ4_RAW,
+        }
+    }
+}
+
+/// Represents a valid zstd compression level.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub struct ZstdLevel(i32);
+
+impl ZstdLevel {
+    /// Attempts to create a zstd compression level from a given compression level.
+    ///
+    /// Compression levels must be valid (i.e. be acceptable for [`zstd::compression_level_range`])
+    #[cfg(feature = "zstd")]
+    pub fn try_new(level: i32) -> Result<Self, Error> {
+        let compression_range = zstd::compression_level_range();
+        if compression_range.contains(&level) {
+            Ok(Self(level))
+        } else {
+            Err(Error::General(format!(
+                "valid compression range {}..={} exceeded.",
+                compression_range.start(),
+                compression_range.end()
+            )))
+        }
+    }
+
+    /// Returns the zstd compression level.
+    pub fn compression_level(&self) -> i32 {
+        self.0
+    }
+}
+
+#[cfg(feature = "zstd")]
+impl Default for ZstdLevel {
+    fn default() -> Self {
+        Self(zstd::DEFAULT_COMPRESSION_LEVEL)
+    }
+}
+
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub enum PageType {
     DataPage,
