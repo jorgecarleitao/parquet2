@@ -97,13 +97,15 @@ impl From<Compression> for CompressionCodec {
 }
 
 /// Defines the compression settings for writing a parquet file.
+///
+/// If None is provided as a compression setting, then the default compression level is used.
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub enum CompressionOptions {
     Uncompressed,
     Snappy,
-    Gzip,
+    Gzip(Option<GzipLevel>),
     Lzo,
-    Brotli,
+    Brotli(Option<BrotliLevel>),
     Lz4,
     Zstd(Option<ZstdLevel>),
     Lz4Raw,
@@ -114,9 +116,9 @@ impl From<CompressionOptions> for Compression {
         match value {
             CompressionOptions::Uncompressed => Compression::Uncompressed,
             CompressionOptions::Snappy => Compression::Snappy,
-            CompressionOptions::Gzip => Compression::Gzip,
+            CompressionOptions::Gzip(_) => Compression::Gzip,
             CompressionOptions::Lzo => Compression::Lzo,
-            CompressionOptions::Brotli => Compression::Brotli,
+            CompressionOptions::Brotli(_) => Compression::Brotli,
             CompressionOptions::Lz4 => Compression::Lz4,
             CompressionOptions::Zstd(_) => Compression::Zstd,
             CompressionOptions::Lz4Raw => Compression::Lz4Raw,
@@ -129,9 +131,9 @@ impl From<CompressionOptions> for CompressionCodec {
         match codec {
             CompressionOptions::Uncompressed => CompressionCodec::UNCOMPRESSED,
             CompressionOptions::Snappy => CompressionCodec::SNAPPY,
-            CompressionOptions::Gzip => CompressionCodec::GZIP,
+            CompressionOptions::Gzip(_) => CompressionCodec::GZIP,
             CompressionOptions::Lzo => CompressionCodec::LZO,
-            CompressionOptions::Brotli => CompressionCodec::BROTLI,
+            CompressionOptions::Brotli(_) => CompressionCodec::BROTLI,
             CompressionOptions::Lz4 => CompressionCodec::LZ4,
             CompressionOptions::Zstd(_) => CompressionCodec::ZSTD,
             CompressionOptions::Lz4Raw => CompressionCodec::LZ4_RAW,
@@ -139,19 +141,16 @@ impl From<CompressionOptions> for CompressionCodec {
     }
 }
 
-/// Represents a valid zstd compression level.
-#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
-pub struct ZstdLevel(i32);
+/// Defines valid compression levels.
+pub trait CompressionLevel<T: std::fmt::Display + std::cmp::PartialOrd> {
+    const MINIMUM_LEVEL: T;
+    const MAXIMUM_LEVEL: T;
 
-impl ZstdLevel {
-    /// Attempts to create a zstd compression level from a given compression level.
-    ///
-    /// Compression levels must be valid (i.e. be acceptable for [`zstd::compression_level_range`])
-    #[cfg(feature = "zstd")]
-    pub fn try_new(level: i32) -> Result<Self, Error> {
-        let compression_range = zstd::compression_level_range();
+    /// Tests if the provided compression level is valid.
+    fn is_valid_level(level: T) -> Result<(), Error> {
+        let compression_range = Self::MINIMUM_LEVEL..=Self::MAXIMUM_LEVEL;
         if compression_range.contains(&level) {
-            Ok(Self(level))
+            Ok(())
         } else {
             Err(Error::General(format!(
                 "valid compression range {}..={} exceeded.",
@@ -160,8 +159,102 @@ impl ZstdLevel {
             )))
         }
     }
+}
 
-    /// Returns the zstd compression level.
+/// Represents a valid brotli compression level.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub struct BrotliLevel(u32);
+
+impl Default for BrotliLevel {
+    fn default() -> Self {
+        Self(1)
+    }
+}
+
+impl CompressionLevel<u32> for BrotliLevel {
+    const MINIMUM_LEVEL: u32 = 0;
+    const MAXIMUM_LEVEL: u32 = 11;
+}
+
+impl BrotliLevel {
+    /// Attempts to create a brotli compression level.
+    ///
+    /// Compression levels must be valid.
+    pub fn try_new(level: u32) -> Result<Self, Error> {
+        Self::is_valid_level(level).map(|_| Self(level))
+    }
+
+    /// Returns the compression level.
+    pub fn compression_level(&self) -> u32 {
+        self.0
+    }
+}
+
+#[cfg(feature = "brotli")]
+impl From<BrotliLevel> for flate2::Compression {
+    fn from(level: BrotliLevel) -> Self {
+        Self::new(level.compression_level() as u32)
+    }
+}
+
+/// Represents a valid gzip compression level.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub struct GzipLevel(u8);
+
+impl Default for GzipLevel {
+    fn default() -> Self {
+        // The default as of miniz_oxide 0.5.1 is 6 for compression level
+        // (miniz_oxide::deflate::CompressionLevel::DefaultLevel)
+        Self(6)
+    }
+}
+
+impl CompressionLevel<u8> for GzipLevel {
+    const MINIMUM_LEVEL: u8 = 0;
+    const MAXIMUM_LEVEL: u8 = 10;
+}
+
+impl GzipLevel {
+    /// Attempts to create a gzip compression level.
+    ///
+    /// Compression levels must be valid (i.e. be acceptable for [`flate2::Compression`]).
+    pub fn try_new(level: u8) -> Result<Self, Error> {
+        Self::is_valid_level(level).map(|_| Self(level))
+    }
+
+    /// Returns the compression level.
+    pub fn compression_level(&self) -> u8 {
+        self.0
+    }
+}
+
+#[cfg(feature = "gzip")]
+impl From<GzipLevel> for flate2::Compression {
+    fn from(level: GzipLevel) -> Self {
+        Self::new(level.compression_level() as u32)
+    }
+}
+
+/// Represents a valid zstd compression level.
+#[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+pub struct ZstdLevel(i32);
+
+impl CompressionLevel<i32> for ZstdLevel {
+    // zstd binds to C, and hence zstd::compression_level_range() is not const as this calls the
+    // underlying C library.
+    const MINIMUM_LEVEL: i32 = 1;
+    const MAXIMUM_LEVEL: i32 = 22;
+}
+
+impl ZstdLevel {
+    /// Attempts to create a zstd compression level from a given compression level.
+    ///
+    /// Compression levels must be valid (i.e. be acceptable for [`zstd::compression_level_range`]).
+    pub fn try_new(level: i32) -> Result<Self, Error> {
+        Self::is_valid_level(level).map(|_| Self(level))
+    }
+
+    /// Returns the compression level.
     pub fn compression_level(&self) -> i32 {
         self.0
     }
