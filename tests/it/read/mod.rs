@@ -116,14 +116,7 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .fields()
         .iter()
         .enumerate()
-        .filter_map(|(i, x)| {
-            println!("{}", x.name());
-            if x.name() == field {
-                Some(i)
-            } else {
-                None
-            }
-        })
+        .filter_map(|(i, x)| if x.name() == field { Some(i) } else { None })
         .next()
         .unwrap();
 
@@ -153,14 +146,7 @@ pub async fn read_column_async<
         .fields()
         .iter()
         .enumerate()
-        .filter_map(|(i, x)| {
-            println!("{}", x.name());
-            if x.name() == field {
-                Some(i)
-            } else {
-                None
-            }
-        })
+        .filter_map(|(i, x)| if x.name() == field { Some(i) } else { None })
         .next()
         .unwrap();
 
@@ -408,6 +394,16 @@ fn pyarrow_v1_non_dict_int64_optional() -> Result<()> {
 }
 
 #[test]
+fn pyarrow_v1_non_dict_int64_optional_brotli() -> Result<()> {
+    test_pyarrow_integration("basic", "int64", 1, false, false, "/brotli")
+}
+
+#[test]
+fn pyarrow_v1_non_dict_int64_optional_gzip() -> Result<()> {
+    test_pyarrow_integration("basic", "int64", 1, false, false, "/gzip")
+}
+
+#[test]
 fn pyarrow_v1_non_dict_int64_optional_snappy() -> Result<()> {
     test_pyarrow_integration("basic", "int64", 1, false, false, "/snappy")
 }
@@ -415,6 +411,11 @@ fn pyarrow_v1_non_dict_int64_optional_snappy() -> Result<()> {
 #[test]
 fn pyarrow_v1_non_dict_int64_optional_lz4() -> Result<()> {
     test_pyarrow_integration("basic", "int64", 1, false, false, "/lz4")
+}
+
+#[test]
+fn pyarrow_v1_non_dict_int64_optional_zstd() -> Result<()> {
+    test_pyarrow_integration("basic", "int64", 1, false, false, "/zstd")
 }
 
 #[test]

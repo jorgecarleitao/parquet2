@@ -150,5 +150,5 @@ def write_pyarrow(
 for case in [case_basic_nullable, case_basic_required, case_nested, case_struct]:
     for version in [1, 2]:
         for use_dict in [False, True]:
-            for compression in [None, "snappy", "lz4"]:
+            for compression in [None, "brotli", "lz4", "gzip", "snappy", "zstd"]:
                 write_pyarrow(case, 1, version, use_dict, compression)
