@@ -5,7 +5,7 @@ mod primitive;
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
 
-use parquet2::compression::CompressionOptions;
+use parquet2::compression::{BrotliLevel, CompressionOptions};
 use parquet2::error::Result;
 use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::read_metadata;
@@ -128,7 +128,10 @@ fn int32_lz4_short_i32_array() -> Result<()> {
 
 #[test]
 fn int32_brotli() -> Result<()> {
-    test_column("id", CompressionOptions::Brotli)
+    test_column(
+        "id",
+        CompressionOptions::Brotli(Some(BrotliLevel::default())),
+    )
 }
 
 #[test]

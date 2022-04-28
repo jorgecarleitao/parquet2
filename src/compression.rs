@@ -1,5 +1,7 @@
 //! Functionality to compress and decompress data according to the parquet specification
-pub use super::parquet_bridge::{Compression, CompressionOptions, ZstdLevel};
+pub use super::parquet_bridge::{
+    BrotliLevel, Compression, CompressionLevel, CompressionOptions, GzipLevel, ZstdLevel,
+};
 
 use crate::error::{Error, Result};
 
@@ -14,35 +16,36 @@ pub fn compress(
 ) -> Result<()> {
     match compression {
         #[cfg(feature = "brotli")]
-        CompressionOptions::Brotli => {
+        CompressionOptions::Brotli(level) => {
             use std::io::Write;
             const BROTLI_DEFAULT_BUFFER_SIZE: usize = 4096;
-            const BROTLI_DEFAULT_COMPRESSION_QUALITY: u32 = 1; // supported levels 0-9
             const BROTLI_DEFAULT_LG_WINDOW_SIZE: u32 = 22; // recommended between 20-22
 
+            let q = level.unwrap_or_default();
             let mut encoder = brotli::CompressorWriter::new(
                 output_buf,
                 BROTLI_DEFAULT_BUFFER_SIZE,
-                BROTLI_DEFAULT_COMPRESSION_QUALITY,
+                q.compression_level(),
                 BROTLI_DEFAULT_LG_WINDOW_SIZE,
             );
             encoder.write_all(input_buf)?;
             encoder.flush().map_err(|e| e.into())
         }
         #[cfg(not(feature = "brotli"))]
-        CompressionOptions::Brotli => Err(Error::FeatureNotActive(
+        CompressionOptions::Brotli(_) => Err(Error::FeatureNotActive(
             crate::error::Feature::Brotli,
             "compress to brotli".to_string(),
         )),
         #[cfg(feature = "gzip")]
-        CompressionOptions::Gzip => {
+        CompressionOptions::Gzip(level) => {
             use std::io::Write;
-            let mut encoder = flate2::write::GzEncoder::new(output_buf, Default::default());
+            let level = level.unwrap_or_default();
+            let mut encoder = flate2::write::GzEncoder::new(output_buf, level.into());
             encoder.write_all(input_buf)?;
             encoder.try_finish().map_err(|e| e.into())
         }
         #[cfg(not(feature = "gzip"))]
-        CompressionOptions::Gzip => Err(Error::FeatureNotActive(
+        CompressionOptions::Gzip(_) => Err(Error::FeatureNotActive(
             crate::error::Feature::Gzip,
             "compress to gzip".to_string(),
         )),
@@ -95,9 +98,7 @@ pub fn compress(
         #[cfg(feature = "zstd")]
         CompressionOptions::Zstd(level) => {
             use std::io::Write;
-            let level = level
-                .map(|v| v.compression_level())
-                .unwrap_or(zstd::DEFAULT_COMPRESSION_LEVEL);
+            let level = level.map(|v| v.compression_level()).unwrap_or_default();
 
             let mut encoder = zstd::Encoder::new(output_buf, level)?;
             encoder.write_all(input_buf)?;
@@ -235,13 +236,41 @@ mod tests {
     }
 
     #[test]
-    fn test_codec_gzip() {
-        test_codec(CompressionOptions::Gzip);
+    fn test_codec_gzip_default() {
+        test_codec(CompressionOptions::Gzip(None));
     }
 
     #[test]
-    fn test_codec_brotli() {
-        test_codec(CompressionOptions::Brotli);
+    fn test_codec_gzip_low_compression() {
+        test_codec(CompressionOptions::Gzip(Some(
+            GzipLevel::try_new(1).unwrap(),
+        )));
+    }
+
+    #[test]
+    fn test_codec_gzip_high_compression() {
+        test_codec(CompressionOptions::Gzip(Some(
+            GzipLevel::try_new(10).unwrap(),
+        )));
+    }
+
+    #[test]
+    fn test_codec_brotli_default() {
+        test_codec(CompressionOptions::Brotli(None));
+    }
+
+    #[test]
+    fn test_codec_brotli_low_compression() {
+        test_codec(CompressionOptions::Brotli(Some(
+            BrotliLevel::try_new(1).unwrap(),
+        )));
+    }
+
+    #[test]
+    fn test_codec_brotli_high_compression() {
+        test_codec(CompressionOptions::Brotli(Some(
+            BrotliLevel::try_new(11).unwrap(),
+        )));
     }
 
     #[test]
