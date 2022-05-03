@@ -22,7 +22,7 @@ pub struct PageMetaData {
     pub num_values: i64,
     /// Compression type
     pub compression: Compression,
-    // The descriptor of this parquet column
+    /// The descriptor of this parquet column
     pub descriptor: Descriptor,
 }
 
