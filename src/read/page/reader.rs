@@ -18,7 +18,7 @@ use super::PageIterator;
 /// This meta is a small part of [`ColumnChunkMetaData`].
 #[derive(Debug, Clone)]
 pub struct PageMetaData {
-    // The number of values in this column chunk.
+    /// The number of values in this column chunk.
     pub num_values: i64,
     // Compression type
     pub compression: Compression,
