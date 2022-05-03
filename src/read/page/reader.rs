@@ -20,7 +20,7 @@ use super::PageIterator;
 pub struct PageMetaData {
     /// The number of values in this column chunk.
     pub num_values: i64,
-    // Compression type
+    /// Compression type
     pub compression: Compression,
     // The descriptor of this parquet column
     pub descriptor: Descriptor,
