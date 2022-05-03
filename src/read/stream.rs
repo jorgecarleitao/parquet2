@@ -1,7 +1,7 @@
-use std::io::SeekFrom;
+use std::io::{Cursor, Seek, SeekFrom};
 
-use futures::{io::Cursor, AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
-use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
+use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
+use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 use parquet_format_async_temp::FileMetaData as TFileMetaData;
 
 use super::super::{metadata::FileMetaData, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
@@ -27,8 +27,9 @@ async fn stream_len(
 pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>(
     reader: &mut R,
 ) -> Result<FileMetaData> {
-    // check file is large enough to hold footer
     let file_size = stream_len(reader).await?;
+
+    // check file is large enough to hold footer
     if file_size < FOOTER_SIZE {
         return Err(general_err!(
             "Invalid Parquet file. Size is smaller than footer"
@@ -40,47 +41,50 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
     reader
         .seek(SeekFrom::End(-(default_end_len as i64)))
         .await?;
-    let mut default_len_end_buf = vec![0; default_end_len];
-    reader.read_exact(&mut default_len_end_buf).await?;
+    let mut buffer = vec![0; default_end_len];
+    reader.read_exact(&mut buffer).await?;
 
     // check this is indeed a parquet file
-    if default_len_end_buf[default_end_len - 4..] != PARQUET_MAGIC {
-        return Err(general_err!("Invalid Parquet file. Corrupt footer"));
+    if buffer[default_end_len - 4..] != PARQUET_MAGIC {
+        return Err(general_err!(
+            "Invalid file. The footer does not contain Parquet's magic numbers"
+        ));
     }
 
-    let metadata_len = metadata_len(&default_len_end_buf, default_end_len);
+    let metadata_len = metadata_len(&buffer, default_end_len);
 
     if metadata_len < 0 {
         return Err(general_err!(
-            "Invalid Parquet file. Metadata length is less than zero ({})",
+            "Invalid file. Metadata length is less than zero ({})",
             metadata_len
         ));
     }
-    let footer_metadata_len = FOOTER_SIZE + metadata_len as u64;
-
-    let metadata = if footer_metadata_len > file_size {
+    let footer_len = FOOTER_SIZE + metadata_len as u64;
+    if footer_len > file_size {
         return Err(general_err!(
             "Invalid Parquet file. Metadata start is less than zero ({})",
-            file_size as i64 - footer_metadata_len as i64
+            file_size as i64 - footer_len as i64
         ));
-    } else if footer_metadata_len < DEFAULT_FOOTER_READ_SIZE {
+    }
+
+    let metadata = if footer_len < DEFAULT_FOOTER_READ_SIZE {
         // the whole metadata is in the bytes we already read
         // build up the reader covering the entire metadata
-        let mut reader = Cursor::new(default_len_end_buf);
-        reader
-            .seek(SeekFrom::End(-(footer_metadata_len as i64)))
-            .await?;
+        let mut reader = Cursor::new(buffer);
+        reader.seek(SeekFrom::End(-(footer_len as i64)))?;
 
-        let mut prot = TCompactInputStreamProtocol::new(reader);
-        TFileMetaData::stream_from_in_protocol(&mut prot).await?
+        let mut prot = TCompactInputProtocol::new(reader);
+        TFileMetaData::read_from_in_protocol(&mut prot)?
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
-        reader
-            .seek(SeekFrom::End(-(footer_metadata_len as i64)))
-            .await?;
+        reader.seek(SeekFrom::End(-(footer_len as i64))).await?;
+        let mut buffer = vec![0; footer_len as usize];
+        reader.read_exact(&mut buffer).await?;
 
-        let mut prot = TCompactInputStreamProtocol::new(reader);
-        TFileMetaData::stream_from_in_protocol(&mut prot).await?
+        let reader = Cursor::new(buffer);
+
+        let mut prot = TCompactInputProtocol::new(reader);
+        TFileMetaData::read_from_in_protocol(&mut prot)?
     };
 
     FileMetaData::try_from_thrift(metadata)
