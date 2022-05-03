@@ -16,7 +16,7 @@ use crate::page::{
 use super::PageIterator;
 
 /// This meta is a small part of [`ColumnChunkMetaData`].
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PageMetaData {
     /// The number of values in this column chunk.
     pub num_values: i64,
