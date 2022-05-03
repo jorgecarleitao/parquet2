@@ -37,6 +37,16 @@ impl PageMetaData {
     }
 }
 
+impl From<&ColumnChunkMetaData> for PageMetaData {
+    fn from(column: &ColumnChunkMetaData) -> Self {
+        Self {
+            num_values: column.num_values(),
+            compression: column.compression(),
+            descriptor: column.descriptor().descriptor.clone(),
+        }
+    }
+}
+
 /// Type declaration for a page filter
 pub type PageFilter = Arc<dyn Fn(&Descriptor, &DataPageHeader) -> bool + Send + Sync>;
 
@@ -78,16 +88,7 @@ impl<R: Read> PageReader<R> {
         pages_filter: PageFilter,
         buffer: Vec<u8>,
     ) -> Self {
-        Self {
-            reader,
-            total_num_values: column.num_values(),
-            compression: column.compression(),
-            seen_num_values: 0,
-            current_dictionary: None,
-            descriptor: column.descriptor().descriptor.clone(),
-            pages_filter,
-            buffer,
-        }
+        Self::new_with_page_meta(reader, column.into(), pages_filter, buffer)
     }
 
     /// Create a a new [`PageReader`] with [`PageMetaData`].
