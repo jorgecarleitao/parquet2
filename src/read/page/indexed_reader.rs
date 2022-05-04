@@ -12,7 +12,7 @@ use crate::{
     parquet_bridge::Compression,
 };
 
-use super::reader::{finish_page, read_page_header, FinishedPage};
+use super::reader::{finish_page, read_page_header, FinishedPage, PageMetaData};
 
 enum LazyDict {
     // The dictionary has been read and deserialized
@@ -110,7 +110,18 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         buffer: Vec<u8>,
         data_buffer: Vec<u8>,
     ) -> Self {
-        let column_start = column.byte_range().0;
+        Self::new_with_page_meta(reader, column.into(), pages, buffer, data_buffer)
+    }
+
+    /// Returns a new [`IndexedPageReader`] with [`PageMetaData`].
+    pub fn new_with_page_meta(
+        reader: R,
+        column: PageMetaData,
+        pages: Vec<FilteredPage>,
+        buffer: Vec<u8>,
+        data_buffer: Vec<u8>,
+    ) -> Self {
+        let column_start = column.column_start;
         // a dictionary page exists iff the first data page is not at the start of
         // the column
         let dictionary = match pages.get(0) {
@@ -128,8 +139,8 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         let pages = pages.into_iter().collect();
         Self {
             reader,
-            compression: column.compression(),
-            descriptor: column.descriptor().descriptor.clone(),
+            compression: column.compression,
+            descriptor: column.descriptor,
             buffer,
             data_buffer,
             pages,

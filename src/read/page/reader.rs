@@ -18,6 +18,8 @@ use super::PageIterator;
 /// This meta is a small part of [`ColumnChunkMetaData`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct PageMetaData {
+    /// The start offset of this column chunk in file.
+    pub column_start: u64,
     /// The number of values in this column chunk.
     pub num_values: i64,
     /// Compression type
@@ -28,8 +30,14 @@ pub struct PageMetaData {
 
 impl PageMetaData {
     /// Returns a new [`PageMetaData`].
-    pub fn new(num_values: i64, compression: Compression, descriptor: Descriptor) -> Self {
+    pub fn new(
+        column_start: u64,
+        num_values: i64,
+        compression: Compression,
+        descriptor: Descriptor,
+    ) -> Self {
         Self {
+            column_start,
             num_values,
             compression,
             descriptor,
@@ -40,6 +48,7 @@ impl PageMetaData {
 impl From<&ColumnChunkMetaData> for PageMetaData {
     fn from(column: &ColumnChunkMetaData) -> Self {
         Self {
+            column_start: column.byte_range().0,
             num_values: column.num_values(),
             compression: column.compression(),
             descriptor: column.descriptor().descriptor.clone(),
