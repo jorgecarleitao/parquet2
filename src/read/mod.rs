@@ -14,7 +14,7 @@ pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::read_metadata;
 #[cfg(feature = "stream")]
 pub use page::get_page_stream;
-pub use page::{IndexedPageReader, PageFilter, PageIterator, PageReader};
+pub use page::{IndexedPageReader, PageFilter, PageIterator, PageMetaData, PageReader};
 #[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 

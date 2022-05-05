@@ -15,6 +15,47 @@ use crate::page::{
 
 use super::PageIterator;
 
+/// This meta is a small part of [`ColumnChunkMetaData`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct PageMetaData {
+    /// The start offset of this column chunk in file.
+    pub column_start: u64,
+    /// The number of values in this column chunk.
+    pub num_values: i64,
+    /// Compression type
+    pub compression: Compression,
+    /// The descriptor of this parquet column
+    pub descriptor: Descriptor,
+}
+
+impl PageMetaData {
+    /// Returns a new [`PageMetaData`].
+    pub fn new(
+        column_start: u64,
+        num_values: i64,
+        compression: Compression,
+        descriptor: Descriptor,
+    ) -> Self {
+        Self {
+            column_start,
+            num_values,
+            compression,
+            descriptor,
+        }
+    }
+}
+
+impl From<&ColumnChunkMetaData> for PageMetaData {
+    fn from(column: &ColumnChunkMetaData) -> Self {
+        Self {
+            column_start: column.byte_range().0,
+            num_values: column.num_values(),
+            compression: column.compression(),
+            descriptor: column.descriptor().descriptor.clone(),
+        }
+    }
+}
+
 /// Type declaration for a page filter
 pub type PageFilter = Arc<dyn Fn(&Descriptor, &DataPageHeader) -> bool + Send + Sync>;
 
@@ -56,13 +97,25 @@ impl<R: Read> PageReader<R> {
         pages_filter: PageFilter,
         buffer: Vec<u8>,
     ) -> Self {
+        Self::new_with_page_meta(reader, column.into(), pages_filter, buffer)
+    }
+
+    /// Create a a new [`PageReader`] with [`PageMetaData`].
+    ///
+    /// It assumes that the reader has been `seeked` to the beginning of `column`.
+    pub fn new_with_page_meta(
+        reader: R,
+        reader_meta: PageMetaData,
+        pages_filter: PageFilter,
+        buffer: Vec<u8>,
+    ) -> Self {
         Self {
             reader,
-            total_num_values: column.num_values(),
-            compression: column.compression(),
+            total_num_values: reader_meta.num_values,
+            compression: reader_meta.compression,
             seen_num_values: 0,
             current_dictionary: None,
-            descriptor: column.descriptor().descriptor.clone(),
+            descriptor: reader_meta.descriptor,
             pages_filter,
             buffer,
         }
