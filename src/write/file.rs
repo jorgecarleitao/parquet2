@@ -86,10 +86,19 @@ impl<W: Write> FileWriter<W> {
         }
     }
 
-    /// Writes the header of the file
-    pub fn start(&mut self) -> Result<()> {
-        self.offset = start_file(&mut self.writer)? as u64;
-        Ok(())
+    /// Writes the header of the file.
+    ///
+    /// This is automatically called by [`Self::write`] if not called following [`Self::new`].
+    ///
+    /// # Errors
+    /// Returns an error if data has been written to the file.
+    fn start(&mut self) -> Result<()> {
+        if self.offset == 0 {
+            self.offset = start_file(&mut self.writer)? as u64;
+            Ok(())
+        } else {
+            Err(Error::General("Start cannot be called twice".to_string()))
+        }
     }
 
     /// Writes a row group to the file.
@@ -101,9 +110,7 @@ impl<W: Write> FileWriter<W> {
         E: std::error::Error,
     {
         if self.offset == 0 {
-            return Err(Error::General(
-                "You must call `start` before writing the first row group".to_string(),
-            ));
+            self.start()?;
         }
         let ordinal = self.row_groups.len();
         let (group, specs, size) = write_row_group(
@@ -119,8 +126,13 @@ impl<W: Write> FileWriter<W> {
         Ok(())
     }
 
-    /// Writes the footer of the parquet file. Returns the total size of the file.
-    pub fn end(&mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
+    /// Writes the footer of the parquet file. Returns the total size of the file and the
+    /// underlying writer.
+    pub fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
+        if self.offset == 0 {
+            self.start()?;
+        }
+
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
@@ -176,7 +188,7 @@ impl<W: Write> FileWriter<W> {
         );
 
         let len = end_file(&mut self.writer, metadata)?;
-        Ok(self.offset + len)
+        Ok((self.offset + len, self.writer))
     }
 
     /// Returns the underlying writer.

@@ -51,11 +51,10 @@ fn write_file() -> Result<Vec<u8>> {
     let writer = Cursor::new(vec![]);
     let mut writer = FileWriter::new(writer, schema, options, None);
 
-    writer.start()?;
     writer.write(DynIter::new(columns))?;
-    writer.end(None)?;
+    let (_, writer) = writer.end(None)?;
 
-    Ok(writer.into_inner().into_inner())
+    Ok(writer.into_inner())
 }
 
 #[test]

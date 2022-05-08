@@ -10,6 +10,7 @@ use parquet_format_async_temp::FileMetaData as TFileMetaData;
 use super::super::{metadata::FileMetaData, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
 
 use crate::error::{Error, Result};
+use crate::HEADER_SIZE;
 
 pub(super) fn metadata_len(buffer: &[u8], len: usize) -> i32 {
     i32::from_le_bytes(buffer[len - 8..len - 4].try_into().unwrap())
@@ -41,9 +42,9 @@ fn stream_len(seek: &mut impl Seek) -> std::result::Result<u64, std::io::Error> 
 pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     // check file is large enough to hold footer
     let file_size = stream_len(reader)?;
-    if file_size < FOOTER_SIZE {
+    if file_size < HEADER_SIZE + FOOTER_SIZE {
         return Err(general_err!(
-            "Invalid Parquet file. Size is smaller than footer"
+            "Invalid Parquet file. Size is smaller than header + footer"
         ));
     }
 

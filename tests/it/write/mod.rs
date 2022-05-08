@@ -90,11 +90,10 @@ fn test_column(column: &str, compression: CompressionOptions) -> Result<()> {
     let writer = Cursor::new(vec![]);
     let mut writer = FileWriter::new(writer, schema, options, None);
 
-    writer.start()?;
     writer.write(DynIter::new(columns))?;
-    writer.end(None)?;
+    let (_, writer) = writer.end(None)?;
 
-    let data = writer.into_inner().into_inner();
+    let data = writer.into_inner();
 
     let (result, statistics) = read_column(&mut Cursor::new(data))?;
     assert_eq!(array, result);
@@ -214,11 +213,10 @@ fn basic() -> Result<()> {
     let writer = Cursor::new(vec![]);
     let mut writer = FileWriter::new(writer, schema, options, None);
 
-    writer.start()?;
     writer.write(DynIter::new(columns))?;
-    writer.end(None)?;
+    let (_, writer) = writer.end(None)?;
 
-    let data = writer.into_inner().into_inner();
+    let data = writer.into_inner();
     let mut reader = Cursor::new(data);
 
     let metadata = read_metadata(&mut reader)?;
@@ -272,7 +270,6 @@ async fn test_column_async(column: &str) -> Result<()> {
     let writer = futures::io::Cursor::new(vec![]);
     let mut writer = FileStreamer::new(writer, schema, options, None);
 
-    writer.start().await?;
     writer.write(DynIter::new(columns)).await?;
     let writer = writer.end(None).await?.1;
 

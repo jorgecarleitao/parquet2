@@ -85,10 +85,19 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         }
     }
 
-    /// Writes the header of the file
-    pub async fn start(&mut self) -> Result<()> {
-        self.offset = start_file(&mut self.writer).await? as u64;
-        Ok(())
+    /// Writes the header of the file.
+    ///
+    /// This is automatically called by [`Self::write`] if not called following [`Self::new`].
+    ///
+    /// # Errors
+    /// Returns an error if data has been written to the file.
+    async fn start(&mut self) -> Result<()> {
+        if self.offset == 0 {
+            self.offset = start_file(&mut self.writer).await? as u64;
+            Ok(())
+        } else {
+            Err(Error::General("Start cannot be called twice".to_string()))
+        }
     }
 
     /// Writes a row group to the file.
@@ -98,9 +107,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         E: std::error::Error,
     {
         if self.offset == 0 {
-            return Err(Error::General(
-                "You must call `start` before writing the first row group".to_string(),
-            ));
+            self.start().await?;
         }
         let (group, _specs, size) = write_row_group_async(
             &mut self.writer,
@@ -117,6 +124,10 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
     /// Writes the footer of the parquet file. Returns the total size of the file and the
     /// underlying writer.
     pub async fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
+        if self.offset == 0 {
+            self.start().await?;
+        }
+
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
