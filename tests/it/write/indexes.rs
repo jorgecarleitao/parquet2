@@ -52,9 +52,9 @@ fn write_file() -> Result<Vec<u8>> {
     let mut writer = FileWriter::new(writer, schema, options, None);
 
     writer.write(DynIter::new(columns))?;
-    let (_, writer) = writer.end(None)?;
+    writer.end(None)?;
 
-    Ok(writer.into_inner())
+    Ok(writer.into_inner().into_inner())
 }
 
 #[test]

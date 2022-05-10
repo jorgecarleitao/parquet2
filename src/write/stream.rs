@@ -123,7 +123,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
 
     /// Writes the footer of the parquet file. Returns the total size of the file and the
     /// underlying writer.
-    pub async fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
+    pub async fn end(&mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
         if self.offset == 0 {
             self.start().await?;
         }
@@ -133,17 +133,22 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
-            self.schema.into_thrift(),
+            self.schema.clone().into_thrift(),
             num_rows,
-            self.row_groups,
+            self.row_groups.clone(),
             key_value_metadata,
-            self.created_by,
+            self.created_by.clone(),
             None,
             None,
             None,
         );
 
         let len = end_file(&mut self.writer, metadata).await?;
-        Ok((self.offset + len, self.writer))
+        Ok(self.offset + len)
+    }
+
+    /// Returns the underlying writer.
+    pub fn into_inner(self) -> W {
+        self.writer
     }
 }
