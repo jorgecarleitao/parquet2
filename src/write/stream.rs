@@ -7,6 +7,7 @@ use parquet_format_async_temp::{
     FileMetaData, RowGroup,
 };
 
+use crate::write::State;
 use crate::{
     error::{Error, Result},
     metadata::{KeyValue, SchemaDescriptor},
@@ -52,6 +53,8 @@ pub struct FileStreamer<W: AsyncWrite + Unpin + Send> {
 
     offset: u64,
     row_groups: Vec<RowGroup>,
+    /// Used to store the current state for writing the file
+    state: State,
 }
 
 // Accessors
@@ -82,6 +85,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             created_by,
             offset: 0,
             row_groups: vec![],
+            state: State::Initialised,
         }
     }
 
@@ -94,6 +98,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
     async fn start(&mut self) -> Result<()> {
         if self.offset == 0 {
             self.offset = start_file(&mut self.writer).await? as u64;
+            self.state = State::Started;
             Ok(())
         } else {
             Err(Error::General("Start cannot be called twice".to_string()))
@@ -128,6 +133,9 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             self.start().await?;
         }
 
+        if self.state != State::Started {
+            Err(Error::General("End cannot be called twice".to_string()))
+        }
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 

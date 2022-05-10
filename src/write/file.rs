@@ -16,6 +16,7 @@ use super::page::PageWriteSpec;
 use super::{row_group::write_row_group, RowGroupIter, WriteOptions};
 
 pub use crate::metadata::KeyValue;
+use crate::write::State;
 
 pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<u64> {
     writer.write_all(&PARQUET_MAGIC)?;
@@ -52,6 +53,8 @@ pub struct FileWriter<W: Write> {
     offset: u64,
     row_groups: Vec<RowGroup>,
     page_specs: Vec<Vec<Vec<PageWriteSpec>>>,
+    /// Used to store the current state for writing the file
+    state: State,
 }
 
 // Accessors
@@ -83,6 +86,7 @@ impl<W: Write> FileWriter<W> {
             offset: 0,
             row_groups: vec![],
             page_specs: vec![],
+            state: State::Initialised,
         }
     }
 
@@ -95,6 +99,7 @@ impl<W: Write> FileWriter<W> {
     fn start(&mut self) -> Result<()> {
         if self.offset == 0 {
             self.offset = start_file(&mut self.writer)? as u64;
+            self.state = State::Started;
             Ok(())
         } else {
             Err(Error::General("Start cannot be called twice".to_string()))
@@ -133,6 +138,9 @@ impl<W: Write> FileWriter<W> {
             self.start()?;
         }
 
+        if self.state != State::Started {
+            Err(Error::General("End cannot be called twice".to_string()))
+        }
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
@@ -188,6 +196,7 @@ impl<W: Write> FileWriter<W> {
         );
 
         let len = end_file(&mut self.writer, metadata)?;
+        self.state = State::Finished;
         Ok(self.offset + len)
     }
 
