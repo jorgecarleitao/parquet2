@@ -139,7 +139,7 @@ impl<W: Write> FileWriter<W> {
         }
 
         if self.state != State::Started {
-            Err(Error::General("End cannot be called twice".to_string()))
+            return Err(Error::General("End cannot be called twice".to_string()));
         }
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
