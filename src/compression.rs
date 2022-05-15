@@ -5,6 +5,22 @@ pub use super::parquet_bridge::{
 
 use crate::error::{Error, Result};
 
+fn inner_compress<G: Fn(usize) -> Result<usize>, F: Fn(&[u8], &mut [u8]) -> Result<usize>>(
+    input: &[u8],
+    output: &mut Vec<u8>,
+    get_length: G,
+    compress: F,
+) -> Result<()> {
+    let original_length = output.len();
+    let max_required_length = get_length(input.len())?;
+
+    output.resize(original_length + max_required_length, 0);
+    let compressed_size = compress(input, &mut output[original_length..])?;
+
+    output.truncate(original_length + compressed_size);
+    Ok(())
+}
+
 /// Compresses data stored in slice `input_buf` and writes the compressed result
 /// to `output_buf`.
 /// Note that you'll need to call `clear()` before reusing the same `output_buf`
@@ -50,46 +66,37 @@ pub fn compress(
             "compress to gzip".to_string(),
         )),
         #[cfg(feature = "snappy")]
-        CompressionOptions::Snappy => {
-            use snap::raw::{max_compress_len, Encoder};
-
-            let output_buf_len = output_buf.len();
-            let required_len = max_compress_len(input_buf.len());
-            output_buf.resize(output_buf_len + required_len, 0);
-            let n = Encoder::new().compress(input_buf, &mut output_buf[output_buf_len..])?;
-            output_buf.truncate(output_buf_len + n);
-            Ok(())
-        }
+        CompressionOptions::Snappy => inner_compress(
+            input_buf,
+            output_buf,
+            |len| Ok(snap::raw::max_compress_len(len)),
+            |input, output| Ok(snap::raw::Encoder::new().compress(input, output)?),
+        ),
         #[cfg(not(feature = "snappy"))]
         CompressionOptions::Snappy => Err(Error::FeatureNotActive(
             crate::error::Feature::Snappy,
             "compress to snappy".to_string(),
         )),
         #[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
-        CompressionOptions::Lz4Raw => {
-            let output_buf_len = output_buf.len();
-            let required_len = lz4_flex::block::get_maximum_output_size(input_buf.len());
-            output_buf.resize(output_buf_len + required_len, 0);
-
-            let compressed_size =
-                lz4_flex::block::compress_into(input_buf, &mut output_buf[output_buf_len..])?;
-            output_buf.truncate(output_buf_len + compressed_size);
-            Ok(())
-        }
+        CompressionOptions::Lz4Raw => inner_compress(
+            input_buf,
+            output_buf,
+            |len| Ok(lz4_flex::block::get_maximum_output_size(len)),
+            |input, output| {
+                let compressed_size = lz4_flex::block::compress_into(input, output)?;
+                Ok(compressed_size)
+            },
+        ),
         #[cfg(feature = "lz4")]
-        CompressionOptions::Lz4Raw => {
-            let output_buf_len = output_buf.len();
-            let required_len = lz4::block::compress_bound(input_buf.len())?;
-            output_buf.resize(output_buf_len + required_len, 0);
-            let compressed_size = lz4::block::compress_to_buffer(
-                input_buf,
-                None,
-                false,
-                &mut output_buf[output_buf_len..],
-            )?;
-            output_buf.truncate(output_buf_len + compressed_size);
-            Ok(())
-        }
+        CompressionOptions::Lz4Raw => inner_compress(
+            input_buf,
+            output_buf,
+            |len| Ok(lz4::block::compress_bound(len)?),
+            |input, output| {
+                let compressed_size = lz4::block::compress_to_buffer(input, None, false, output)?;
+                Ok(compressed_size)
+            },
+        ),
         #[cfg(all(not(feature = "lz4"), not(feature = "lz4_flex")))]
         CompressionOptions::Lz4Raw => Err(Error::FeatureNotActive(
             crate::error::Feature::Lz4,
