@@ -80,14 +80,14 @@ pub fn compress(
         CompressionOptions::Lz4Raw => {
             let output_buf_len = output_buf.len();
             let required_len = lz4::block::compress_bound(input_buf.len())?;
-            output_buf.resize(required_len, 0);
-            let size = lz4::block::compress_to_buffer(
+            output_buf.resize(output_buf_len + required_len, 0);
+            let compressed_size = lz4::block::compress_to_buffer(
                 input_buf,
                 None,
                 false,
                 &mut output_buf[output_buf_len..],
             )?;
-            output_buf.truncate(output_buf_len + size);
+            output_buf.truncate(output_buf_len + compressed_size);
             Ok(())
         }
         #[cfg(all(not(feature = "lz4"), not(feature = "lz4_flex")))]
@@ -207,14 +207,14 @@ mod tests {
     use super::*;
 
     fn test_roundtrip(c: CompressionOptions, data: &[u8]) {
-        let offset = 2;
+        let offset = 2048;
 
         // Compress to a buffer that already has data is possible
         let mut compressed = vec![2; offset];
         compress(c, data, &mut compressed).expect("Error when compressing");
 
         // data is compressed...
-        assert!(compressed.len() - 2 < data.len());
+        assert!(compressed.len() - offset < data.len());
 
         let mut decompressed = vec![0; data.len()];
         decompress(c.into(), &compressed[offset..], &mut decompressed)
@@ -223,7 +223,7 @@ mod tests {
     }
 
     fn test_codec(c: CompressionOptions) {
-        let sizes = vec![10000, 100000];
+        let sizes = vec![1000, 10000, 100000];
         for size in sizes {
             let data = (0..size).map(|x| (x % 255) as u8).collect::<Vec<_>>();
             test_roundtrip(c, &data);
@@ -274,7 +274,7 @@ mod tests {
     }
 
     #[test]
-    fn test_codec_lz4() {
+    fn test_codec_lz4_raw() {
         test_codec(CompressionOptions::Lz4Raw);
     }
 
