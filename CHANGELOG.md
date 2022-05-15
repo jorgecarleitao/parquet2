@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.12.1](https://github.com/jorgecarleitao/parquet2/tree/v0.12.1) (2022-05-15)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.12.0...v0.12.1)
+
+**Fixed bugs:**
+
+- Fixed error in compressing lz4raw with large offsets [\#140](https://github.com/jorgecarleitao/parquet2/pull/140) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.12.0](https://github.com/jorgecarleitao/parquet2/tree/v0.12.0) (2022-04-22)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.11.0...v0.12.0)
