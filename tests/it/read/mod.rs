@@ -28,6 +28,7 @@ use parquet2::read::{MutStreamingIterator, State};
 use parquet2::schema::types::GroupConvertedType;
 use parquet2::schema::types::ParquetType;
 use parquet2::schema::types::PhysicalType;
+use parquet2::schema::Repetition;
 use parquet2::statistics::{BinaryStatistics, BooleanStatistics, PrimitiveStatistics, Statistics};
 use parquet2::types::int96_to_i64_ns;
 use parquet2::FallibleStreamingIterator;
@@ -516,4 +517,59 @@ fn pyarrow_v1_struct_required() -> Result<()> {
 #[test]
 fn pyarrow_v2_struct_required() -> Result<()> {
     test_pyarrow_integration("struct", "struct_required", 2, false, false, "")
+}
+
+#[test]
+fn test_metadata() -> Result<()> {
+    let mut testdata = get_path();
+    testdata.push("alltypes_plain.parquet");
+    let mut file = File::open(testdata).unwrap();
+
+    let metadata = read_metadata(&mut file)?;
+
+    let columns = metadata.schema_descr.columns();
+
+    /*
+    from pyarrow:
+    required group field_id=0 schema {
+        optional int32 field_id=1 id;
+        optional boolean field_id=2 bool_col;
+        optional int32 field_id=3 tinyint_col;
+        optional int32 field_id=4 smallint_col;
+        optional int32 field_id=5 int_col;
+        optional int64 field_id=6 bigint_col;
+        optional float field_id=7 float_col;
+        optional double field_id=8 double_col;
+        optional binary field_id=9 date_string_col;
+        optional binary field_id=10 string_col;
+        optional int96 field_id=11 timestamp_col;
+    }
+    */
+    let expected = vec![
+        PhysicalType::Int32,
+        PhysicalType::Boolean,
+        PhysicalType::Int32,
+        PhysicalType::Int32,
+        PhysicalType::Int32,
+        PhysicalType::Int64,
+        PhysicalType::Float,
+        PhysicalType::Double,
+        PhysicalType::ByteArray,
+        PhysicalType::ByteArray,
+        PhysicalType::Int96,
+    ];
+
+    let result = columns
+        .iter()
+        .map(|column| {
+            assert_eq!(
+                column.descriptor.primitive_type.field_info.repetition,
+                Repetition::Optional
+            );
+            column.descriptor.primitive_type.physical_type
+        })
+        .collect::<Vec<_>>();
+
+    assert_eq!(expected, result);
+    Ok(())
 }
