@@ -7,6 +7,7 @@ use parquet_format_async_temp::{
     FileMetaData, RowGroup,
 };
 
+use crate::write::State;
 use crate::{
     error::{Error, Result},
     metadata::{KeyValue, SchemaDescriptor},
@@ -52,6 +53,8 @@ pub struct FileStreamer<W: AsyncWrite + Unpin + Send> {
 
     offset: u64,
     row_groups: Vec<RowGroup>,
+    /// Used to store the current state for writing the file
+    state: State,
 }
 
 // Accessors
@@ -82,13 +85,24 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             created_by,
             offset: 0,
             row_groups: vec![],
+            state: State::Initialised,
         }
     }
 
-    /// Writes the header of the file
-    pub async fn start(&mut self) -> Result<()> {
-        self.offset = start_file(&mut self.writer).await? as u64;
-        Ok(())
+    /// Writes the header of the file.
+    ///
+    /// This is automatically called by [`Self::write`] if not called following [`Self::new`].
+    ///
+    /// # Errors
+    /// Returns an error if data has been written to the file.
+    async fn start(&mut self) -> Result<()> {
+        if self.offset == 0 {
+            self.offset = start_file(&mut self.writer).await? as u64;
+            self.state = State::Started;
+            Ok(())
+        } else {
+            Err(Error::General("Start cannot be called twice".to_string()))
+        }
     }
 
     /// Writes a row group to the file.
@@ -98,9 +112,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         E: std::error::Error,
     {
         if self.offset == 0 {
-            return Err(Error::General(
-                "You must call `start` before writing the first row group".to_string(),
-            ));
+            self.start().await?;
         }
         let (group, _specs, size) = write_row_group_async(
             &mut self.writer,
@@ -116,23 +128,35 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
 
     /// Writes the footer of the parquet file. Returns the total size of the file and the
     /// underlying writer.
-    pub async fn end(mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<(u64, W)> {
+    pub async fn end(&mut self, key_value_metadata: Option<Vec<KeyValue>>) -> Result<u64> {
+        if self.offset == 0 {
+            self.start().await?;
+        }
+
+        if self.state != State::Started {
+            return Err(Error::General("End cannot be called twice".to_string()));
+        }
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
-            self.schema.into_thrift(),
+            self.schema.clone().into_thrift(),
             num_rows,
-            self.row_groups,
+            self.row_groups.clone(),
             key_value_metadata,
-            self.created_by,
+            self.created_by.clone(),
             None,
             None,
             None,
         );
 
         let len = end_file(&mut self.writer, metadata).await?;
-        Ok((self.offset + len, self.writer))
+        Ok(self.offset + len)
+    }
+
+    /// Returns the underlying writer.
+    pub fn into_inner(self) -> W {
+        self.writer
     }
 }

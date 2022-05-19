@@ -41,6 +41,14 @@ pub enum Version {
     V2,
 }
 
+/// Used to recall the state of the parquet writer - whether sync or async.
+#[derive(PartialEq)]
+enum State {
+    Initialised,
+    Started,
+    Finished,
+}
+
 impl From<Version> for i32 {
     fn from(version: Version) -> Self {
         match version {
