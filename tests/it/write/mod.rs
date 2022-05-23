@@ -231,7 +231,7 @@ fn basic() -> Result<()> {
     Ok(())
 }
 
-async fn test_column_async(column: &str) -> Result<()> {
+async fn test_column_async(column: &str, compression: CompressionOptions) -> Result<()> {
     let array = alltypes_plain(column);
 
     let options = WriteOptions {
@@ -246,6 +246,7 @@ async fn test_column_async(column: &str) -> Result<()> {
         Array::Int96(_) => PhysicalType::Int96,
         Array::Float32(_) => PhysicalType::Float,
         Array::Float64(_) => PhysicalType::Double,
+        Array::Binary(_) => PhysicalType::ByteArray,
         _ => todo!(),
     };
 
@@ -262,7 +263,7 @@ async fn test_column_async(column: &str) -> Result<()> {
             &options,
             &a[0].descriptor,
         ))),
-        CompressionOptions::Uncompressed,
+        compression,
         vec![],
     ));
     let columns = std::iter::once(Ok(pages));
@@ -287,5 +288,5 @@ async fn test_column_async(column: &str) -> Result<()> {
 
 #[tokio::test]
 async fn test_async() -> Result<()> {
-    test_column_async("float_col").await
+    test_column_async("float_col", CompressionOptions::Uncompressed).await
 }
