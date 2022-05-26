@@ -1,0 +1,3 @@
+(function() {var implementors = {};
+implementors["parquet2"] = [{"text":"impl Compressed for <a class=\"struct\" href=\"parquet2/page/struct.CompressedDataPage.html\" title=\"struct parquet2::page::CompressedDataPage\">CompressedDataPage</a>","synthetic":false,"types":["parquet2::page::CompressedDataPage"]}];
+if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
