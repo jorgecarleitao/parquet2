@@ -52,15 +52,16 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
         ));
     }
 
-    let metadata_len = metadata_len(&buffer, default_end_len);
+    let metadata = metadata_len(&buffer, default_end_len);
 
-    if metadata_len < 0 {
-        return Err(general_err!(
-            "Invalid file. Metadata length is less than zero ({})",
-            metadata_len
-        ));
-    }
-    let footer_len = FOOTER_SIZE + metadata_len as u64;
+    let metadata_len: u64 = metadata.try_into().map_err(|_| {
+        general_err!(
+            "Invalid Parquet file. Metadata length is less than zero ({})",
+            metadata
+        )
+    })?;
+
+    let footer_len = FOOTER_SIZE + metadata_len;
     if footer_len > file_size {
         return Err(general_err!(
             "Invalid Parquet file. Metadata start is less than zero ({})",
@@ -68,25 +69,24 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
         ));
     }
 
-    let metadata = if footer_len < DEFAULT_FOOTER_READ_SIZE {
+    let reader = if (footer_len as usize) < buffer.len() {
         // the whole metadata is in the bytes we already read
         // build up the reader covering the entire metadata
         let mut reader = Cursor::new(buffer);
         reader.seek(SeekFrom::End(-(footer_len as i64)))?;
 
-        let mut prot = TCompactInputProtocol::new(reader);
-        TFileMetaData::read_from_in_protocol(&mut prot)?
+        reader
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader.seek(SeekFrom::End(-(footer_len as i64))).await?;
         let mut buffer = vec![0; footer_len as usize];
         reader.read_exact(&mut buffer).await?;
 
-        let reader = Cursor::new(buffer);
-
-        let mut prot = TCompactInputProtocol::new(reader);
-        TFileMetaData::read_from_in_protocol(&mut prot)?
+        Cursor::new(buffer)
     };
+
+    let mut prot = TCompactInputProtocol::new(reader);
+    let metadata = TFileMetaData::read_from_in_protocol(&mut prot)?;
 
     FileMetaData::try_from_thrift(metadata)
 }
