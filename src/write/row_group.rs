@@ -146,6 +146,7 @@ pub async fn write_row_group_async<
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
     columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
+    ordinal: usize,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
     W: AsyncWrite + Unpin + Send,
@@ -193,7 +194,7 @@ where
             sorting_columns: None,
             file_offset,
             total_compressed_size: Some(total_compressed_size),
-            ordinal: None,
+            ordinal: ordinal.try_into().ok(),
         },
         specs,
         bytes_written,

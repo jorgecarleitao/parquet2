@@ -7,6 +7,8 @@ use parquet_format_async_temp::{
     FileMetaData, RowGroup,
 };
 
+use crate::write::indexes::{write_column_index_async, write_offset_index_async};
+use crate::write::page::PageWriteSpec;
 use crate::write::State;
 use crate::{
     error::{Error, Result},
@@ -53,6 +55,7 @@ pub struct FileStreamer<W: AsyncWrite + Unpin + Send> {
 
     offset: u64,
     row_groups: Vec<RowGroup>,
+    page_specs: Vec<Vec<Vec<PageWriteSpec>>>,
     /// Used to store the current state for writing the file
     state: State,
 }
@@ -85,6 +88,7 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             created_by,
             offset: 0,
             row_groups: vec![],
+            page_specs: vec![],
             state: State::Initialised,
         }
     }
@@ -114,15 +118,19 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         if self.offset == 0 {
             self.start().await?;
         }
-        let (group, _specs, size) = write_row_group_async(
+
+        let ordinal = self.row_groups.len();
+        let (group, specs, size) = write_row_group_async(
             &mut self.writer,
             self.offset,
             self.schema.columns(),
             row_group,
+            ordinal,
         )
         .await?;
         self.offset += size;
         self.row_groups.push(group);
+        self.page_specs.push(specs);
         Ok(())
     }
 
@@ -138,6 +146,29 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         }
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();
+
+        if self.options.write_statistics {
+            // write column indexes (require page statistics)
+            for (group, pages) in self.row_groups.iter_mut().zip(self.page_specs.iter()) {
+                for (column, pages) in group.columns.iter_mut().zip(pages.iter()) {
+                    let offset = self.offset;
+                    column.column_index_offset = Some(offset as i64);
+                    self.offset += write_column_index_async(&mut self.writer, pages).await?;
+                    let length = self.offset - offset;
+                    column.column_index_length = Some(length as i32);
+                }
+            }
+        };
+
+        // write offset index
+        for (group, pages) in self.row_groups.iter_mut().zip(self.page_specs.iter()) {
+            for (column, pages) in group.columns.iter_mut().zip(pages.iter()) {
+                let offset = self.offset;
+                column.offset_index_offset = Some(offset as i64);
+                self.offset += write_offset_index_async(&mut self.writer, pages).await?;
+                column.offset_index_length = Some((self.offset - offset) as i32);
+            }
+        }
 
         let metadata = FileMetaData::new(
             self.options.version.into(),
