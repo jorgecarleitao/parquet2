@@ -3,7 +3,6 @@ mod indexes;
 pub mod levels;
 mod metadata;
 mod page;
-#[cfg(feature = "stream")]
 mod stream;
 
 use std::io::{Read, Seek, SeekFrom};
@@ -12,10 +11,8 @@ use std::vec::IntoIter;
 
 pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::read_metadata;
-#[cfg(feature = "stream")]
 pub use page::get_page_stream;
 pub use page::{IndexedPageReader, PageFilter, PageIterator, PageMetaData, PageReader};
-#[cfg(feature = "stream")]
 pub use stream::read_metadata as read_metadata_async;
 
 use crate::error::Error;

@@ -26,6 +26,7 @@ where
 
 /// The deserialization state of a `DataPage` of `Primitive` parquet primitive type
 #[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum PageState<'a, T>
 where
     T: NativeType,

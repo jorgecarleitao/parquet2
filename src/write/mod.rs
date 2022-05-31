@@ -6,9 +6,7 @@ pub(crate) mod page;
 mod row_group;
 pub(self) mod statistics;
 
-#[cfg(feature = "stream")]
 mod stream;
-#[cfg(feature = "stream")]
 pub use stream::FileStreamer;
 
 mod dyn_iter;

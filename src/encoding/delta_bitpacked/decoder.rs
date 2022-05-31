@@ -8,7 +8,7 @@ use super::super::zigzag_leb128;
 struct Block<'a> {
     // this is the minimum delta that must be added to every value.
     min_delta: i64,
-    num_mini_blocks: usize,
+    _num_mini_blocks: usize,
     values_per_mini_block: usize,
     bitwidths: &'a [u8],
     values: &'a [u8],
@@ -40,7 +40,7 @@ impl<'a> Block<'a> {
 
         let mut block = Block {
             min_delta,
-            num_mini_blocks,
+            _num_mini_blocks: num_mini_blocks,
             values_per_mini_block,
             bitwidths,
             remaining: length,
