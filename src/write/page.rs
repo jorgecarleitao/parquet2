@@ -225,12 +225,8 @@ mod tests {
 
     #[test]
     fn dict_too_many_values() {
-        let page = CompressedDictPage::new(
-            vec![],
-            Compression::Uncompressed,
-            0,
-            i32::MAX as usize + 1,
-        );
+        let page =
+            CompressedDictPage::new(vec![], Compression::Uncompressed, 0, i32::MAX as usize + 1);
         assert!(assemble_dict_page_header(&page).is_err());
     }
 }
