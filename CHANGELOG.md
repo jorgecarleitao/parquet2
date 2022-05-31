@@ -1,5 +1,42 @@
 # Changelog
 
+## [v0.13.0](https://github.com/jorgecarleitao/parquet2/tree/v0.13.0) (2022-05-31)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.12.1...v0.13.0)
+
+**Breaking changes:**
+
+- Removed unused cargo feature [\#145](https://github.com/jorgecarleitao/parquet2/pull/145) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Fix potential misuse of FileWriter API's \(sync + async\) [\#138](https://github.com/jorgecarleitao/parquet2/pull/138) ([TurnOfACard](https://github.com/TurnOfACard))
+
+**New features:**
+
+- Added new\_with\_page\_meta to PageReader [\#136](https://github.com/jorgecarleitao/parquet2/pull/136) ([ygf11](https://github.com/ygf11))
+- Added compression options/levels for GZIP and BROTLI codecs. [\#132](https://github.com/jorgecarleitao/parquet2/pull/132) ([TurnOfACard](https://github.com/TurnOfACard))
+
+**Fixed bugs:**
+
+- Async FileStreamer does not write statistics [\#139](https://github.com/jorgecarleitao/parquet2/issues/139)
+- Fixed error in compressing lz4raw with large offsets [\#140](https://github.com/jorgecarleitao/parquet2/pull/140) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Improved read of metadata [\#143](https://github.com/jorgecarleitao/parquet2/pull/143) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Simplified async metadata read [\#137](https://github.com/jorgecarleitao/parquet2/pull/137) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Testing updates:**
+
+- Lifted duplicated code to a function [\#141](https://github.com/jorgecarleitao/parquet2/pull/141) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Improved Integration test documentation and expanded tests [\#133](https://github.com/jorgecarleitao/parquet2/pull/133) ([TurnOfACard](https://github.com/TurnOfACard))
+
+## [v0.12.1](https://github.com/jorgecarleitao/parquet2/tree/v0.12.1) (2022-05-15)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.12.0...v0.12.1)
+
+**Enhancements:**
+
+- Pass only necessary data when create PageReader [\#135](https://github.com/jorgecarleitao/parquet2/issues/135)
+
 ## [v0.12.0](https://github.com/jorgecarleitao/parquet2/tree/v0.12.0) (2022-04-22)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.11.0...v0.12.0)
