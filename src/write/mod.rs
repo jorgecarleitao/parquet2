@@ -14,7 +14,7 @@ pub use dyn_iter::{DynIter, DynStreamingIterator};
 
 pub use compression::{compress, Compressor};
 
-pub use file::FileWriter;
+pub use file::{write_metadata_sidecar, FileWriter};
 
 pub use row_group::ColumnOffsetsMetadata;
 

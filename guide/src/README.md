@@ -132,3 +132,14 @@ This crate offers the necessary functionality to check whether an item is not in
 ```rust,no_run,noplayground
 {{#include ../../examples/read_metadata.rs:column_metadata}}
 ```
+
+## Sidecar
+
+When writing multiple parquet files, it is common to have a "sidecar" metadata file containing
+the combined metadata of all files, including statistics.
+
+This crate supports this use-case, as shown in the example below:
+
+```rust
+{{#include ../../examples/write_sidecar.rs}}
+```

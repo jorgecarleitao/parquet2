@@ -1,6 +1,7 @@
 mod binary;
 mod indexes;
 mod primitive;
+mod sidecar;
 
 use std::io::{Cursor, Read, Seek};
 use std::sync::Arc;
