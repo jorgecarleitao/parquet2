@@ -23,7 +23,7 @@ pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<u64> {
     Ok(PARQUET_MAGIC.len() as u64)
 }
 
-pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: FileMetaData) -> Result<u64> {
+pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: &FileMetaData) -> Result<u64> {
     // Write metadata
     let mut protocol = TCompactOutputProtocol::new(&mut writer);
     let metadata_len = metadata.write_to_out_protocol(&mut protocol)? as i32;
@@ -55,6 +55,21 @@ pub struct FileWriter<W: Write> {
     page_specs: Vec<Vec<Vec<PageWriteSpec>>>,
     /// Used to store the current state for writing the file
     state: State,
+    // when the file is written, metadata becomes available
+    metadata: Option<FileMetaData>,
+}
+
+/// Writes a parquet file containing only the header and footer
+///
+/// This is used to write the metadata as a separate Parquet file, usually when data
+/// is partitioned across multiple files.
+///
+/// Note: Recall that when combining row groups from [`FileMetaData`], the `file_path` on each
+/// of their column chunks must be updated with their path relative to where they are written to.
+pub fn write_metadata_sidecar<W: Write>(writer: &mut W, metadata: &FileMetaData) -> Result<u64> {
+    let mut len = start_file(writer)?;
+    len += end_file(writer, metadata)?;
+    Ok(len)
 }
 
 // Accessors
@@ -67,6 +82,14 @@ impl<W: Write> FileWriter<W> {
     /// The [`SchemaDescriptor`] assigned to this file
     pub fn schema(&self) -> &SchemaDescriptor {
         &self.schema
+    }
+
+    /// Returns the [`FileMetaData`]. This is Some iff the [`Self::end`] has been called.
+    ///
+    /// This is used to write the metadata as a separate Parquet file, usually when data
+    /// is partitioned across multiple files
+    pub fn metadata(&self) -> Option<&FileMetaData> {
+        self.metadata.as_ref()
     }
 }
 
@@ -87,6 +110,7 @@ impl<W: Write> FileWriter<W> {
             row_groups: vec![],
             page_specs: vec![],
             state: State::Initialised,
+            metadata: None,
         }
     }
 
@@ -195,14 +219,22 @@ impl<W: Write> FileWriter<W> {
             None,
         );
 
-        let len = end_file(&mut self.writer, metadata)?;
+        let len = end_file(&mut self.writer, &metadata)?;
         self.state = State::Finished;
+        self.metadata = Some(metadata);
         Ok(self.offset + len)
     }
 
     /// Returns the underlying writer.
     pub fn into_inner(self) -> W {
         self.writer
+    }
+
+    /// Returns the underlying writer and [`FileMetaData`]
+    /// # Panics
+    /// This function panics if [`Self::end`] has not yet been called
+    pub fn into_inner_and_metadata(self) -> (W, FileMetaData) {
+        (self.writer, self.metadata.expect("File to have ended"))
     }
 }
 
@@ -232,7 +264,7 @@ mod tests {
 
         // write the file
         start_file(&mut writer)?;
-        end_file(&mut writer, metadata.into_thrift())?;
+        end_file(&mut writer, &metadata.into_thrift())?;
 
         let a = writer.into_inner();
 
