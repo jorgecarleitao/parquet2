@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.13.1](https://github.com/jorgecarleitao/parquet2/tree/v0.13.1) (2022-06-10)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.13.0...v0.13.1)
+
+**New features:**
+
+- Added support to write sidecar [\#147](https://github.com/jorgecarleitao/parquet2/pull/147) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.13.0](https://github.com/jorgecarleitao/parquet2/tree/v0.13.0) (2022-05-31)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.12.1...v0.13.0)
