@@ -1,1 +1,0 @@
-initSidebarItems({"enum":[["Repetition","The repetition of a parquet field"]],"mod":[["io_message",""],["io_thrift",""],["types",""]],"struct":[["SchemaElement","Represents a element inside a schema definition."]]});
