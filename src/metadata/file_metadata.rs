@@ -3,7 +3,7 @@ use crate::{error::Error, metadata::get_sort_order};
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
 use parquet_format_async_temp::ColumnOrder as TColumnOrder;
 
-pub use parquet_format_async_temp::KeyValue;
+pub use crate::thrift_format::KeyValue;
 
 /// Metadata for a Parquet file.
 // This is almost equal to [`parquet_format_async_temp::FileMetaData`] but contains the descriptors,
@@ -59,7 +59,7 @@ impl FileMetaData {
             .unwrap_or(ColumnOrder::Undefined)
     }
 
-    /// Deserializes [`parquet_format_async_temp::FileMetaData`] into this struct
+    /// Deserializes [`crate::thrift_format::FileMetaData`] into this struct
     pub fn try_from_thrift(
         metadata: parquet_format_async_temp::FileMetaData,
     ) -> Result<Self, Error> {

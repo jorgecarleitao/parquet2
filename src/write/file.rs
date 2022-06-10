@@ -2,9 +2,9 @@ use std::io::Write;
 
 use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
-use parquet_format_async_temp::FileMetaData;
 use parquet_format_async_temp::RowGroup;
 
+use crate::metadata::ThriftFileMetaData;
 use crate::{
     error::{Error, Result},
     metadata::SchemaDescriptor,
@@ -23,7 +23,7 @@ pub(super) fn start_file<W: Write>(writer: &mut W) -> Result<u64> {
     Ok(PARQUET_MAGIC.len() as u64)
 }
 
-pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: &FileMetaData) -> Result<u64> {
+pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: &ThriftFileMetaData) -> Result<u64> {
     // Write metadata
     let mut protocol = TCompactOutputProtocol::new(&mut writer);
     let metadata_len = metadata.write_to_out_protocol(&mut protocol)? as i32;
@@ -56,7 +56,7 @@ pub struct FileWriter<W: Write> {
     /// Used to store the current state for writing the file
     state: State,
     // when the file is written, metadata becomes available
-    metadata: Option<FileMetaData>,
+    metadata: Option<ThriftFileMetaData>,
 }
 
 /// Writes a parquet file containing only the header and footer
@@ -66,7 +66,10 @@ pub struct FileWriter<W: Write> {
 ///
 /// Note: Recall that when combining row groups from [`FileMetaData`], the `file_path` on each
 /// of their column chunks must be updated with their path relative to where they are written to.
-pub fn write_metadata_sidecar<W: Write>(writer: &mut W, metadata: &FileMetaData) -> Result<u64> {
+pub fn write_metadata_sidecar<W: Write>(
+    writer: &mut W,
+    metadata: &ThriftFileMetaData,
+) -> Result<u64> {
     let mut len = start_file(writer)?;
     len += end_file(writer, metadata)?;
     Ok(len)
@@ -84,11 +87,11 @@ impl<W: Write> FileWriter<W> {
         &self.schema
     }
 
-    /// Returns the [`FileMetaData`]. This is Some iff the [`Self::end`] has been called.
+    /// Returns the [`ThriftFileMetaData`]. This is Some iff the [`Self::end`] has been called.
     ///
     /// This is used to write the metadata as a separate Parquet file, usually when data
     /// is partitioned across multiple files
-    pub fn metadata(&self) -> Option<&FileMetaData> {
+    pub fn metadata(&self) -> Option<&ThriftFileMetaData> {
         self.metadata.as_ref()
     }
 }
@@ -207,7 +210,7 @@ impl<W: Write> FileWriter<W> {
                 Result::Ok(())
             })?;
 
-        let metadata = FileMetaData::new(
+        let metadata = ThriftFileMetaData::new(
             self.options.version.into(),
             self.schema.clone().into_thrift(),
             num_rows,
@@ -230,10 +233,10 @@ impl<W: Write> FileWriter<W> {
         self.writer
     }
 
-    /// Returns the underlying writer and [`FileMetaData`]
+    /// Returns the underlying writer and [`ThriftFileMetaData`]
     /// # Panics
     /// This function panics if [`Self::end`] has not yet been called
-    pub fn into_inner_and_metadata(self) -> (W, FileMetaData) {
+    pub fn into_inner_and_metadata(self) -> (W, ThriftFileMetaData) {
         (self.writer, self.metadata.expect("File to have ended"))
     }
 }

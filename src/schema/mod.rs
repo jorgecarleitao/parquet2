@@ -1,4 +1,4 @@
-pub use parquet_format_async_temp::SchemaElement;
+pub use super::thrift_format::SchemaElement;
 
 pub use crate::parquet_bridge::Repetition;
 

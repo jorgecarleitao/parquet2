@@ -2,7 +2,7 @@ mod index;
 mod intervals;
 
 pub use crate::parquet_bridge::BoundaryOrder;
-pub use parquet_format_async_temp::PageLocation;
+pub use crate::thrift_format::PageLocation;
 
 pub use self::index::{BooleanIndex, ByteIndex, FixedLenByteIndex, Index, NativeIndex, PageIndex};
 pub use intervals::{compute_rows, select_pages, FilteredPage, Interval};
