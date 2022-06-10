@@ -1,19 +1,12 @@
 // Bridges structs from thrift-generated code to rust enums.
 use std::convert::TryFrom;
 
-use parquet_format_async_temp::BoundaryOrder as ParquetBoundaryOrder;
-use parquet_format_async_temp::CompressionCodec;
-use parquet_format_async_temp::DataPageHeader;
-use parquet_format_async_temp::DataPageHeaderV2;
-use parquet_format_async_temp::DecimalType;
-use parquet_format_async_temp::Encoding as ParquetEncoding;
-use parquet_format_async_temp::FieldRepetitionType;
-use parquet_format_async_temp::IntType;
-use parquet_format_async_temp::LogicalType as ParquetLogicalType;
-use parquet_format_async_temp::PageType as ParquetPageType;
-use parquet_format_async_temp::TimeType;
-use parquet_format_async_temp::TimeUnit as ParquetTimeUnit;
-use parquet_format_async_temp::TimestampType;
+use super::thrift_format::{
+    BoundaryOrder as ParquetBoundaryOrder, CompressionCodec, DataPageHeader, DataPageHeaderV2,
+    DecimalType, Encoding as ParquetEncoding, FieldRepetitionType, IntType,
+    LogicalType as ParquetLogicalType, PageType as ParquetPageType, TimeType,
+    TimeUnit as ParquetTimeUnit, TimestampType,
+};
 
 use crate::error::Error;
 

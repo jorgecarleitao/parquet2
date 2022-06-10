@@ -13,3 +13,5 @@ pub use file_metadata::{FileMetaData, KeyValue};
 pub use row_metadata::RowGroupMetaData;
 pub use schema_descriptor::SchemaDescriptor;
 pub use sort::*;
+
+pub use crate::thrift_format::FileMetaData as ThriftFileMetaData;

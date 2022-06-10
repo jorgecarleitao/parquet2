@@ -3,7 +3,7 @@ pub use page_dict::*;
 
 use std::sync::Arc;
 
-pub use parquet_format_async_temp::{
+pub use crate::thrift_format::{
     DataPageHeader as DataPageHeaderV1, DataPageHeaderV2, PageHeader as ParquetPageHeader,
 };
 
