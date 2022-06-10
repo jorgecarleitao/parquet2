@@ -1,0 +1,1 @@
+initSidebarItems({"fn":[["decode",""],["encode","Encodes `value` in ULEB128 into `container`. The exact number of bytes written depends on `value`, and cannot be determined upfront. The maximum number of bytes required are 10."]]});
