@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.13.2](https://github.com/jorgecarleitao/parquet2/tree/v0.13.2) (2022-06-10)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.13.1...v0.13.2)
+
+**Fixed bugs:**
+
+- Fixed missing re-export of `FileMetaData` to allow using side-car API [\#148](https://github.com/jorgecarleitao/parquet2/pull/148) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.13.1](https://github.com/jorgecarleitao/parquet2/tree/v0.13.1) (2022-06-10)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.13.0...v0.13.1)
