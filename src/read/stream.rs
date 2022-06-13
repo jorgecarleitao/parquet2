@@ -1,11 +1,9 @@
 use std::io::{Cursor, Seek, SeekFrom};
 
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
-use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
-use parquet_format_async_temp::FileMetaData as TFileMetaData;
 
 use super::super::{metadata::FileMetaData, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, PARQUET_MAGIC};
-use super::metadata::metadata_len;
+use super::metadata::{deserialize_metadata, metadata_len};
 use crate::error::{Error, Result};
 use crate::HEADER_SIZE;
 
@@ -85,8 +83,5 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
         Cursor::new(buffer)
     };
 
-    let mut prot = TCompactInputProtocol::new(reader);
-    let metadata = TFileMetaData::read_from_in_protocol(&mut prot)?;
-
-    FileMetaData::try_from_thrift(metadata)
+    deserialize_metadata(reader)
 }

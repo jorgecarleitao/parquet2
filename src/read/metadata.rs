@@ -93,9 +93,13 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         Cursor::new(buffer)
     };
 
+    deserialize_metadata(reader)
+}
+
+/// Parse loaded metadata bytes
+pub fn deserialize_metadata<R: Read>(reader: R) -> Result<FileMetaData> {
     let mut prot = TCompactInputProtocol::new(reader);
-    let metadata = TFileMetaData::read_from_in_protocol(&mut prot)
-        .map_err(|e| Error::General(format!("Could not parse metadata: {}", e)))?;
+    let metadata = TFileMetaData::read_from_in_protocol(&mut prot)?;
 
     FileMetaData::try_from_thrift(metadata)
 }
