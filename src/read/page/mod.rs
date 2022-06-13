@@ -12,3 +12,4 @@ pub trait PageIterator: Iterator<Item = Result<CompressedDataPage, Error>> {
 }
 
 pub use stream::get_page_stream;
+pub use stream::get_page_stream_from_column_start;

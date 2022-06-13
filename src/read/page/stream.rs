@@ -1,6 +1,7 @@
 use std::io::SeekFrom;
 
 use async_stream::try_stream;
+use futures::io::{copy, sink};
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt, Stream};
 use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 
@@ -22,6 +23,24 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
     get_page_stream_with_page_meta(column_metadata.into(), reader, buffer, pages_filter).await
 }
 
+/// Returns a stream of compressed data pages from a reader that begins at the start of the column
+pub async fn get_page_stream_from_column_start<'a, R: AsyncRead + Unpin + Send>(
+    column_metadata: &'a ColumnChunkMetaData,
+    reader: &'a mut R,
+    buffer: Vec<u8>,
+    pages_filter: PageFilter,
+) -> Result<impl Stream<Item = Result<CompressedDataPage>> + 'a> {
+    let page_metadata: PageMetaData = column_metadata.into();
+    Ok(_get_page_stream(
+        reader,
+        page_metadata.num_values,
+        page_metadata.compression,
+        page_metadata.descriptor,
+        buffer,
+        pages_filter,
+    ))
+}
+
 /// Returns a stream of compressed data pages with [`PageMetaData`]
 pub async fn get_page_stream_with_page_meta<RR: AsyncRead + Unpin + Send + AsyncSeek>(
     page_metadata: PageMetaData,
@@ -41,7 +60,7 @@ pub async fn get_page_stream_with_page_meta<RR: AsyncRead + Unpin + Send + Async
     ))
 }
 
-fn _get_page_stream<R: AsyncRead + AsyncSeek + Unpin + Send>(
+fn _get_page_stream<R: AsyncRead + Unpin + Send>(
     reader: &mut R,
     total_num_values: i64,
     compression: Compression,
@@ -64,7 +83,7 @@ fn _get_page_stream<R: AsyncRead + AsyncSeek + Unpin + Send>(
             if let Some(data_header) = data_header {
                 if !pages_filter(&descriptor, &data_header) {
                     // page to be skipped, we sill need to seek
-                    reader.seek(SeekFrom::Current(read_size)).await?;
+                    copy(reader.take(read_size as u64), &mut sink()).await?;
                     continue
                 }
             }
