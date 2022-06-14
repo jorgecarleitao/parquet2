@@ -1,6 +1,6 @@
 use std::{any::Any, sync::Arc};
 
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::schema::types::PhysicalType;
 
 use super::DictPage;
@@ -30,8 +30,14 @@ impl FixedLenByteArrayPageDict {
     }
 
     #[inline]
-    pub fn value(&self, index: usize) -> &[u8] {
-        &self.values[index * self.size..(index + 1) * self.size]
+    pub fn value(&self, index: usize) -> Result<&[u8]> {
+        self.values
+            .get(index * self.size..(index + 1) * self.size)
+            .ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The data page has an index larger than the dictionary page values".to_string(),
+                )
+            })
     }
 }
 

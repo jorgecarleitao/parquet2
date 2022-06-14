@@ -9,22 +9,23 @@ pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<Vec<u8>>>> {
 
     match state {
         FixedLenBinaryPageState::Optional(validity, values) => {
-            deserialize_optional(validity, values.map(|x| x.to_vec()))
+            deserialize_optional(validity, values.map(|x| Ok(x.to_vec())))
         }
         FixedLenBinaryPageState::Required(values) => {
             Ok(values.map(|x| x.to_vec()).map(Some).collect())
         }
-        FixedLenBinaryPageState::RequiredDictionary(dict) => Ok(dict
+        FixedLenBinaryPageState::RequiredDictionary(dict) => dict
             .indexes
             .map(|x| x as usize)
-            .map(|x| dict.dict.value(x).to_vec())
+            .map(|x| dict.dict.value(x).map(|x| x.to_vec()))
             .map(Some)
-            .collect()),
+            .map(|x| x.transpose())
+            .collect(),
         FixedLenBinaryPageState::OptionalDictionary(validity, dict) => {
             let values = dict
                 .indexes
                 .map(|x| x as usize)
-                .map(|x| dict.dict.value(x).to_vec());
+                .map(|x| dict.dict.value(x).map(|x| x.to_vec()));
             deserialize_optional(validity, values)
         }
     }

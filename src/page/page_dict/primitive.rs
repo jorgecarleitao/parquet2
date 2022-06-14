@@ -21,6 +21,15 @@ impl<T: NativeType> PrimitivePageDict<T> {
     pub fn values(&self) -> &[T] {
         &self.values
     }
+
+    #[inline]
+    pub fn value(&self, index: usize) -> Result<&T> {
+        self.values.get(index).ok_or_else(|| {
+            Error::OutOfSpec(
+                "The data page has an index larger than the dictionary page values".to_string(),
+            )
+        })
+    }
 }
 
 impl<T: NativeType> DictPage for PrimitivePageDict<T> {
@@ -33,26 +42,23 @@ impl<T: NativeType> DictPage for PrimitivePageDict<T> {
     }
 }
 
-fn read_plain<T: NativeType>(values: &[u8]) -> Result<Vec<T>> {
-    // read in plain
-    if values.len() % std::mem::size_of::<T>() != 0 {
-        return Err(Error::OutOfSpec(
-            "A dictionary page with primitive values must contain a multiple of their format."
-                .to_string(),
-        ));
-    }
-    Ok(values
-        .chunks_exact(std::mem::size_of::<T>())
-        .map(decode::<T>)
-        .collect())
-}
-
 pub fn read<T: NativeType>(
     buf: &[u8],
     num_values: usize,
     _is_sorted: bool,
 ) -> Result<Arc<dyn DictPage>> {
-    let typed_size = num_values * std::mem::size_of::<T>();
-    let values = read_plain::<T>(&buf[..typed_size])?;
+    let size_of = std::mem::size_of::<T>();
+
+    let typed_size = num_values.wrapping_mul(size_of);
+
+    let values = buf.get(..typed_size).ok_or_else(|| {
+        Error::OutOfSpec(
+            "The number of values declared in the dict page does not match the length of the page"
+                .to_string(),
+        )
+    })?;
+
+    let values = values.chunks_exact(size_of).map(decode::<T>).collect();
+
     Ok(Arc::new(PrimitivePageDict::new(values)))
 }

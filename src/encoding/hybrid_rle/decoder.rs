@@ -30,20 +30,25 @@ impl<'a> Iterator for Decoder<'a> {
         }
         let (indicator, consumed) = uleb128::decode(self.values);
         self.values = &self.values[consumed..];
+        if self.values.is_empty() {
+            return None;
+        };
         if indicator & 1 == 1 {
             // is bitpacking
             let bytes = (indicator as usize >> 1) * self.num_bits as usize;
             let bytes = std::cmp::min(bytes, self.values.len());
-            let result = Some(HybridEncoded::Bitpacked(&self.values[..bytes]));
-            self.values = &self.values[bytes..];
+            let (result, remaining) = self.values.split_at(bytes);
+            let result = Some(HybridEncoded::Bitpacked(result));
+            self.values = remaining;
             result
         } else {
             // is rle
             let run_length = indicator as usize >> 1;
             // repeated-value := value that is repeated, using a fixed-width of round-up-to-next-byte(bit-width)
             let rle_bytes = ceil8(self.num_bits as usize);
-            let result = Some(HybridEncoded::Rle(&self.values[..rle_bytes], run_length));
-            self.values = &self.values[rle_bytes..];
+            let (result, remaining) = self.values.split_at(rle_bytes);
+            let result = Some(HybridEncoded::Rle(result, run_length));
+            self.values = remaining;
             result
         }
     }

@@ -4,7 +4,7 @@ use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::compression::Compression;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::schema::types::PhysicalType;
 use crate::statistics::{deserialize_statistics, Statistics};
 
@@ -135,6 +135,22 @@ impl ColumnChunkMetaData {
         column_descr: ColumnDescriptor,
         column_chunk: ColumnChunk,
     ) -> Result<Self> {
+        // validate metadata
+        if let Some(meta) = &column_chunk.meta_data {
+            let _: usize = meta.total_compressed_size.try_into()?;
+
+            if let Some(offset) = meta.dictionary_page_offset {
+                let _: usize = offset.try_into()?;
+            }
+            let _: usize = meta.data_page_offset.try_into()?;
+
+            let _: Compression = meta.codec.try_into()?;
+        } else {
+            return Err(Error::OutOfSpec(
+                "Column chunk requires metdata".to_string(),
+            ));
+        }
+
         Ok(Self {
             column_chunk,
             column_descr,

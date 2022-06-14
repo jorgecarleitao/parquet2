@@ -6,9 +6,9 @@ use parquet2::encoding::Encoding;
 use parquet2::page::{split_buffer, DataPage};
 use parquet2::schema::types::PhysicalType;
 
-fn deserialize(page: &DataPage) {
+fn deserialize(page: &DataPage) -> Result<()> {
     // split the data buffer in repetition levels, definition levels and values
-    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page);
+    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page)?;
 
     // decode and deserialize.
     match (

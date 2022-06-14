@@ -37,7 +37,9 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
     // There is only one message type node in the schema tree.
     let is_root_node = index == 0;
 
-    let element = &elements[index];
+    let element = elements.get(index).ok_or_else(|| {
+        Error::OutOfSpec(format!("index {} on SchemaElement is not valid", index))
+    })?;
     let name = element.name.clone();
     let converted_type = element.converted_type;
 
@@ -55,8 +57,7 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
                 .ok_or_else(|| {
                     general_err!("Repetition level must be defined for a primitive type")
                 })?
-                .try_into()
-                .unwrap();
+                .try_into()?;
             let physical_type = element.type_.ok_or_else(|| {
                 general_err!("Physical type must be defined for a primitive type")
             })?;

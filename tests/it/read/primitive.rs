@@ -46,7 +46,7 @@ impl<'a, T: NativeType> PageState<'a, T> {
 
             match (page.encoding(), page.dictionary_page(), is_optional) {
                 (Encoding::Plain, _, true) => {
-                    let (_, def_levels, _) = split_buffer(page);
+                    let (_, def_levels, _) = split_buffer(page)?;
 
                     let validity = HybridRleDecoderIter::new(HybridRleIter::new(
                         Decoder::new(def_levels, 1),
@@ -87,16 +87,22 @@ pub fn page_to_vec<T: NativeType>(page: &DataPage) -> Result<Vec<Option<T>>, Err
 
     match state {
         PageState::Nominal(state) => match state {
-            NativePageState::Optional(validity, values) => deserialize_optional(validity, values),
+            NativePageState::Optional(validity, mut values) => {
+                deserialize_optional(validity, values.by_ref().map(Ok))
+            }
             NativePageState::Required(values) => Ok(values.map(Some).collect()),
-            NativePageState::RequiredDictionary(dict) => Ok(dict
+            NativePageState::RequiredDictionary(dict) => dict
                 .indexes
                 .map(|x| x as usize)
-                .map(|x| dict.values[x])
+                .map(|x| dict.dict.value(x).copied())
                 .map(Some)
-                .collect()),
+                .map(|x| x.transpose())
+                .collect(),
             NativePageState::OptionalDictionary(validity, dict) => {
-                let values = dict.indexes.map(|x| x as usize).map(|x| dict.values[x]);
+                let values = dict
+                    .indexes
+                    .map(|x| x as usize)
+                    .map(|x| dict.dict.value(x).copied());
                 deserialize_optional(validity, values)
             }
         },

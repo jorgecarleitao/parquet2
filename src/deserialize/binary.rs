@@ -14,10 +14,10 @@ pub struct Dictionary<'a> {
 }
 
 impl<'a> Dictionary<'a> {
-    pub fn new(page: &'a DataPage, dict: &'a BinaryPageDict) -> Self {
-        let indexes = utils::dict_indices_decoder(page);
+    pub fn try_new(page: &'a DataPage, dict: &'a BinaryPageDict) -> Result<Self, Error> {
+        let indexes = utils::dict_indices_decoder(page)?;
 
-        Self { indexes, dict }
+        Ok(Self { indexes, dict })
     }
 
     #[inline]
@@ -41,26 +41,26 @@ impl<'a> BinaryPageState<'a> {
         match (page.encoding(), page.dictionary_page(), is_optional) {
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), false) => {
                 let dict = dict.as_any().downcast_ref().unwrap();
-                Ok(Self::RequiredDictionary(Dictionary::new(page, dict)))
+                Ok(Self::RequiredDictionary(Dictionary::try_new(page, dict)?))
             }
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), true) => {
                 let dict = dict.as_any().downcast_ref().unwrap();
 
                 Ok(Self::OptionalDictionary(
-                    utils::DefLevelsDecoder::new(page),
-                    Dictionary::new(page, dict),
+                    utils::DefLevelsDecoder::try_new(page)?,
+                    Dictionary::try_new(page, dict)?,
                 ))
             }
             (Encoding::Plain, _, true) => {
-                let (_, _, values) = split_buffer(page);
+                let (_, _, values) = split_buffer(page)?;
 
-                let validity = utils::DefLevelsDecoder::new(page);
+                let validity = utils::DefLevelsDecoder::try_new(page)?;
                 let values = BinaryIter::new(values, None);
 
                 Ok(Self::Optional(validity, values))
             }
             (Encoding::Plain, _, false) => {
-                let (_, _, values) = split_buffer(page);
+                let (_, _, values) = split_buffer(page)?;
                 let values = BinaryIter::new(values, Some(page.num_values()));
 
                 Ok(Self::Required(values))

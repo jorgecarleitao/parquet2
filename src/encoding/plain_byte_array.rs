@@ -2,6 +2,7 @@
 /// prefixes, lengths and values
 /// # Implementation
 /// This struct does not allocate on the heap.
+use crate::error::Error;
 
 #[derive(Debug)]
 pub struct BinaryIter<'a> {
@@ -16,7 +17,7 @@ impl<'a> BinaryIter<'a> {
 }
 
 impl<'a> Iterator for BinaryIter<'a> {
-    type Item = &'a [u8];
+    type Item = Result<&'a [u8], Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -30,7 +31,7 @@ impl<'a> Iterator for BinaryIter<'a> {
         self.values = &self.values[4..];
         let result = &self.values[..length];
         self.values = &self.values[length..];
-        Some(result)
+        Some(Ok(result))
     }
 
     #[inline]

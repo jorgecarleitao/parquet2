@@ -26,8 +26,13 @@ impl BinaryPageDict {
 
     #[inline]
     pub fn value(&self, index: usize) -> Result<&[u8], Error> {
+        let end = *self.offsets.get(index + 1).ok_or_else(|| {
+            Error::OutOfSpec(
+                "The data page has an index larger than the dictionary page values".to_string(),
+            )
+        })?;
+        let end: usize = end.try_into()?;
         let start: usize = self.offsets[index].try_into()?;
-        let end: usize = self.offsets[(index + 1)].try_into()?;
         Ok(&self.values[start..end])
     }
 }
@@ -50,10 +55,10 @@ fn read_plain(bytes: &[u8], length: usize) -> (Vec<u8>, Vec<i32>) {
 
     let mut current_length = 0;
     offsets.extend((0..length).map(|_| {
-        let slot_length = get_length(bytes) as i32;
-        current_length += slot_length;
-        values.extend_from_slice(&bytes[4..4 + slot_length as usize]);
-        bytes = &bytes[4 + slot_length as usize..];
+        let slot_length = get_length(bytes).unwrap();
+        current_length += slot_length as i32;
+        values.extend_from_slice(&bytes[4..4 + slot_length]);
+        bytes = &bytes[4 + slot_length..];
         current_length
     }));
 

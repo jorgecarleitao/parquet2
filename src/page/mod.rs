@@ -12,7 +12,7 @@ pub use crate::parquet_bridge::{DataPageHeaderExt, PageType};
 
 use crate::compression::Compression;
 use crate::encoding::{get_length, Encoding};
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::metadata::Descriptor;
 
 use crate::statistics::{deserialize_statistics, Statistics};
@@ -301,28 +301,62 @@ impl CompressedPage {
 
 /// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values) for v1 pages.
 #[inline]
-pub fn split_buffer_v1(buffer: &[u8], has_rep: bool, has_def: bool) -> (&[u8], &[u8], &[u8]) {
+pub fn split_buffer_v1(
+    buffer: &[u8],
+    has_rep: bool,
+    has_def: bool,
+) -> Result<(&[u8], &[u8], &[u8])> {
     let (rep, buffer) = if has_rep {
-        let level_buffer_length = get_length(buffer) as usize;
+        let level_buffer_length = get_length(buffer).ok_or_else(|| {
+            Error::OutOfSpec(
+                "The number of bytes declared in v1 rep levels is higher than the page size"
+                    .to_string(),
+            )
+        })?;
         (
-            &buffer[4..4 + level_buffer_length],
-            &buffer[4 + level_buffer_length..],
+            buffer.get(4..4 + level_buffer_length).ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The number of bytes declared in v1 rep levels is higher than the page size"
+                        .to_string(),
+                )
+            })?,
+            buffer.get(4 + level_buffer_length..).ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The number of bytes declared in v1 rep levels is higher than the page size"
+                        .to_string(),
+                )
+            })?,
         )
     } else {
         (&[] as &[u8], buffer)
     };
 
     let (def, buffer) = if has_def {
-        let level_buffer_length = get_length(buffer) as usize;
+        let level_buffer_length = get_length(buffer).ok_or_else(|| {
+            Error::OutOfSpec(
+                "The number of bytes declared in v1 rep levels is higher than the page size"
+                    .to_string(),
+            )
+        })?;
         (
-            &buffer[4..4 + level_buffer_length],
-            &buffer[4 + level_buffer_length..],
+            buffer.get(4..4 + level_buffer_length).ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The number of bytes declared in v1 def levels is higher than the page size"
+                        .to_string(),
+                )
+            })?,
+            buffer.get(4 + level_buffer_length..).ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The number of bytes declared in v1 def levels is higher than the page size"
+                        .to_string(),
+                )
+            })?,
         )
     } else {
         (&[] as &[u8], buffer)
     };
 
-    (rep, def, buffer)
+    Ok((rep, def, buffer))
 }
 
 /// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values) for v2 pages.
@@ -330,16 +364,16 @@ pub fn split_buffer_v2(
     buffer: &[u8],
     rep_level_buffer_length: usize,
     def_level_buffer_length: usize,
-) -> (&[u8], &[u8], &[u8]) {
-    (
+) -> Result<(&[u8], &[u8], &[u8])> {
+    Ok((
         &buffer[..rep_level_buffer_length],
         &buffer[rep_level_buffer_length..rep_level_buffer_length + def_level_buffer_length],
         &buffer[rep_level_buffer_length + def_level_buffer_length..],
-    )
+    ))
 }
 
 /// Splits the page buffer into 3 slices corresponding to (encoded rep levels, encoded def levels, encoded values).
-pub fn split_buffer(page: &DataPage) -> (&[u8], &[u8], &[u8]) {
+pub fn split_buffer(page: &DataPage) -> Result<(&[u8], &[u8], &[u8])> {
     match page.header() {
         DataPageHeader::V1(_) => split_buffer_v1(
             page.buffer(),
@@ -347,8 +381,8 @@ pub fn split_buffer(page: &DataPage) -> (&[u8], &[u8], &[u8]) {
             page.descriptor.max_def_level > 0,
         ),
         DataPageHeader::V2(header) => {
-            let def_level_buffer_length = header.definition_levels_byte_length as usize;
-            let rep_level_buffer_length = header.repetition_levels_byte_length as usize;
+            let def_level_buffer_length: usize = header.definition_levels_byte_length.try_into()?;
+            let rep_level_buffer_length: usize = header.repetition_levels_byte_length.try_into()?;
             split_buffer_v2(
                 page.buffer(),
                 rep_level_buffer_length,

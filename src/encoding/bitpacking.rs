@@ -69,16 +69,16 @@ fn decode_pack(compressed: &[u8], num_bits: u8, pack: &mut [u32; BitPacker1x::BL
 }
 
 impl<'a> Decoder<'a> {
-    pub fn new(compressed: &'a [u8], num_bits: u8, length: usize) -> Self {
+    pub fn new(compressed: &'a [u8], num_bits: u8, mut length: usize) -> Self {
         let compressed_block_size = BitPacker1x::BLOCK_LEN * num_bits as usize / 8;
 
         let mut compressed_chunks = compressed.chunks(compressed_block_size);
         let mut current_pack = [0; BitPacker1x::BLOCK_LEN];
-        decode_pack(
-            compressed_chunks.next().unwrap(),
-            num_bits,
-            &mut current_pack,
-        );
+        if let Some(chunk) = compressed_chunks.next() {
+            decode_pack(chunk, num_bits, &mut current_pack);
+        } else {
+            length = 0
+        };
 
         Self {
             remaining: length,

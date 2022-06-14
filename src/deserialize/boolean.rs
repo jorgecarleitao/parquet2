@@ -22,15 +22,15 @@ impl<'a> BooleanPageState<'a> {
 
         match (page.encoding(), page.dictionary_page(), is_optional) {
             (Encoding::Plain, _, true) => {
-                let validity = utils::DefLevelsDecoder::new(page);
+                let validity = utils::DefLevelsDecoder::try_new(page)?;
 
-                let (_, _, values) = split_buffer(page);
+                let (_, _, values) = split_buffer(page)?;
                 let values = BitmapIter::new(values, 0, values.len() * 8);
 
                 Ok(Self::Optional(validity, values))
             }
             (Encoding::Plain, _, false) => {
-                let (_, _, values) = split_buffer(page);
+                let (_, _, values) = split_buffer(page)?;
                 Ok(Self::Required(values, page.num_values()))
             }
             _ => Err(Error::General(format!(
