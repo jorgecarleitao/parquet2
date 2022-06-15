@@ -10,8 +10,8 @@ use std::sync::Arc;
 use std::vec::IntoIter;
 
 pub use compression::{decompress, BasicDecompressor, Decompressor};
-pub use metadata::read_metadata;
-pub use page::get_page_stream;
+pub use metadata::{deserialize_metadata, read_metadata};
+pub use page::{get_page_stream, get_page_stream_from_column_start};
 pub use page::{IndexedPageReader, PageFilter, PageIterator, PageMetaData, PageReader};
 pub use stream::read_metadata as read_metadata_async;
 
