@@ -51,12 +51,10 @@ impl DictPage for FixedLenByteArrayPageDict {
     }
 }
 
-fn read_plain(bytes: &[u8], size: usize, length: usize) -> Vec<u8> {
-    bytes[..size * length].to_vec()
-}
-
 pub fn read(buf: &[u8], size: usize, num_values: usize) -> Result<Arc<dyn DictPage>> {
-    let values = read_plain(buf, size, num_values);
+    let length = size.saturating_mul(num_values);
+    let values = buf.get(..length).ok_or_else(|| Error::OutOfSpec("Fixed sized binary declares a number of values times size larger than the page buffer".to_string()))?.to_vec();
+
     Ok(Arc::new(FixedLenByteArrayPageDict::new(
         values,
         PhysicalType::FixedLenByteArray(size),

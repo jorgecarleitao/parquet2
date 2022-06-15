@@ -29,8 +29,13 @@ impl<'a> Iterator for BinaryIter<'a> {
         }
         let length = u32::from_le_bytes(self.values[0..4].try_into().unwrap()) as usize;
         self.values = &self.values[4..];
-        let result = &self.values[..length];
-        self.values = &self.values[length..];
+        if length > self.values.len() {
+            return Some(Err(Error::OutOfSpec(
+                "A string in plain encoding declares a length that is out of range".to_string(),
+            )));
+        }
+        let (result, remaining) = self.values.split_at(length);
+        self.values = remaining;
         Some(Ok(result))
     }
 

@@ -47,25 +47,35 @@ impl DictPage for BinaryPageDict {
     }
 }
 
-fn read_plain(bytes: &[u8], length: usize) -> (Vec<u8>, Vec<i32>) {
+fn read_plain(bytes: &[u8], length: usize) -> Result<(Vec<u8>, Vec<i32>), Error> {
     let mut bytes = bytes;
     let mut values = Vec::new();
     let mut offsets = Vec::with_capacity(length as usize + 1);
     offsets.push(0);
 
     let mut current_length = 0;
-    offsets.extend((0..length).map(|_| {
+    offsets.reserve(length);
+    for _ in 0..length {
         let slot_length = get_length(bytes).unwrap();
+        bytes = &bytes[4..];
         current_length += slot_length as i32;
-        values.extend_from_slice(&bytes[4..4 + slot_length]);
-        bytes = &bytes[4 + slot_length..];
-        current_length
-    }));
 
-    (values, offsets)
+        if slot_length > bytes.len() {
+            return Err(Error::OutOfSpec(
+                "The string on a dictionary page has a length that is out of bounds".to_string(),
+            ));
+        }
+        let (result, remaining) = bytes.split_at(slot_length);
+
+        values.extend_from_slice(result);
+        bytes = remaining;
+        offsets.push(current_length);
+    }
+
+    Ok((values, offsets))
 }
 
 pub fn read(buf: &[u8], num_values: usize) -> Result<Arc<dyn DictPage>, Error> {
-    let (values, offsets) = read_plain(buf, num_values);
+    let (values, offsets) = read_plain(buf, num_values)?;
     Ok(Arc::new(BinaryPageDict::new(values, offsets)))
 }
