@@ -197,9 +197,14 @@ pub(super) fn build_page<R: Read>(
 
     let read_size = page_header.compressed_page_size as usize;
     if read_size > 0 {
-        if read_size > buffer.len() {
-            // dealloc and ignore region, replacing it by a new region
-            *buffer = vec![0; read_size]
+        if read_size > buffer.capacity() {
+            // dealloc and ignore region, replacing it by a new region.
+            // This won't reallocate - it frees and calls `alloc_zeroed`
+            *buffer = vec![0; read_size];
+        } else if read_size > buffer.len() {
+            // fill what we need with zeros so that we can use them in `Read`.
+            // This won't reallocate
+            buffer.resize(read_size, 0);
         } else {
             buffer.truncate(read_size);
         }

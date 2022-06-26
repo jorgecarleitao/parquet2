@@ -51,9 +51,14 @@ pub fn decompress_buffer(
 
         // prepare the compression buffer
         let read_size = compressed_page.uncompressed_size();
-        if read_size > buffer.len() {
-            // dealloc and ignore region, replacing it by a new region
-            *buffer = vec![0; read_size]
+        if read_size > buffer.capacity() {
+            // dealloc and ignore region, replacing it by a new region.
+            // This won't reallocate - it frees and calls `alloc_zeroed`
+            *buffer = vec![0; read_size];
+        } else if read_size > buffer.len() {
+            // fill what we need with zeros so that we can use them in `Read`.
+            // This won't reallocate
+            buffer.resize(read_size, 0);
         } else {
             buffer.truncate(read_size);
         }
