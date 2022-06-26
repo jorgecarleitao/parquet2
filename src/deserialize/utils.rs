@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{
     encoding::hybrid_rle::{self, HybridRleDecoder},
+    error::{Error, Result},
     indexes::Interval,
     page::{split_buffer, DataPage},
     read::levels::get_bit_width,
@@ -9,15 +10,24 @@ use crate::{
 
 use super::hybrid_rle::{HybridDecoderBitmapIter, HybridRleIter};
 
-pub(super) fn dict_indices_decoder(page: &DataPage) -> hybrid_rle::HybridRleDecoder {
-    let (_, _, indices_buffer) = split_buffer(page);
+pub(super) fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::HybridRleDecoder> {
+    let (_, _, indices_buffer) = split_buffer(page)?;
 
     // SPEC: Data page format: the bit width used to encode the entry ids stored as 1 byte (max bit width = 32),
     // SPEC: followed by the values encoded using RLE/Bit packed described above (with the given bit width).
     let bit_width = indices_buffer[0];
+    if bit_width > 32 {
+        return Err(Error::OutOfSpec(
+            "Bit width of dictionary pages cannot be larger than 32".to_string(),
+        ));
+    }
     let indices_buffer = &indices_buffer[1..];
 
-    hybrid_rle::HybridRleDecoder::new(indices_buffer, bit_width as u32, page.num_values())
+    Ok(hybrid_rle::HybridRleDecoder::new(
+        indices_buffer,
+        bit_width as u32,
+        page.num_values(),
+    ))
 }
 
 /// Decoder of definition levels.
@@ -32,11 +42,11 @@ pub enum DefLevelsDecoder<'a> {
 }
 
 impl<'a> DefLevelsDecoder<'a> {
-    pub fn new(page: &'a DataPage) -> Self {
-        let (_, def_levels, _) = split_buffer(page);
+    pub fn try_new(page: &'a DataPage) -> Result<Self> {
+        let (_, def_levels, _) = split_buffer(page)?;
 
         let max_def_level = page.descriptor.max_def_level;
-        if max_def_level == 1 {
+        Ok(if max_def_level == 1 {
             let iter = hybrid_rle::Decoder::new(def_levels, 1);
             let iter = HybridRleIter::new(iter, page.num_values());
             Self::Bitmap(iter)
@@ -44,7 +54,7 @@ impl<'a> DefLevelsDecoder<'a> {
             let iter =
                 HybridRleDecoder::new(def_levels, get_bit_width(max_def_level), page.num_values());
             Self::Levels(iter, max_def_level as u32)
-        }
+        })
     }
 }
 

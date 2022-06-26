@@ -80,7 +80,7 @@ where
             let mut iterator = BasicDecompressor::new(pages, vec![]);
             while let Some(page) = iterator.next()? {
                 if !has_filled {
-                    struct_::extend_validity(&mut validity, page);
+                    struct_::extend_validity(&mut validity, page)?;
                 }
                 // todo: this is wrong: multiple pages -> array
                 arrays.push(page_to_array(page)?)
@@ -91,7 +91,9 @@ where
     }
 
     match field {
-        ParquetType::PrimitiveType { .. } => Ok(arrays.pop().unwrap()),
+        ParquetType::PrimitiveType { .. } => {
+            arrays.pop().ok_or_else(|| Error::OutOfSpec("".to_string()))
+        }
         ParquetType::GroupType { converted_type, .. } => {
             if let Some(converted_type) = converted_type {
                 match converted_type {
@@ -119,7 +121,7 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .enumerate()
         .filter_map(|(i, x)| if x.name() == field { Some(i) } else { None })
         .next()
-        .unwrap();
+        .ok_or_else(|| Error::OutOfSpec("column does not exist".to_string()))?;
 
     let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
     let field = &metadata.schema().fields()[field];

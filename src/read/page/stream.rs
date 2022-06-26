@@ -75,7 +75,7 @@ fn _get_page_stream<R: AsyncRead + Unpin + Send>(
             // the header
             let page_header = read_page_header(reader).await?;
 
-            let data_header = get_page_header(&page_header);
+            let data_header = get_page_header(&page_header)?;
             seen_values += data_header.as_ref().map(|x| x.num_values() as i64).unwrap_or_default();
 
             let read_size = page_header.compressed_page_size as i64;

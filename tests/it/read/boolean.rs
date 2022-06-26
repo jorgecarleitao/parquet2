@@ -10,7 +10,9 @@ pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<bool>>> {
     let state = BooleanPageState::try_new(page)?;
 
     match state {
-        BooleanPageState::Optional(validity, values) => deserialize_optional(validity, values),
+        BooleanPageState::Optional(validity, mut values) => {
+            deserialize_optional(validity, values.by_ref().map(Ok))
+        }
         BooleanPageState::Required(bitmap, length) => Ok(BitmapIter::new(bitmap, 0, length)
             .into_iter()
             .map(Some)

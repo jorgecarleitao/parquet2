@@ -138,7 +138,7 @@ fn read_array<T: NativeType>(
 }
 
 pub fn page_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
-    let (rep_levels, def_levels, values) = split_buffer(page);
+    let (rep_levels, def_levels, values) = split_buffer(page)?;
 
     match (&page.encoding(), &page.dictionary_page()) {
         (Encoding::Plain, None) => Ok(read_array::<T>(
@@ -193,7 +193,7 @@ fn read_dict_array<T: NativeType>(
 pub fn page_dict_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
     assert_eq!(page.descriptor.max_rep_level, 1);
 
-    let (rep_levels, def_levels, values) = split_buffer(page);
+    let (rep_levels, def_levels, values) = split_buffer(page)?;
 
     match (page.encoding(), &page.dictionary_page()) {
         (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_array::<T>(

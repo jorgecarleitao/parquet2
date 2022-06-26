@@ -4,7 +4,7 @@ use std::{io::Read, sync::Arc};
 use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
 
 use crate::compression::Compression;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::indexes::Interval;
 use crate::metadata::{ColumnChunkMetaData, Descriptor};
 
@@ -12,6 +12,7 @@ use crate::page::{
     read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
     ParquetPageHeader,
 };
+use crate::parquet_bridge::Encoding;
 
 use super::PageIterator;
 
@@ -190,7 +191,7 @@ pub(super) fn build_page<R: Read>(
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedDataPage>> {
     let page_header = read_page_header(&mut reader.reader)?;
-    reader.seen_num_values += get_page_header(&page_header)
+    reader.seen_num_values += get_page_header(&page_header)?
         .map(|x| x.num_values() as i64)
         .unwrap_or_default();
 
@@ -238,9 +239,15 @@ pub(super) fn finish_page(
     selected_rows: Option<Vec<Interval>>,
 ) -> Result<FinishedPage> {
     let type_ = page_header.type_.try_into()?;
+    let uncompressed_page_size = page_header.uncompressed_page_size.try_into()?;
     match type_ {
         PageType::DictionaryPage => {
-            let dict_header = page_header.dictionary_page_header.as_ref().unwrap();
+            let dict_header = page_header.dictionary_page_header.as_ref().ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The page header type is a dictionary page but the dictionary header is empty"
+                        .to_string(),
+                )
+            })?;
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
             // move the buffer to `dict_page`
@@ -249,7 +256,7 @@ pub(super) fn finish_page(
 
             let page = read_dict_page(
                 &dict_page,
-                (compression, page_header.uncompressed_page_size as usize),
+                (compression, uncompressed_page_size),
                 is_sorted,
                 descriptor.primitive_type.physical_type,
             )?;
@@ -259,26 +266,36 @@ pub(super) fn finish_page(
             Ok(FinishedPage::Dict(page))
         }
         PageType::DataPage => {
-            let header = page_header.data_page_header.unwrap();
+            let header = page_header.data_page_header.ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The page header type is a v1 data page but the v1 data header is empty"
+                        .to_string(),
+                )
+            })?;
 
             Ok(FinishedPage::Data(CompressedDataPage::new_read(
                 DataPageHeader::V1(header),
                 std::mem::take(data),
                 compression,
-                page_header.uncompressed_page_size as usize,
+                uncompressed_page_size,
                 current_dictionary.clone(),
                 descriptor.clone(),
                 selected_rows,
             )))
         }
         PageType::DataPageV2 => {
-            let header = page_header.data_page_header_v2.unwrap();
+            let header = page_header.data_page_header_v2.ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The page header type is a v2 data page but the v2 data header is empty"
+                        .to_string(),
+                )
+            })?;
 
             Ok(FinishedPage::Data(CompressedDataPage::new_read(
                 DataPageHeader::V2(header),
                 std::mem::take(data),
                 compression,
-                page_header.uncompressed_page_size as usize,
+                uncompressed_page_size,
                 current_dictionary.clone(),
                 descriptor.clone(),
                 selected_rows,
@@ -287,17 +304,30 @@ pub(super) fn finish_page(
     }
 }
 
-pub(super) fn get_page_header(header: &ParquetPageHeader) -> Option<DataPageHeader> {
-    let type_ = header.type_.try_into().unwrap();
-    match type_ {
+pub(super) fn get_page_header(header: &ParquetPageHeader) -> Result<Option<DataPageHeader>> {
+    let type_ = header.type_.try_into()?;
+    Ok(match type_ {
         PageType::DataPage => {
-            let header = header.data_page_header.clone().unwrap();
+            let header = header.data_page_header.clone().ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The page header type is a v1 data page but the v1 header is empty".to_string(),
+                )
+            })?;
+            let _: Encoding = header.encoding.try_into()?;
+            let _: Encoding = header.repetition_level_encoding.try_into()?;
+            let _: Encoding = header.definition_level_encoding.try_into()?;
+
             Some(DataPageHeader::V1(header))
         }
         PageType::DataPageV2 => {
-            let header = header.data_page_header_v2.clone().unwrap();
+            let header = header.data_page_header_v2.clone().ok_or_else(|| {
+                Error::OutOfSpec(
+                    "The page header type is a v1 data page but the v1 header is empty".to_string(),
+                )
+            })?;
+            let _: Encoding = header.encoding.try_into()?;
             Some(DataPageHeader::V2(header))
         }
         _ => None,
-    }
+    })
 }

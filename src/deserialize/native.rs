@@ -13,7 +13,7 @@ pub type Casted<'a, T> = std::iter::Map<std::slice::ChunksExact<'a, u8>, fn(&'a 
 
 /// Views the values of the data page as [`Casted`] to [`NativeType`].
 pub fn native_cast<T: NativeType>(page: &DataPage) -> Result<Casted<T>, Error> {
-    let (_, _, values) = split_buffer(page);
+    let (_, _, values) = split_buffer(page)?;
     if values.len() % std::mem::size_of::<T>() != 0 {
         return Err(Error::OutOfSpec(
             "A primitive page data's len must be a multiple of the type".to_string(),
@@ -31,20 +31,17 @@ where
     T: NativeType,
 {
     pub indexes: hybrid_rle::HybridRleDecoder<'a>,
-    pub values: &'a [T],
+    pub dict: &'a PrimitivePageDict<T>,
 }
 
 impl<'a, T> Dictionary<'a, T>
 where
     T: NativeType,
 {
-    pub fn new(page: &'a DataPage, dict: &'a PrimitivePageDict<T>) -> Self {
-        let indexes = utils::dict_indices_decoder(page);
+    pub fn try_new(page: &'a DataPage, dict: &'a PrimitivePageDict<T>) -> Result<Self, Error> {
+        let indexes = utils::dict_indices_decoder(page)?;
 
-        Self {
-            values: dict.values(),
-            indexes,
-        }
+        Ok(Self { dict, indexes })
     }
 
     pub fn len(&self) -> usize {
@@ -84,18 +81,18 @@ impl<'a, T: NativeType> NativePageState<'a, T> {
         match (page.encoding(), page.dictionary_page(), is_optional) {
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), false) => {
                 let dict = dict.as_any().downcast_ref().unwrap();
-                Ok(Self::RequiredDictionary(Dictionary::new(page, dict)))
+                Ok(Self::RequiredDictionary(Dictionary::try_new(page, dict)?))
             }
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), true) => {
                 let dict = dict.as_any().downcast_ref().unwrap();
 
                 Ok(Self::OptionalDictionary(
-                    utils::DefLevelsDecoder::new(page),
-                    Dictionary::new(page, dict),
+                    utils::DefLevelsDecoder::try_new(page)?,
+                    Dictionary::try_new(page, dict)?,
                 ))
             }
             (Encoding::Plain, _, true) => {
-                let validity = utils::DefLevelsDecoder::new(page);
+                let validity = utils::DefLevelsDecoder::try_new(page)?;
                 let values = native_cast(page)?;
 
                 Ok(Self::Optional(validity, values))

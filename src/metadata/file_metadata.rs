@@ -40,7 +40,7 @@ pub struct FileMetaData {
 }
 
 impl FileMetaData {
-    /// Returns the ['SchemaDescriptor`] that describes schema of this file.
+    /// Returns the [`SchemaDescriptor`] that describes schema of this file.
     pub fn schema(&self) -> &SchemaDescriptor {
         &self.schema_descr
     }
@@ -69,7 +69,7 @@ impl FileMetaData {
             .row_groups
             .into_iter()
             .map(|rg| RowGroupMetaData::try_from_thrift(&schema_descr, rg))
-            .collect::<Result<Vec<_>, Error>>()?;
+            .collect::<Result<_, Error>>()?;
 
         let column_orders = metadata
             .column_orders

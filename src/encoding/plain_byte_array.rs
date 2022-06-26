@@ -2,6 +2,7 @@
 /// prefixes, lengths and values
 /// # Implementation
 /// This struct does not allocate on the heap.
+use crate::error::Error;
 
 #[derive(Debug)]
 pub struct BinaryIter<'a> {
@@ -16,7 +17,7 @@ impl<'a> BinaryIter<'a> {
 }
 
 impl<'a> Iterator for BinaryIter<'a> {
-    type Item = &'a [u8];
+    type Item = Result<&'a [u8], Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -28,9 +29,14 @@ impl<'a> Iterator for BinaryIter<'a> {
         }
         let length = u32::from_le_bytes(self.values[0..4].try_into().unwrap()) as usize;
         self.values = &self.values[4..];
-        let result = &self.values[..length];
-        self.values = &self.values[length..];
-        Some(result)
+        if length > self.values.len() {
+            return Some(Err(Error::OutOfSpec(
+                "A string in plain encoding declares a length that is out of range".to_string(),
+            )));
+        }
+        let (result, remaining) = self.values.split_at(length);
+        self.values = remaining;
+        Some(Ok(result))
     }
 
     #[inline]
