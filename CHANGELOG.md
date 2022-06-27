@@ -1,5 +1,22 @@
 # Changelog
 
+## [v0.14.0](https://github.com/jorgecarleitao/parquet2/tree/v0.14.0) (2022-06-27)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.13.2...v0.14.0)
+
+**Breaking changes:**
+
+- `split_buffer` should return `Result` [\#156](https://github.com/jorgecarleitao/parquet2/issues/156)
+
+**Fixed bugs:**
+
+- Removed panics on read [\#150](https://github.com/jorgecarleitao/parquet2/pull/150) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Reduced reallocations [\#153](https://github.com/jorgecarleitao/parquet2/pull/153) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Removed `AsyncSeek` requirement from page stream [\#149](https://github.com/jorgecarleitao/parquet2/pull/149) ([medwards](https://github.com/medwards))
+
 ## [v0.13.2](https://github.com/jorgecarleitao/parquet2/tree/v0.13.2) (2022-06-10)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.13.1...v0.13.2)
