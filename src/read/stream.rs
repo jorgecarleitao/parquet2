@@ -40,8 +40,13 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
     reader
         .seek(SeekFrom::End(-(default_end_len as i64)))
         .await?;
-    let mut buffer = vec![0; default_end_len];
-    reader.read_exact(&mut buffer).await?;
+
+    let mut buffer = vec![];
+    buffer.try_reserve(default_end_len)?;
+    reader
+        .take(default_end_len as u64)
+        .read_to_end(&mut buffer)
+        .await?;
 
     // check this is indeed a parquet file
     if buffer[default_end_len - 4..] != PARQUET_MAGIC {
@@ -77,8 +82,13 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader.seek(SeekFrom::End(-(footer_len as i64))).await?;
-        let mut buffer = vec![0; footer_len as usize];
-        reader.read_exact(&mut buffer).await?;
+
+        buffer.clear();
+        buffer.try_reserve(footer_len as usize)?;
+        reader
+            .take(footer_len as u64)
+            .read_to_end(&mut buffer)
+            .await?;
 
         Cursor::new(buffer)
     };

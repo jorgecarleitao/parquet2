@@ -90,6 +90,12 @@ impl From<std::io::Error> for Error {
     }
 }
 
+impl From<std::collections::TryReserveError> for Error {
+    fn from(e: std::collections::TryReserveError) -> Error {
+        Error::General(format!("OOM: {}", e))
+    }
+}
+
 impl From<std::num::TryFromIntError> for Error {
     fn from(e: std::num::TryFromIntError) -> Error {
         Error::OutOfSpec(format!("Number must be zero or positive: {}", e))
