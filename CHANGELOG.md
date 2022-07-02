@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.14.1](https://github.com/jorgecarleitao/parquet2/tree/v0.14.1) (2022-07-02)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.14.0...v0.14.1)
+
+**New features:**
+
+- Added support for legacy lz4 decompression [\#151](https://github.com/jorgecarleitao/parquet2/pull/151) ([dantengsky](https://github.com/dantengsky))
+
+**Enhancements:**
+
+- Improved performance of reading [\#157](https://github.com/jorgecarleitao/parquet2/pull/157) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.14.0](https://github.com/jorgecarleitao/parquet2/tree/v0.14.0) (2022-06-27)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.13.2...v0.14.0)
