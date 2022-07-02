@@ -188,6 +188,20 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             crate::error::Feature::Lz4,
             "decompress with lz4".to_string(),
         )),
+
+        #[cfg(any(feature = "lz4_flex", feature = "lz4"))]
+        Compression::Lz4 => try_decompress_hadoop(input_buf, output_buf).or_else(|_| {
+            lz4_decompress_to_buffer(input_buf, Some(output_buf.len() as i32), output_buf)
+                .map(|_| {})
+        }
+        ),
+
+        #[cfg(all(not(feature = "lz4_flex"), not(feature = "lz4")))]
+        Compression::Lz4 => Err(Error::FeatureNotActive(
+            crate::error::Feature::Lz4,
+            "decompress with legacy lz4".to_string(),
+        )),
+
         #[cfg(feature = "zstd")]
         Compression::Zstd => {
             use std::io::Read;
@@ -207,6 +221,92 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             compression
         )),
     }
+}
+
+/// Try to decompress the buffer as if it was compressed with the Hadoop Lz4Codec.
+/// Translated from the apache arrow c++ function [TryDecompressHadoop](https://github.com/apache/arrow/blob/bf18e6e4b5bb6180706b1ba0d597a65a4ce5ca48/cpp/src/arrow/util/compression_lz4.cc#L474).
+/// Returns error if decompression failed.
+#[cfg(any(feature = "lz4", feature = "lz4_flex"))]
+fn try_decompress_hadoop(input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> {
+    // Parquet files written with the Hadoop Lz4Codec use their own framing.
+    // The input buffer can contain an arbitrary number of "frames", each
+    // with the following structure:
+    // - bytes 0..3: big-endian uint32_t representing the frame decompressed size
+    // - bytes 4..7: big-endian uint32_t representing the frame compressed size
+    // - bytes 8...: frame compressed data
+    //
+    // The Hadoop Lz4Codec source code can be found here:
+    // https://github.com/apache/hadoop/blob/trunk/hadoop-mapreduce-project/hadoop-mapreduce-client/hadoop-mapreduce-client-nativetask/src/main/native/src/codec/Lz4Codec.cc
+
+    const SIZE_U32: usize = std::mem::size_of::<u32>();
+    const PREFIX_LEN: usize = SIZE_U32 * 2;
+    let mut input_len = input_buf.len();
+    let mut input = input_buf;
+    let mut output_len = output_buf.len();
+    let mut output: &mut [u8] = output_buf;
+    while input_len >= PREFIX_LEN {
+        let mut bytes = [0; SIZE_U32];
+        bytes.copy_from_slice(&input[0..4]);
+        let expected_decompressed_size = u32::from_be_bytes(bytes);
+        let mut bytes = [0; SIZE_U32];
+        bytes.copy_from_slice(&input[4..8]);
+        let expected_compressed_size = u32::from_be_bytes(bytes);
+        input = &input[PREFIX_LEN..];
+        input_len -= PREFIX_LEN;
+
+        if input_len < expected_compressed_size as usize {
+            return Err(general_err!("Not enough bytes for Hadoop frame".to_owned()));
+        }
+
+        if output_len < expected_decompressed_size as usize {
+            return Err(general_err!(
+                "Not enough bytes to hold advertised output".to_owned()
+            ));
+        }
+        let decompressed_size = lz4_decompress_to_buffer(
+            &input[..expected_compressed_size as usize],
+            Some(output_len as i32),
+            output,
+        )?;
+        if decompressed_size != expected_decompressed_size as usize {
+            return Err(general_err!("unexpected decompressed size"));
+        }
+        input_len -= expected_compressed_size as usize;
+        output_len -= expected_decompressed_size as usize;
+        if input_len > expected_compressed_size as usize {
+            input = &input[expected_compressed_size as usize..];
+            output = &mut output[expected_decompressed_size as usize..];
+        } else {
+            break;
+        }
+    }
+    if input_len == 0 {
+        Ok(())
+    } else {
+        Err(general_err!("Not all input are consumed"))
+    }
+}
+
+#[cfg(all(feature = "lz4", not(feature = "lz4_flex")))]
+#[inline]
+fn lz4_decompress_to_buffer(
+    src: &[u8],
+    uncompressed_size: Option<i32>,
+    buffer: &mut [u8],
+) -> Result<usize> {
+    let size = lz4::block::decompress_to_buffer(src, uncompressed_size, buffer)?;
+    Ok(size)
+}
+
+#[cfg(all(feature = "lz4_flex", not(feature = "lz4")))]
+#[inline]
+fn lz4_decompress_to_buffer(
+    src: &[u8],
+    _uncompressed_size: Option<i32>,
+    buffer: &mut [u8],
+) -> Result<usize> {
+    let size = lz4_flex::block::decompress_into(src, buffer)?;
+    Ok(size)
 }
 
 #[cfg(test)]

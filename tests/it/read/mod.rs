@@ -11,6 +11,9 @@ mod primitive_nested;
 mod struct_;
 mod utils;
 
+#[cfg(any(feature = "lz4", feature = "lz4_flex"))]
+mod lz4_legacy;
+
 use std::fs::File;
 
 use futures::StreamExt;
