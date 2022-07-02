@@ -44,17 +44,7 @@ pub struct IndexedPageReader<R: Read + Seek> {
     pages: VecDeque<FilteredPage>,
 }
 
-fn resize_buffer(buffer: &mut Vec<u8>, length: usize) {
-    // prepare buffer
-    if length > buffer.len() {
-        // dealloc and ignore region, replacing it by a new region
-        *buffer = vec![0u8; length];
-    } else {
-        buffer.clear();
-        buffer.resize(length, 0);
-    }
-}
-
+#[allow(clippy::ptr_arg)] // false positive
 fn read_page<R: Read + Seek>(
     reader: &mut R,
     start: u64,
@@ -66,8 +56,9 @@ fn read_page<R: Read + Seek>(
     reader.seek(SeekFrom::Start(start))?;
 
     // read [header][data] to buffer
-    resize_buffer(buffer, length);
-    reader.read_exact(buffer)?;
+    buffer.clear();
+    buffer.try_reserve(length)?;
+    reader.by_ref().take(length as u64).read_to_end(buffer)?;
 
     // deserialize [header]
     let mut reader = Cursor::new(buffer);

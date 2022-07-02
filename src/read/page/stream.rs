@@ -78,7 +78,7 @@ fn _get_page_stream<R: AsyncRead + Unpin + Send>(
             let data_header = get_page_header(&page_header)?;
             seen_values += data_header.as_ref().map(|x| x.num_values() as i64).unwrap_or_default();
 
-            let read_size = page_header.compressed_page_size as i64;
+            let read_size: usize = page_header.compressed_page_size.try_into()?;
 
             if let Some(data_header) = data_header {
                 if !pages_filter(&descriptor, &data_header) {
@@ -89,11 +89,12 @@ fn _get_page_stream<R: AsyncRead + Unpin + Send>(
             }
 
             // followed by the buffer
-            let read_size = read_size as usize;
-            if read_size > 0 {
-                buffer.resize(read_size, 0);
-                reader.read_exact(&mut buffer).await?;
-            }
+            buffer.clear();
+            buffer.try_reserve(read_size)?;
+            reader
+                .take(read_size as u64)
+                .read_to_end(&mut buffer).await?;
+
             let result = finish_page(
                 page_header,
                 &mut buffer,

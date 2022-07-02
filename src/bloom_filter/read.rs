@@ -38,14 +38,12 @@ pub fn read<R: Read + Seek>(
         bitset.clear();
         return Ok(());
     }
-    // read bitset
-    if header.num_bytes as usize > bitset.capacity() {
-        *bitset = vec![0; header.num_bytes as usize]
-    } else {
-        bitset.clear();
-        bitset.resize(header.num_bytes as usize, 0); // populate with zeros
-    }
 
-    reader.read_exact(bitset)?;
+    let length: usize = header.num_bytes.try_into()?;
+
+    bitset.clear();
+    bitset.try_reserve(length)?;
+    reader.by_ref().take(length as u64).read_to_end(bitset)?;
+
     Ok(())
 }

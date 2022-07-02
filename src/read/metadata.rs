@@ -52,8 +52,12 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     // read and cache up to DEFAULT_FOOTER_READ_SIZE bytes from the end and process the footer
     let default_end_len = min(DEFAULT_FOOTER_READ_SIZE, file_size) as usize;
     reader.seek(SeekFrom::End(-(default_end_len as i64)))?;
-    let mut buffer = vec![0; default_end_len];
-    reader.read_exact(&mut buffer)?;
+
+    let mut buffer = Vec::with_capacity(default_end_len);
+    reader
+        .by_ref()
+        .take(default_end_len as u64)
+        .read_to_end(&mut buffer)?;
 
     // check this is indeed a parquet file
     if buffer[default_end_len - 4..] != PARQUET_MAGIC {
@@ -87,8 +91,13 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     } else {
         // the end of file read by default is not long enough, read again including all metadata.
         reader.seek(SeekFrom::End(-(footer_len as i64)))?;
-        let mut buffer = vec![0; footer_len as usize];
-        reader.read_exact(&mut buffer)?;
+
+        buffer.clear();
+        buffer.try_reserve(footer_len as usize)?;
+        reader
+            .by_ref()
+            .take(footer_len as u64)
+            .read_to_end(&mut buffer)?;
 
         Cursor::new(buffer)
     };

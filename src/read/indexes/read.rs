@@ -90,8 +90,10 @@ pub fn read_columns_indexes<R: Read + Seek>(
     let length = lengths.iter().sum::<usize>();
 
     reader.seek(SeekFrom::Start(offset))?;
-    let mut data = vec![0; length];
-    reader.read_exact(&mut data)?;
+
+    let mut data = vec![];
+    data.try_reserve(length)?;
+    reader.by_ref().take(length as u64).read_to_end(&mut data)?;
 
     deserialize_column_indexes(chunks, &data, lengths)
 }
@@ -122,8 +124,10 @@ pub fn read_pages_locations<R: Read + Seek>(
     let length = lengths.iter().sum::<usize>();
 
     reader.seek(SeekFrom::Start(offset))?;
-    let mut data = vec![0; length];
-    reader.read_exact(&mut data)?;
+
+    let mut data = vec![];
+    data.try_reserve(length)?;
+    reader.by_ref().take(length as u64).read_to_end(&mut data)?;
 
     deserialize_page_locations(&data, chunks.len())
 }
