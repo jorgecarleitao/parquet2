@@ -108,11 +108,6 @@ pub struct Compressor<I: Iterator<Item = Result<EncodedPage>>> {
 
 impl<I: Iterator<Item = Result<EncodedPage>>> Compressor<I> {
     /// Creates a new [`Compressor`]
-    pub fn new_from_vec(iter: I, compression: CompressionOptions, buffer: Vec<u8>) -> Self {
-        Self::new(iter, compression, buffer)
-    }
-
-    /// Creates a new [`Compressor`]
     pub fn new(iter: I, compression: CompressionOptions, buffer: Vec<u8>) -> Self {
         Self {
             iter,
@@ -120,6 +115,22 @@ impl<I: Iterator<Item = Result<EncodedPage>>> Compressor<I> {
             buffer,
             current: None,
         }
+    }
+
+    /// Creates a new [`Compressor`] (same as `new`)
+    pub fn new_from_vec(iter: I, compression: CompressionOptions, buffer: Vec<u8>) -> Self {
+        Self::new(iter, compression, buffer)
+    }
+
+    /// Deconstructs itself into its iterator and scratch buffer.
+    pub fn into_inner(mut self) -> (I, Vec<u8>) {
+        let mut buffer = if let Some(page) = self.current.as_mut() {
+            std::mem::take(page.buffer())
+        } else {
+            std::mem::take(&mut self.buffer)
+        };
+        buffer.clear();
+        (self.iter, buffer)
     }
 }
 
