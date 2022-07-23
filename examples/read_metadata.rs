@@ -3,10 +3,10 @@ use parquet2::error::Result;
 
 // ANCHOR: deserialize
 use parquet2::encoding::Encoding;
-use parquet2::page::{split_buffer, DataPage};
+use parquet2::page::{split_buffer, DataPage, DictPage, Page};
 use parquet2::schema::types::PhysicalType;
 
-fn deserialize(page: &DataPage) -> Result<()> {
+fn deserialize(page: &DataPage, dict: Option<&DictPage>) -> Result<()> {
     // split the data buffer in repetition levels, definition levels and values
     let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page)?;
 
@@ -14,7 +14,7 @@ fn deserialize(page: &DataPage) -> Result<()> {
     match (
         page.descriptor.primitive_type.physical_type,
         page.encoding(),
-        page.dictionary_page(),
+        dict,
     ) {
         (
             PhysicalType::Int32,
@@ -123,11 +123,23 @@ fn main() -> Result<()> {
 
     // ANCHOR: decompress
     let mut decompress_buffer = vec![];
+    let mut dict = None;
     for maybe_page in pages {
         let page = maybe_page?;
         let page = parquet2::read::decompress(page, &mut decompress_buffer)?;
 
-        let _array = deserialize(&page);
+        match page {
+            Page::Dict(page) => {
+                // the first page may be a dictionary page, which needs to be deserialized
+                // depending on your target in-memory format, you may want to deserialize
+                // the values differently...
+                // let page = deserialize_dict(&page)?;
+                dict = Some(page);
+            }
+            Page::Data(page) => {
+                let _array = deserialize(&page, dict.as_ref())?;
+            }
+        }
     }
     // ANCHOR_END: decompress
 

@@ -10,7 +10,7 @@ use parquet2::{
     types::NativeType,
 };
 
-use super::utils::deserialize_optional;
+use super::{dictionary::PrimitivePageDict, utils::deserialize_optional};
 
 /// The deserialization state of a `DataPage` of `Primitive` parquet primitive type
 #[derive(Debug)]
@@ -31,7 +31,7 @@ pub enum PageState<'a, T>
 where
     T: NativeType,
 {
-    Nominal(NativePageState<'a, T>),
+    Nominal(NativePageState<'a, T, &'a PrimitivePageDict<T>>),
     Filtered(FilteredPageState<'a, T>),
 }
 
@@ -39,12 +39,15 @@ impl<'a, T: NativeType> PageState<'a, T> {
     /// Tries to create [`NativePageState`]
     /// # Error
     /// Errors iff the page is not a `NativePageState`
-    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
+    pub fn try_new(
+        page: &'a DataPage,
+        dict: Option<&'a PrimitivePageDict<T>>,
+    ) -> Result<Self, Error> {
         if let Some(selected_rows) = page.selected_rows() {
             let is_optional =
                 page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
 
-            match (page.encoding(), page.dictionary_page(), is_optional) {
+            match (page.encoding(), dict, is_optional) {
                 (Encoding::Plain, _, true) => {
                     let (_, def_levels, _) = split_buffer(page)?;
 
@@ -76,14 +79,17 @@ impl<'a, T: NativeType> PageState<'a, T> {
                 ))),
             }
         } else {
-            NativePageState::try_new(page).map(Self::Nominal)
+            NativePageState::try_new(page, dict).map(Self::Nominal)
         }
     }
 }
 
-pub fn page_to_vec<T: NativeType>(page: &DataPage) -> Result<Vec<Option<T>>, Error> {
+pub fn page_to_vec<T: NativeType>(
+    page: &DataPage,
+    dict: Option<&PrimitivePageDict<T>>,
+) -> Result<Vec<Option<T>>, Error> {
     assert_eq!(page.descriptor.max_rep_level, 0);
-    let state = PageState::<T>::try_new(page)?;
+    let state = PageState::<T>::try_new(page, dict)?;
 
     match state {
         PageState::Nominal(state) => match state {

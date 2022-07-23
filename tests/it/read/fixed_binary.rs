@@ -1,11 +1,15 @@
 use parquet2::{deserialize::FixedLenBinaryPageState, error::Result, page::DataPage};
 
-use crate::read::utils::deserialize_optional;
+use super::dictionary::FixedLenByteArrayPageDict;
+use super::utils::deserialize_optional;
 
-pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<Vec<u8>>>> {
+pub fn page_to_vec(
+    page: &DataPage,
+    dict: Option<&FixedLenByteArrayPageDict>,
+) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(page.descriptor.max_rep_level, 0);
 
-    let state = FixedLenBinaryPageState::try_new(page)?;
+    let state = FixedLenBinaryPageState::try_new(page, dict)?;
 
     match state {
         FixedLenBinaryPageState::Optional(validity, values) => {

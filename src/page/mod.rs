@@ -1,6 +1,3 @@
-mod page_dict;
-pub use page_dict::*;
-
 use std::sync::Arc;
 
 pub use crate::thrift_format::{
@@ -23,9 +20,8 @@ use crate::statistics::{deserialize_statistics, Statistics};
 pub struct CompressedDataPage {
     pub(crate) header: DataPageHeader,
     pub(crate) buffer: Vec<u8>,
-    compression: Compression,
+    pub(crate) compression: Compression,
     uncompressed_page_size: usize,
-    pub dictionary_page: Option<Arc<dyn DictPage>>,
     pub(crate) descriptor: Descriptor,
 
     // The offset and length in rows
@@ -39,7 +35,6 @@ impl CompressedDataPage {
         buffer: Vec<u8>,
         compression: Compression,
         uncompressed_page_size: usize,
-        dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
         rows: Option<usize>,
     ) -> Self {
@@ -48,7 +43,6 @@ impl CompressedDataPage {
             buffer,
             compression,
             uncompressed_page_size,
-            dictionary_page,
             descriptor,
             rows.map(|x| vec![Interval::new(0, x)]),
         )
@@ -60,7 +54,6 @@ impl CompressedDataPage {
         buffer: Vec<u8>,
         compression: Compression,
         uncompressed_page_size: usize,
-        dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
         selected_rows: Option<Vec<Interval>>,
     ) -> Self {
@@ -69,7 +62,6 @@ impl CompressedDataPage {
             buffer,
             compression,
             uncompressed_page_size,
-            dictionary_page,
             descriptor,
             selected_rows,
         }
@@ -140,7 +132,6 @@ impl DataPageHeader {
 pub struct DataPage {
     pub(super) header: DataPageHeader,
     pub(super) buffer: Vec<u8>,
-    pub(super) dictionary_page: Option<Arc<dyn DictPage>>,
     pub descriptor: Descriptor,
     pub selected_rows: Option<Vec<Interval>>,
 }
@@ -149,14 +140,12 @@ impl DataPage {
     pub fn new(
         header: DataPageHeader,
         buffer: Vec<u8>,
-        dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
         rows: Option<usize>,
     ) -> Self {
         Self::new_read(
             header,
             buffer,
-            dictionary_page,
             descriptor,
             rows.map(|x| vec![Interval::new(0, x)]),
         )
@@ -165,14 +154,12 @@ impl DataPage {
     pub(crate) fn new_read(
         header: DataPageHeader,
         buffer: Vec<u8>,
-        dictionary_page: Option<Arc<dyn DictPage>>,
         descriptor: Descriptor,
         selected_rows: Option<Vec<Interval>>,
     ) -> Self {
         Self {
             header,
             buffer,
-            dictionary_page,
             descriptor,
             selected_rows,
         }
@@ -180,10 +167,6 @@ impl DataPage {
 
     pub fn header(&self) -> &DataPageHeader {
         &self.header
-    }
-
-    pub fn dictionary_page(&self) -> Option<&Arc<dyn DictPage>> {
-        self.dictionary_page.as_ref()
     }
 
     pub fn buffer(&self) -> &[u8] {
@@ -248,7 +231,16 @@ impl DataPage {
 #[allow(clippy::large_enum_variant)]
 pub enum Page {
     Data(DataPage),
-    Dict(Arc<dyn DictPage>),
+    Dict(DictPage),
+}
+
+impl Page {
+    pub(crate) fn buffer(&mut self) -> &mut Vec<u8> {
+        match self {
+            Self::Data(page) => &mut page.buffer,
+            Self::Dict(page) => &mut page.buffer,
+        }
+    }
 }
 
 /// A [`EncodedPage`] is an uncompressed, encoded representation of a Parquet page. It may hold actual data
@@ -257,7 +249,7 @@ pub enum Page {
 #[allow(clippy::large_enum_variant)]
 pub enum EncodedPage {
     Data(DataPage),
-    Dict(EncodedDictPage),
+    Dict(DictPage),
 }
 
 /// A [`CompressedPage`] is a compressed, encoded representation of a Parquet page. It holds actual data
@@ -296,6 +288,64 @@ impl CompressedPage {
             CompressedPage::Data(page) => page.selected_rows(),
             CompressedPage::Dict(_) => None,
         }
+    }
+
+    pub(crate) fn uncompressed_size(&self) -> usize {
+        match self {
+            CompressedPage::Data(page) => page.uncompressed_page_size,
+            CompressedPage::Dict(page) => page.uncompressed_page_size,
+        }
+    }
+}
+
+/// An uncompressed, encoded dictionary page.
+#[derive(Debug)]
+pub struct DictPage {
+    pub buffer: Vec<u8>,
+    pub num_values: usize,
+    pub is_sorted: bool,
+}
+
+impl DictPage {
+    pub fn new(buffer: Vec<u8>, num_values: usize, is_sorted: bool) -> Self {
+        Self {
+            buffer,
+            num_values,
+            is_sorted,
+        }
+    }
+}
+
+/// A compressed, encoded dictionary page.
+#[derive(Debug)]
+pub struct CompressedDictPage {
+    pub(crate) buffer: Vec<u8>,
+    compression: Compression,
+    pub(crate) num_values: usize,
+    pub(crate) uncompressed_page_size: usize,
+    pub is_sorted: bool,
+}
+
+impl CompressedDictPage {
+    pub fn new(
+        buffer: Vec<u8>,
+        compression: Compression,
+        uncompressed_page_size: usize,
+        num_values: usize,
+        is_sorted: bool,
+    ) -> Self {
+        Self {
+            buffer,
+            compression,
+            uncompressed_page_size,
+            num_values,
+            is_sorted,
+        }
+    }
+
+    /// The compression of the data in this page.
+    pub fn compression(&self) -> Compression {
+        self.compression
     }
 }
 

@@ -8,9 +8,9 @@ use parquet_format_async_temp::thrift::protocol::TCompactInputStreamProtocol;
 use crate::compression::Compression;
 use crate::error::Result;
 use crate::metadata::{ColumnChunkMetaData, Descriptor};
-use crate::page::{CompressedDataPage, ParquetPageHeader};
+use crate::page::{CompressedPage, ParquetPageHeader};
 
-use super::reader::{finish_page, get_page_header, FinishedPage, PageMetaData};
+use super::reader::{finish_page, get_page_header, PageMetaData};
 use super::PageFilter;
 
 /// Returns a stream of compressed data pages
@@ -19,7 +19,7 @@ pub async fn get_page_stream<'a, RR: AsyncRead + Unpin + Send + AsyncSeek>(
     reader: &'a mut RR,
     buffer: Vec<u8>,
     pages_filter: PageFilter,
-) -> Result<impl Stream<Item = Result<CompressedDataPage>> + 'a> {
+) -> Result<impl Stream<Item = Result<CompressedPage>> + 'a> {
     get_page_stream_with_page_meta(column_metadata.into(), reader, buffer, pages_filter).await
 }
 
@@ -29,7 +29,7 @@ pub async fn get_page_stream_from_column_start<'a, R: AsyncRead + Unpin + Send>(
     reader: &'a mut R,
     buffer: Vec<u8>,
     pages_filter: PageFilter,
-) -> Result<impl Stream<Item = Result<CompressedDataPage>> + 'a> {
+) -> Result<impl Stream<Item = Result<CompressedPage>> + 'a> {
     let page_metadata: PageMetaData = column_metadata.into();
     Ok(_get_page_stream(
         reader,
@@ -47,7 +47,7 @@ pub async fn get_page_stream_with_page_meta<RR: AsyncRead + Unpin + Send + Async
     reader: &mut RR,
     buffer: Vec<u8>,
     pages_filter: PageFilter,
-) -> Result<impl Stream<Item = Result<CompressedDataPage>> + '_> {
+) -> Result<impl Stream<Item = Result<CompressedPage>> + '_> {
     let column_start = page_metadata.column_start;
     reader.seek(SeekFrom::Start(column_start)).await?;
     Ok(_get_page_stream(
@@ -67,9 +67,8 @@ fn _get_page_stream<R: AsyncRead + Unpin + Send>(
     descriptor: Descriptor,
     mut buffer: Vec<u8>,
     pages_filter: PageFilter,
-) -> impl Stream<Item = Result<CompressedDataPage>> + '_ {
+) -> impl Stream<Item = Result<CompressedPage>> + '_ {
     let mut seen_values = 0i64;
-    let mut current_dictionary = None;
     try_stream! {
         while seen_values < total_num_values {
             // the header
@@ -95,24 +94,13 @@ fn _get_page_stream<R: AsyncRead + Unpin + Send>(
                 .take(read_size as u64)
                 .read_to_end(&mut buffer).await?;
 
-            let result = finish_page(
+            yield finish_page(
                 page_header,
                 &mut buffer,
                 compression,
-                &current_dictionary,
                 &descriptor,
                 None,
             )?;
-
-            match result {
-                FinishedPage::Data(page) => {
-                    yield page
-                }
-                FinishedPage::Dict(dict) => {
-                    current_dictionary = Some(dict);
-                    continue
-                }
-            }
         }
     }
 }
