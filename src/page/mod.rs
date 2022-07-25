@@ -25,7 +25,7 @@ pub struct CompressedDataPage {
     pub(crate) buffer: Vec<u8>,
     compression: Compression,
     uncompressed_page_size: usize,
-    pub(crate) dictionary_page: Option<Arc<dyn DictPage>>,
+    pub dictionary_page: Option<Arc<dyn DictPage>>,
     pub(crate) descriptor: Descriptor,
 
     // The offset and length in rows

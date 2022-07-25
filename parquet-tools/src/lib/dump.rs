@@ -1,11 +1,12 @@
 //! Subcommand `dump`. This subcommand shows the parquet metadata information
 use parquet2::{
-    read::{
-        get_page_iterator, read_metadata, BinaryPageDict, CompressedDataPage, DictPage,
-        FixedLenByteArrayPageDict, PrimitivePageDict,
+    page::{
+        BinaryPageDict, DataPageHeader, DictPage, FixedLenByteArrayPageDict, PrimitivePageDict,
     },
+    read::{get_page_iterator, read_metadata},
     schema::types::PhysicalType,
 };
+
 use std::{fs::File, io::Write, path::Path, sync::Arc};
 
 use crate::{Result, SEPARATOR};
@@ -47,8 +48,9 @@ where
         writeln!(writer, "{}", SEPARATOR)?;
 
         for column in &columns {
-            let column_meta = group.column(column);
-            let iter = get_page_iterator(column_meta, &mut file)?;
+            let column_meta = &group.columns()[*column];
+            let iter =
+                get_page_iterator(column_meta, &mut file, None, Vec::with_capacity(4 * 1024))?;
             for (page_ind, page) in iter.enumerate() {
                 let page = page?;
                 writeln!(
@@ -58,16 +60,16 @@ where
                     column,
                     page.uncompressed_size()
                 )?;
-                let (dict, msg_type) = match page {
-                    CompressedDataPage::V1(page_v1) => {
-                        if let Some(dict) = page_v1.dictionary_page {
+                let (dict, msg_type) = match page.header() {
+                    DataPageHeader::V1(_) => {
+                        if let Some(dict) = page.dictionary_page {
                             (dict, "PageV1")
                         } else {
                             continue;
                         }
                     }
-                    CompressedDataPage::V2(page_v2) => {
-                        if let Some(dict) = page_v2.dictionary_page {
+                    DataPageHeader::V2(_) => {
+                        if let Some(dict) = page.dictionary_page {
                             (dict, "PageV2")
                         } else {
                             continue;
@@ -127,7 +129,7 @@ where
             if let Some(res) = dict.as_any().downcast_ref::<BinaryPageDict>() {
                 for (i, pair) in res.offsets().windows(2).enumerate().take(sample_size) {
                     let bytes = &res.values()[pair[0] as usize..pair[1] as usize];
-                    let msg = std::str::from_utf8(&bytes).unwrap_or("").to_string();
+                    let msg = String::from_utf8_lossy(bytes);
 
                     writeln!(writer, "Value: {:<10}\t{:?}", i, msg)?;
                 }
@@ -141,7 +143,7 @@ where
                     .enumerate()
                     .take(sample_size)
                 {
-                    let msg = std::str::from_utf8(&bytes).unwrap_or("").to_string();
+                    let msg = String::from_utf8_lossy(bytes);
 
                     writeln!(writer, "Value: {:<10}\t{:?}", i, msg)?;
                 }
