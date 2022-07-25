@@ -1,11 +1,13 @@
 //! Subcommand `meta`. This subcommand shows the parquet metadata information
 use parquet2::{
     read::read_metadata,
-    schema::{types::ParquetType, Statistics},
+    schema::{types::ParquetType, types::PrimitiveType},
+    statistics::Statistics,
 };
 use std::{fs::File, io::Write, path::Path};
 
 use crate::{Result, SEPARATOR};
+use std::sync::Arc;
 
 // Shows meta data from the file. If the `extra` flag is available, then
 // extra data that the file may contain is presented
@@ -73,8 +75,8 @@ where
                 writer,
                 "{:4}: {:27}{:?} {:?} DO:{} RC:{} SZ:{}/{}/{:.2} ENC:{:?}{}",
                 index,
-                c.column_descriptor().name(),
-                c.column_type(),
+                c.descriptor().path_in_schema.join("."),
+                c.physical_type(),
                 c.compression(),
                 c.data_page_offset(),
                 c.num_values(),
@@ -83,7 +85,7 @@ where
                 c.uncompressed_size() as f32 / c.compressed_size() as f32,
                 c.column_encoding(),
                 if show_stats {
-                    statistics_str(c.column_statistics())
+                    statistics_str(&c.statistics().transpose().unwrap())
                 } else {
                     "".to_string()
                 },
@@ -97,17 +99,17 @@ where
 // String creator to print information from ParquetType
 fn parquet_type_str(parquet_type: &ParquetType) -> String {
     match parquet_type {
-        ParquetType::PrimitiveType {
+        ParquetType::PrimitiveType(PrimitiveType {
             field_info,
             logical_type,
             converted_type,
             physical_type,
-        } => {
+        }) => {
             format!(
                 "{:27} {:?} {:?} P:{:?} L:{:?} C:{:?}",
-                field_info.name(),
-                field_info.repetition(),
-                field_info.id(),
+                &field_info.name,
+                field_info.repetition,
+                field_info.id,
                 physical_type,
                 logical_type,
                 converted_type,
@@ -121,11 +123,7 @@ fn parquet_type_str(parquet_type: &ParquetType) -> String {
         } => {
             format!(
                 "{:27} {:?} {:?} L:{:?} C:{:?}",
-                ":",
-                field_info.repetition(),
-                field_info.id(),
-                logical_type,
-                converted_type,
+                ":", field_info.repetition, field_info.id, logical_type, converted_type,
             )
         }
     }
@@ -133,21 +131,11 @@ fn parquet_type_str(parquet_type: &ParquetType) -> String {
 
 // Creates a string showing the column statistics.
 // The max and min data are PLAIN encoded as Vec<u8>
-fn statistics_str(statistics: &Option<Statistics>) -> String {
+fn statistics_str(statistics: &Option<Arc<dyn Statistics>>) -> String {
     match statistics {
         None => "".to_string(),
         Some(stats) => {
-            let max = stats.max_value.as_ref().map_or("".to_string(), |v| {
-                std::str::from_utf8(&v).unwrap_or("").to_string()
-            });
-
-            let min = stats.min_value.as_ref().map_or("".to_string(), |v| {
-                std::str::from_utf8(&v).unwrap_or("").to_string()
-            });
-
-            let null = stats.null_count.as_ref().map_or(0, |v| *v);
-
-            format!("ST:[max: {} min: {} null: {}]", max, min, null)
+            format!("ST:{:?}", stats.as_ref())
         }
     }
 }
