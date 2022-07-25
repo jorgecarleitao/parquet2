@@ -1,3 +1,0 @@
-(function() {var implementors = {};
-implementors["parquet2"] = [{"text":"impl Decompressed for <a class=\"struct\" href=\"parquet2/page/struct.DataPage.html\" title=\"struct parquet2::page::DataPage\">DataPage</a>","synthetic":false,"types":["parquet2::page::DataPage"]}];
-if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
