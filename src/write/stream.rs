@@ -41,6 +41,7 @@ async fn end_file<W: AsyncWrite + Unpin + Send>(
 
     (&mut footer_buffer[4..]).write_all(&PARQUET_MAGIC)?;
     writer.write_all(&footer_buffer).await?;
+    writer.flush().await?;
     Ok(metadata_len as u64 + FOOTER_SIZE)
 }
 
