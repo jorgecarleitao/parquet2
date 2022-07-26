@@ -1,5 +1,18 @@
 # Changelog
 
+## [v0.14.2](https://github.com/jorgecarleitao/parquet2/tree/v0.14.2) (2022-07-26)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.14.1...v0.14.2)
+
+**Fixed bugs:**
+
+- Fixed FileStreamer's end method to flush Parquet magic [\#163](https://github.com/jorgecarleitao/parquet2/pull/163) ([v0y4g3r](https://github.com/v0y4g3r))
+- Fix compilation of parquet-tools [\#161](https://github.com/jorgecarleitao/parquet2/pull/161) ([jhorstmann](https://github.com/jhorstmann))
+
+**Enhancements:**
+
+- Added `Compressor::into_inner` [\#158](https://github.com/jorgecarleitao/parquet2/pull/158) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.14.1](https://github.com/jorgecarleitao/parquet2/tree/v0.14.1) (2022-07-02)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.14.0...v0.14.1)
