@@ -20,8 +20,8 @@ impl<'a> BooleanPageState<'a> {
         let is_optional =
             page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
 
-        match (page.encoding(), page.dictionary_page(), is_optional) {
-            (Encoding::Plain, _, true) => {
+        match (page.encoding(), is_optional) {
+            (Encoding::Plain, true) => {
                 let validity = utils::DefLevelsDecoder::try_new(page)?;
 
                 let (_, _, values) = split_buffer(page)?;
@@ -29,7 +29,7 @@ impl<'a> BooleanPageState<'a> {
 
                 Ok(Self::Optional(validity, values))
             }
-            (Encoding::Plain, _, false) => {
+            (Encoding::Plain, false) => {
                 let (_, _, values) = split_buffer(page)?;
                 Ok(Self::Required(values, page.num_values()))
             }

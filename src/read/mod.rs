@@ -17,7 +17,7 @@ pub use stream::read_metadata as read_metadata_async;
 
 use crate::error::Error;
 use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
-use crate::page::CompressedDataPage;
+use crate::page::CompressedPage;
 use crate::schema::types::ParquetType;
 use crate::{error::Result, metadata::FileMetaData};
 
@@ -192,15 +192,15 @@ impl<R: Read + Seek> ColumnChunkIter<PageReader<R>> for ColumnIterator<R> {
 #[derive(Debug)]
 pub struct ReadColumnIterator {
     field: ParquetType,
-    chunks: Vec<(Vec<Result<CompressedDataPage>>, ColumnChunkMetaData)>,
-    current: Option<(IntoIter<Result<CompressedDataPage>>, ColumnChunkMetaData)>,
+    chunks: Vec<(Vec<Result<CompressedPage>>, ColumnChunkMetaData)>,
+    current: Option<(IntoIter<Result<CompressedPage>>, ColumnChunkMetaData)>,
 }
 
 impl ReadColumnIterator {
     /// Returns a new [`ReadColumnIterator`]
     pub fn new(
         field: ParquetType,
-        chunks: Vec<(Vec<Result<CompressedDataPage>>, ColumnChunkMetaData)>,
+        chunks: Vec<(Vec<Result<CompressedPage>>, ColumnChunkMetaData)>,
     ) -> Self {
         Self {
             field,
@@ -211,7 +211,7 @@ impl ReadColumnIterator {
 }
 
 impl MutStreamingIterator for ReadColumnIterator {
-    type Item = (IntoIter<Result<CompressedDataPage>>, ColumnChunkMetaData);
+    type Item = (IntoIter<Result<CompressedPage>>, ColumnChunkMetaData);
     type Error = Error;
 
     fn advance(mut self) -> Result<State<Self>> {
@@ -234,7 +234,7 @@ impl MutStreamingIterator for ReadColumnIterator {
     }
 }
 
-impl ColumnChunkIter<IntoIter<Result<CompressedDataPage>>> for ReadColumnIterator {
+impl ColumnChunkIter<IntoIter<Result<CompressedPage>>> for ReadColumnIterator {
     fn field(&self) -> &ParquetType {
         &self.field
     }
@@ -264,6 +264,8 @@ mod tests {
         let buffer = vec![];
         let mut iter = get_page_iterator(column_metadata, &mut file, None, buffer)?;
 
+        let dict = iter.next().unwrap().unwrap();
+        assert_eq!(dict.num_values(), 0);
         let page = iter.next().unwrap().unwrap();
         assert_eq!(page.num_values(), 8);
         Ok(())
@@ -286,7 +288,8 @@ mod tests {
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
-        let _ = iterator.next()?.unwrap();
+        let _dict = iterator.next()?.unwrap();
+        let _page = iterator.next()?.unwrap();
 
         assert!(iterator.next()?.is_none());
         let (a, b) = iterator.into_buffers();
@@ -313,6 +316,9 @@ mod tests {
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
 
+        // dict
+        iterator.next()?.unwrap();
+        // page
         iterator.next()?.unwrap();
 
         assert!(iterator.next()?.is_none());

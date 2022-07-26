@@ -30,8 +30,8 @@ pub fn array_to_page(
         Array::Int32(array) => primitive::array_to_page_v1(array, options, descriptor),
         Array::Int64(array) => primitive::array_to_page_v1(array, options, descriptor),
         Array::Int96(array) => primitive::array_to_page_v1(array, options, descriptor),
-        Array::Float32(array) => primitive::array_to_page_v1(array, options, descriptor),
-        Array::Float64(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Float(array) => primitive::array_to_page_v1(array, options, descriptor),
+        Array::Double(array) => primitive::array_to_page_v1(array, options, descriptor),
         Array::Binary(array) => binary::array_to_page_v1(array, options, descriptor),
         _ => todo!(),
     }
@@ -64,8 +64,8 @@ fn test_column(column: &str, compression: CompressionOptions) -> Result<()> {
         Array::Int32(_) => PhysicalType::Int32,
         Array::Int64(_) => PhysicalType::Int64,
         Array::Int96(_) => PhysicalType::Int96,
-        Array::Float32(_) => PhysicalType::Float,
-        Array::Float64(_) => PhysicalType::Double,
+        Array::Float(_) => PhysicalType::Float,
+        Array::Double(_) => PhysicalType::Double,
         Array::Binary(_) => PhysicalType::ByteArray,
         _ => todo!(),
     };
@@ -245,8 +245,8 @@ async fn test_column_async(column: &str, compression: CompressionOptions) -> Res
         Array::Int32(_) => PhysicalType::Int32,
         Array::Int64(_) => PhysicalType::Int64,
         Array::Int96(_) => PhysicalType::Int96,
-        Array::Float32(_) => PhysicalType::Float,
-        Array::Float64(_) => PhysicalType::Double,
+        Array::Float(_) => PhysicalType::Float,
+        Array::Double(_) => PhysicalType::Double,
         Array::Binary(_) => PhysicalType::ByteArray,
         _ => todo!(),
     };

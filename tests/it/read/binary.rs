@@ -1,11 +1,12 @@
 use parquet2::{deserialize::BinaryPageState, error::Result, page::DataPage};
 
-use crate::read::utils::deserialize_optional;
+use super::dictionary::BinaryPageDict;
+use super::utils::deserialize_optional;
 
-pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<Vec<u8>>>> {
+pub fn page_to_vec(page: &DataPage, dict: Option<&BinaryPageDict>) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(page.descriptor.max_rep_level, 0);
 
-    let state = BinaryPageState::try_new(page)?;
+    let state = BinaryPageState::try_new(page, dict)?;
 
     match state {
         BinaryPageState::Optional(validity, values) => {

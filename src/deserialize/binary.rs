@@ -1,20 +1,20 @@
 use crate::{
     encoding::{hybrid_rle, plain_byte_array::BinaryIter},
     error::Error,
-    page::{split_buffer, BinaryPageDict, DataPage},
+    page::{split_buffer, DataPage},
     parquet_bridge::{Encoding, Repetition},
 };
 
 use super::utils;
 
 #[derive(Debug)]
-pub struct Dictionary<'a> {
+pub struct Dictionary<'a, P> {
     pub indexes: hybrid_rle::HybridRleDecoder<'a>,
-    pub dict: &'a BinaryPageDict,
+    pub dict: P,
 }
 
-impl<'a> Dictionary<'a> {
-    pub fn try_new(page: &'a DataPage, dict: &'a BinaryPageDict) -> Result<Self, Error> {
+impl<'a, P> Dictionary<'a, P> {
+    pub fn try_new(page: &'a DataPage, dict: P) -> Result<Self, Error> {
         let indexes = utils::dict_indices_decoder(page)?;
 
         Ok(Self { indexes, dict })
@@ -26,26 +26,24 @@ impl<'a> Dictionary<'a> {
     }
 }
 
-pub enum BinaryPageState<'a> {
+#[allow(clippy::large_enum_variant)]
+pub enum BinaryPageState<'a, P> {
     Optional(utils::DefLevelsDecoder<'a>, BinaryIter<'a>),
     Required(BinaryIter<'a>),
-    RequiredDictionary(Dictionary<'a>),
-    OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a>),
+    RequiredDictionary(Dictionary<'a, P>),
+    OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a, P>),
 }
 
-impl<'a> BinaryPageState<'a> {
-    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
+impl<'a, P> BinaryPageState<'a, P> {
+    pub fn try_new(page: &'a DataPage, dict: Option<P>) -> Result<Self, Error> {
         let is_optional =
             page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
 
-        match (page.encoding(), page.dictionary_page(), is_optional) {
+        match (page.encoding(), dict, is_optional) {
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), false) => {
-                let dict = dict.as_any().downcast_ref().unwrap();
-                Ok(Self::RequiredDictionary(Dictionary::try_new(page, dict)?))
+                Dictionary::try_new(page, dict).map(Self::RequiredDictionary)
             }
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), true) => {
-                let dict = dict.as_any().downcast_ref().unwrap();
-
                 Ok(Self::OptionalDictionary(
                     utils::DefLevelsDecoder::try_new(page)?,
                     Dictionary::try_new(page, dict)?,

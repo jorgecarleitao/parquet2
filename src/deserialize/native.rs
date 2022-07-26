@@ -1,7 +1,7 @@
 use crate::{
     encoding::hybrid_rle,
     error::Error,
-    page::{split_buffer, DataPage, PrimitivePageDict},
+    page::{split_buffer, DataPage},
     parquet_bridge::{Encoding, Repetition},
     types::{decode, NativeType},
 };
@@ -26,19 +26,13 @@ pub fn native_cast<T: NativeType>(page: &DataPage) -> Result<Casted<T>, Error> {
 }
 
 #[derive(Debug)]
-pub struct Dictionary<'a, T>
-where
-    T: NativeType,
-{
+pub struct Dictionary<'a, P> {
     pub indexes: hybrid_rle::HybridRleDecoder<'a>,
-    pub dict: &'a PrimitivePageDict<T>,
+    pub dict: P,
 }
 
-impl<'a, T> Dictionary<'a, T>
-where
-    T: NativeType,
-{
-    pub fn try_new(page: &'a DataPage, dict: &'a PrimitivePageDict<T>) -> Result<Self, Error> {
+impl<'a, P> Dictionary<'a, P> {
+    pub fn try_new(page: &'a DataPage, dict: P) -> Result<Self, Error> {
         let indexes = utils::dict_indices_decoder(page)?;
 
         Ok(Self { dict, indexes })
@@ -56,7 +50,8 @@ where
 
 /// The deserialization state of a `DataPage` of `Primitive` parquet primitive type
 #[derive(Debug)]
-pub enum NativePageState<'a, T>
+#[allow(clippy::large_enum_variant)]
+pub enum NativePageState<'a, T, P>
 where
     T: NativeType,
 {
@@ -65,27 +60,24 @@ where
     /// A page of required values
     Required(Casted<'a, T>),
     /// A page of required, dictionary-encoded values
-    RequiredDictionary(Dictionary<'a, T>),
+    RequiredDictionary(Dictionary<'a, P>),
     /// A page of optional, dictionary-encoded values
-    OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a, T>),
+    OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a, P>),
 }
 
-impl<'a, T: NativeType> NativePageState<'a, T> {
+impl<'a, T: NativeType, P> NativePageState<'a, T, P> {
     /// Tries to create [`NativePageState`]
     /// # Error
     /// Errors iff the page is not a `NativePageState`
-    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
+    pub fn try_new(page: &'a DataPage, dict: Option<P>) -> Result<Self, Error> {
         let is_optional =
             page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
 
-        match (page.encoding(), page.dictionary_page(), is_optional) {
+        match (page.encoding(), dict, is_optional) {
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), false) => {
-                let dict = dict.as_any().downcast_ref().unwrap();
-                Ok(Self::RequiredDictionary(Dictionary::try_new(page, dict)?))
+                Dictionary::try_new(page, dict).map(Self::RequiredDictionary)
             }
             (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), true) => {
-                let dict = dict.as_any().downcast_ref().unwrap();
-
                 Ok(Self::OptionalDictionary(
                     utils::DefLevelsDecoder::try_new(page)?,
                     Dictionary::try_new(page, dict)?,
@@ -97,7 +89,7 @@ impl<'a, T: NativeType> NativePageState<'a, T> {
 
                 Ok(Self::Optional(validity, values))
             }
-            (Encoding::Plain, _, false) => Ok(Self::Required(native_cast(page)?)),
+            (Encoding::Plain, _, false) => native_cast(page).map(Self::Required),
             _ => Err(Error::General(format!(
                 "Viewing page for encoding {:?} for native type {} not supported",
                 page.encoding(),

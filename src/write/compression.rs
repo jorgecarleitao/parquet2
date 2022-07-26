@@ -1,6 +1,6 @@
 use crate::compression::CompressionOptions;
 use crate::error::{Error, Result};
-use crate::page::{CompressedDictPage, CompressedPage, DataPageHeader, EncodedDictPage};
+use crate::page::{CompressedDictPage, CompressedPage, DataPageHeader, DictPage};
 use crate::FallibleStreamingIterator;
 use crate::{
     compression,
@@ -16,7 +16,6 @@ fn compress_data(
     let DataPage {
         mut buffer,
         header,
-        dictionary_page,
         descriptor,
         selected_rows,
     } = page;
@@ -46,20 +45,20 @@ fn compress_data(
         compressed_buffer,
         compression.into(),
         uncompressed_page_size,
-        dictionary_page,
         descriptor,
         selected_rows,
     ))
 }
 
 fn compress_dict(
-    page: EncodedDictPage,
+    page: DictPage,
     mut compressed_buffer: Vec<u8>,
     compression: CompressionOptions,
 ) -> Result<CompressedDictPage> {
-    let EncodedDictPage {
+    let DictPage {
         mut buffer,
         num_values,
+        is_sorted,
     } = page;
     let uncompressed_page_size = buffer.len();
     if compression != CompressionOptions::Uncompressed {
@@ -72,6 +71,7 @@ fn compress_dict(
         compression.into(),
         uncompressed_page_size,
         num_values,
+        is_sorted,
     ))
 }
 

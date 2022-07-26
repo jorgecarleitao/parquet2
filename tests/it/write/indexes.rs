@@ -12,9 +12,8 @@ use parquet2::read::{
 use parquet2::schema::types::{ParquetType, PhysicalType, PrimitiveType};
 use parquet2::write::WriteOptions;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
-use parquet2::FallibleStreamingIterator;
 
-use crate::read::page_to_array;
+use crate::read::collect;
 use crate::Array;
 
 use super::primitive::array_to_page_v1;
@@ -76,12 +75,9 @@ fn read_indexed_page() -> Result<()> {
 
     let pages = IndexedPageReader::new(reader, &columns[column], pages, vec![], vec![]);
 
-    let mut pages = BasicDecompressor::new(pages, vec![]);
+    let pages = BasicDecompressor::new(pages, vec![]);
 
-    let mut arrays = vec![];
-    while let Some(page) = pages.next()? {
-        arrays.push(page_to_array(page)?)
-    }
+    let arrays = collect(pages, columns[column].physical_type())?;
 
     // the second item and length 2
     assert_eq!(arrays, vec![Array::Int32(vec![None, Some(3)])]);

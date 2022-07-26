@@ -1,11 +1,11 @@
 use std::convert::TryInto;
 
-use super::Array;
+use super::{dictionary::PrimitivePageDict, Array};
 
 use parquet2::{
     encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
     error::{Error, Result},
-    page::{split_buffer, DataPage, PrimitivePageDict},
+    page::{split_buffer, DataPage},
     read::levels::get_bit_width,
     types::NativeType,
 };
@@ -137,10 +137,13 @@ fn read_array<T: NativeType>(
     )
 }
 
-pub fn page_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
+pub fn page_to_array<T: NativeType>(
+    page: &DataPage,
+    dict: Option<&PrimitivePageDict<T>>,
+) -> Result<Array> {
     let (rep_levels, def_levels, values) = split_buffer(page)?;
 
-    match (&page.encoding(), &page.dictionary_page()) {
+    match (&page.encoding(), dict) {
         (Encoding::Plain, None) => Ok(read_array::<T>(
             rep_levels,
             def_levels,
@@ -190,18 +193,21 @@ fn read_dict_array<T: NativeType>(
     )
 }
 
-pub fn page_dict_to_array<T: NativeType>(page: &DataPage) -> Result<Array> {
+pub fn page_dict_to_array<T: NativeType>(
+    page: &DataPage,
+    dict: Option<&PrimitivePageDict<i64>>,
+) -> Result<Array> {
     assert_eq!(page.descriptor.max_rep_level, 1);
 
     let (rep_levels, def_levels, values) = split_buffer(page)?;
 
-    match (page.encoding(), &page.dictionary_page()) {
+    match (page.encoding(), dict) {
         (Encoding::PlainDictionary, Some(dict)) => Ok(read_dict_array::<T>(
             rep_levels,
             def_levels,
             values,
             page.num_values() as u32,
-            dict.as_any().downcast_ref().unwrap(),
+            dict,
             (
                 &page.repetition_level_encoding(),
                 page.descriptor.max_rep_level,

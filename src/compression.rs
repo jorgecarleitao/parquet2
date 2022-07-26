@@ -193,8 +193,7 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
         Compression::Lz4 => try_decompress_hadoop(input_buf, output_buf).or_else(|_| {
             lz4_decompress_to_buffer(input_buf, Some(output_buf.len() as i32), output_buf)
                 .map(|_| {})
-        }
-        ),
+        }),
 
         #[cfg(all(not(feature = "lz4_flex"), not(feature = "lz4")))]
         Compression::Lz4 => Err(Error::FeatureNotActive(

@@ -3,7 +3,7 @@ use streaming_decompression;
 
 use crate::compression::{self, Compression};
 use crate::error::{Error, Result};
-use crate::page::{CompressedDataPage, DataPage, DataPageHeader};
+use crate::page::{CompressedPage, DataPage, DataPageHeader, DictPage, Page};
 use crate::FallibleStreamingIterator;
 
 use super::page::PageIterator;
@@ -43,14 +43,13 @@ fn decompress_v2(
 /// If the page is un-compressed, `buffer` is swapped instead.
 /// Returns whether the page was decompressed.
 pub fn decompress_buffer(
-    compressed_page: &mut CompressedDataPage,
+    compressed_page: &mut CompressedPage,
     buffer: &mut Vec<u8>,
 ) -> Result<bool> {
     if compressed_page.compression() != Compression::Uncompressed {
-        let compressed_buffer = &compressed_page.buffer;
-
         // prepare the compression buffer
         let read_size = compressed_page.uncompressed_size();
+
         if read_size > buffer.capacity() {
             // dealloc and ignore region, replacing it by a new region.
             // This won't reallocate - it frees and calls `alloc_zeroed`
@@ -62,61 +61,66 @@ pub fn decompress_buffer(
         } else {
             buffer.truncate(read_size);
         }
-        match compressed_page.header() {
-            DataPageHeader::V1(_) => {
-                decompress_v1(compressed_buffer, compressed_page.compression(), buffer)?
-            }
-            DataPageHeader::V2(header) => decompress_v2(
-                compressed_buffer,
-                header,
-                compressed_page.compression(),
-                buffer,
-            )?,
+        match compressed_page {
+            CompressedPage::Data(compressed_page) => match compressed_page.header() {
+                DataPageHeader::V1(_) => {
+                    decompress_v1(&compressed_page.buffer, compressed_page.compression, buffer)?
+                }
+                DataPageHeader::V2(header) => decompress_v2(
+                    &compressed_page.buffer,
+                    header,
+                    compressed_page.compression,
+                    buffer,
+                )?,
+            },
+            CompressedPage::Dict(page) => decompress_v1(&page.buffer, page.compression(), buffer)?,
         }
         Ok(true)
     } else {
         // page.buffer is already decompressed => swap it with `buffer`, making `page.buffer` the
         // decompression buffer and `buffer` the decompressed buffer
-        std::mem::swap(&mut compressed_page.buffer, buffer);
+        std::mem::swap(compressed_page.buffer(), buffer);
         Ok(false)
+    }
+}
+
+fn create_page(compressed_page: CompressedPage, buffer: Vec<u8>) -> Page {
+    match compressed_page {
+        CompressedPage::Data(page) => Page::Data(DataPage::new_read(
+            page.header,
+            buffer,
+            page.descriptor,
+            page.selected_rows,
+        )),
+        CompressedPage::Dict(page) => Page::Dict(DictPage {
+            buffer,
+            num_values: page.num_values,
+            is_sorted: page.is_sorted,
+        }),
     }
 }
 
 /// Decompresses the page, using `buffer` for decompression.
 /// If `page.buffer.len() == 0`, there was no decompression and the buffer was moved.
 /// Else, decompression took place.
-pub fn decompress(
-    mut compressed_page: CompressedDataPage,
-    buffer: &mut Vec<u8>,
-) -> Result<DataPage> {
+pub fn decompress(mut compressed_page: CompressedPage, buffer: &mut Vec<u8>) -> Result<Page> {
     decompress_buffer(&mut compressed_page, buffer)?;
-    Ok(DataPage::new_read(
-        compressed_page.header,
-        std::mem::take(buffer),
-        compressed_page.dictionary_page,
-        compressed_page.descriptor,
-        compressed_page.selected_rows,
-    ))
+    Ok(create_page(compressed_page, std::mem::take(buffer)))
 }
 
 fn decompress_reuse<P: PageIterator>(
-    mut compressed_page: CompressedDataPage,
+    mut compressed_page: CompressedPage,
     iterator: &mut P,
     buffer: &mut Vec<u8>,
-) -> Result<(DataPage, bool)> {
+) -> Result<(Page, bool)> {
     let was_decompressed = decompress_buffer(&mut compressed_page, buffer)?;
 
-    let new_page = DataPage::new_read(
-        compressed_page.header,
-        std::mem::take(buffer),
-        compressed_page.dictionary_page,
-        compressed_page.descriptor,
-        compressed_page.selected_rows,
-    );
-
     if was_decompressed {
-        iterator.swap_buffer(&mut compressed_page.buffer)
+        iterator.swap_buffer(compressed_page.buffer())
     };
+
+    let new_page = create_page(compressed_page, std::mem::take(buffer));
+
     Ok((new_page, was_decompressed))
 }
 
@@ -149,7 +153,7 @@ fn decompress_reuse<P: PageIterator>(
 pub struct Decompressor<P: PageIterator> {
     iter: P,
     buffer: Vec<u8>,
-    current: Option<DataPage>,
+    current: Option<Page>,
     was_decompressed: bool,
 }
 
@@ -174,15 +178,15 @@ impl<P: PageIterator> Decompressor<P> {
 }
 
 impl<P: PageIterator> FallibleStreamingIterator for Decompressor<P> {
-    type Item = DataPage;
+    type Item = Page;
     type Error = Error;
 
     fn advance(&mut self) -> Result<()> {
         if let Some(page) = self.current.as_mut() {
             if self.was_decompressed {
-                self.buffer = std::mem::take(&mut page.buffer);
+                self.buffer = std::mem::take(page.buffer());
             } else {
-                self.iter.swap_buffer(&mut page.buffer);
+                self.iter.swap_buffer(page.buffer());
             }
         }
 
@@ -208,39 +212,39 @@ impl<P: PageIterator> FallibleStreamingIterator for Decompressor<P> {
 }
 
 type _Decompressor<I> = streaming_decompression::Decompressor<
-    CompressedDataPage,
-    DataPage,
-    fn(CompressedDataPage, &mut Vec<u8>) -> Result<DataPage>,
+    CompressedPage,
+    Page,
+    fn(CompressedPage, &mut Vec<u8>) -> Result<Page>,
     Error,
     I,
 >;
 
-impl streaming_decompression::Compressed for CompressedDataPage {
+impl streaming_decompression::Compressed for CompressedPage {
     #[inline]
     fn is_compressed(&self) -> bool {
         self.compression() != Compression::Uncompressed
     }
 }
 
-impl streaming_decompression::Decompressed for DataPage {
+impl streaming_decompression::Decompressed for Page {
     #[inline]
     fn buffer_mut(&mut self) -> &mut Vec<u8> {
-        self.buffer_mut()
+        self.buffer()
     }
 }
 
-/// A [`FallibleStreamingIterator`] that decompresses [`CompressedDataPage`] into [`DataPage`].
+/// A [`FallibleStreamingIterator`] that decompresses [`CompressedPage`] into [`DataPage`].
 /// # Implementation
 /// This decompressor uses an internal [`Vec<u8>`] to perform decompressions which
 /// is re-used across pages, so that a single allocation is required.
 /// If the pages are not compressed, the internal buffer is not used.
-pub struct BasicDecompressor<I: Iterator<Item = Result<CompressedDataPage>>> {
+pub struct BasicDecompressor<I: Iterator<Item = Result<CompressedPage>>> {
     iter: _Decompressor<I>,
 }
 
 impl<I> BasicDecompressor<I>
 where
-    I: Iterator<Item = Result<CompressedDataPage>>,
+    I: Iterator<Item = Result<CompressedPage>>,
 {
     /// Returns a new [`BasicDecompressor`].
     pub fn new(iter: I, buffer: Vec<u8>) -> Self {
@@ -257,9 +261,9 @@ where
 
 impl<I> FallibleStreamingIterator for BasicDecompressor<I>
 where
-    I: Iterator<Item = Result<CompressedDataPage>>,
+    I: Iterator<Item = Result<CompressedPage>>,
 {
-    type Item = DataPage;
+    type Item = Page;
     type Error = Error;
 
     fn advance(&mut self) -> Result<()> {
