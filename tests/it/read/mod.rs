@@ -4,6 +4,7 @@
 mod binary;
 mod boolean;
 mod deserialize;
+mod dictionary;
 mod fixed_binary;
 mod indexes;
 mod primitive;
@@ -21,8 +22,8 @@ use futures::StreamExt;
 use parquet2::error::Error;
 use parquet2::error::Result;
 use parquet2::metadata::ColumnChunkMetaData;
-use parquet2::page::CompressedDataPage;
-use parquet2::page::DataPage;
+use parquet2::page::Page;
+use parquet2::page::{CompressedPage, DataPage};
 use parquet2::read::get_page_stream;
 use parquet2::read::read_metadata_async;
 use parquet2::read::BasicDecompressor;
@@ -37,56 +38,154 @@ use parquet2::types::int96_to_i64_ns;
 use parquet2::FallibleStreamingIterator;
 
 use super::*;
+use dictionary::{deserialize as deserialize_dict, DecodedDictPage};
 
 /// Reads a page into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
-pub fn page_to_array(page: &DataPage) -> Result<Array> {
+pub fn page_to_array(page: &DataPage, dict: Option<&DecodedDictPage>) -> Result<Array> {
     let physical_type = page.descriptor.primitive_type.physical_type;
     match page.descriptor.max_rep_level {
         0 => match physical_type {
             PhysicalType::Boolean => Ok(Array::Boolean(boolean::page_to_vec(page)?)),
-            PhysicalType::Int32 => Ok(Array::Int32(primitive::page_to_vec(page)?)),
-            PhysicalType::Int64 => Ok(Array::Int64(primitive::page_to_vec(page)?)),
-            PhysicalType::Int96 => Ok(Array::Int96(primitive::page_to_vec(page)?)),
-            PhysicalType::Float => Ok(Array::Float32(primitive::page_to_vec(page)?)),
-            PhysicalType::Double => Ok(Array::Float64(primitive::page_to_vec(page)?)),
-            PhysicalType::ByteArray => Ok(Array::Binary(binary::page_to_vec(page)?)),
+            PhysicalType::Int32 => {
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::Int32(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+                primitive::page_to_vec(page, dict).map(Array::Int32)
+            }
+            PhysicalType::Int64 => {
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::Int64(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+                primitive::page_to_vec(page, dict).map(Array::Int64)
+            }
+            PhysicalType::Int96 => {
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::Int96(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+                primitive::page_to_vec(page, dict).map(Array::Int96)
+            }
+            PhysicalType::Float => {
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::Float(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+                primitive::page_to_vec(page, dict).map(Array::Float)
+            }
+            PhysicalType::Double => {
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::Double(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+                primitive::page_to_vec(page, dict).map(Array::Double)
+            }
+            PhysicalType::ByteArray => {
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::ByteArray(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+
+                binary::page_to_vec(page, dict).map(Array::Binary)
+            }
             PhysicalType::FixedLenByteArray(_) => {
-                Ok(Array::FixedLenBinary(fixed_binary::page_to_vec(page)?))
+                let dict = dict.map(|dict| {
+                    if let DecodedDictPage::FixedLenByteArray(dict) = dict {
+                        dict
+                    } else {
+                        panic!()
+                    }
+                });
+
+                fixed_binary::page_to_vec(page, dict).map(Array::FixedLenBinary)
             }
         },
-        _ => match page.dictionary_page() {
+        _ => match dict {
             None => match physical_type {
-                PhysicalType::Int64 => Ok(primitive_nested::page_to_array::<i64>(page)?),
+                PhysicalType::Int64 => Ok(primitive_nested::page_to_array::<i64>(page, None)?),
                 _ => todo!(),
             },
             Some(_) => match physical_type {
-                PhysicalType::Int64 => Ok(primitive_nested::page_dict_to_array::<i64>(page)?),
+                PhysicalType::Int64 => {
+                    let dict = dict.map(|dict| {
+                        if let DecodedDictPage::Int64(dict) = dict {
+                            dict
+                        } else {
+                            panic!()
+                        }
+                    });
+                    Ok(primitive_nested::page_dict_to_array::<i64>(page, dict)?)
+                }
                 _ => todo!(),
             },
         },
     }
 }
 
+pub fn collect<I: FallibleStreamingIterator<Item = Page, Error = Error>>(
+    mut iterator: I,
+    type_: PhysicalType,
+) -> Result<Vec<Array>> {
+    let mut arrays = vec![];
+    let mut dict = None;
+    while let Some(page) = iterator.next()? {
+        match page {
+            Page::Data(page) => arrays.push(page_to_array(page, dict.as_ref())?),
+            Page::Dict(page) => {
+                dict = Some(deserialize_dict(page, type_)?);
+            }
+        }
+    }
+    Ok(arrays)
+}
+
 /// Reads columns into an [`Array`].
 /// This is CPU-intensive: decompress, decode and de-serialize.
 pub fn columns_to_array<II, I>(mut columns: I, field: &ParquetType) -> Result<Array>
 where
-    II: Iterator<Item = Result<CompressedDataPage>>,
+    II: Iterator<Item = Result<CompressedPage>>,
     I: MutStreamingIterator<Item = (II, ColumnChunkMetaData), Error = Error>,
 {
     let mut validity = vec![];
     let mut has_filled = false;
     let mut arrays = vec![];
     while let State::Some(mut new_iter) = columns.advance()? {
-        if let Some((pages, _column)) = new_iter.get() {
+        if let Some((pages, column)) = new_iter.get() {
             let mut iterator = BasicDecompressor::new(pages, vec![]);
+
+            let mut dict = None;
             while let Some(page) = iterator.next()? {
-                if !has_filled {
-                    struct_::extend_validity(&mut validity, page)?;
+                match page {
+                    parquet2::page::Page::Data(page) => {
+                        if !has_filled {
+                            struct_::extend_validity(&mut validity, page)?;
+                        }
+                        arrays.push(page_to_array(page, dict.as_ref())?)
+                    }
+                    parquet2::page::Page::Dict(page) => {
+                        dict = Some(deserialize_dict(page, column.physical_type())?);
+                    }
                 }
-                // todo: this is wrong: multiple pages -> array
-                arrays.push(page_to_array(page)?)
             }
         }
         has_filled = true;
@@ -156,13 +255,9 @@ pub async fn read_column_async<
         .next()
         .unwrap();
 
-    let pages = get_page_stream(
-        &metadata.row_groups[0].columns()[0],
-        reader,
-        vec![],
-        Arc::new(|_, _| true),
-    )
-    .await?;
+    let column = &metadata.row_groups[0].columns()[0];
+
+    let pages = get_page_stream(column, reader, vec![], Arc::new(|_, _| true)).await?;
     let field = &metadata.schema().fields()[field];
 
     let mut statistics = get_field_columns(&metadata, row_group, field)
@@ -171,14 +266,11 @@ pub async fn read_column_async<
 
     let pages = pages.collect::<Vec<_>>().await;
 
-    let mut iterator = BasicDecompressor::new(pages.into_iter(), vec![]);
+    let iterator = BasicDecompressor::new(pages.into_iter(), vec![]);
 
-    let array = iterator
-        .next()?
-        .map(|page| page_to_array(page).unwrap())
-        .unwrap();
+    let mut arrays = collect(iterator, column.physical_type())?;
 
-    Ok((array, statistics.pop().unwrap()))
+    Ok((arrays.pop().unwrap(), statistics.pop().unwrap()))
 }
 
 fn get_column(path: &str, column: &str) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {

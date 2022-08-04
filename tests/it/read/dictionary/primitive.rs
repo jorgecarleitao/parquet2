@@ -1,12 +1,5 @@
-use std::{any::Any, sync::Arc};
-
-use crate::error::{Error, Result};
-use crate::{
-    schema::types::PhysicalType,
-    types::{decode, NativeType},
-};
-
-use super::DictPage;
+use parquet2::error::{Error, Result};
+use parquet2::types::{decode, NativeType};
 
 #[derive(Debug)]
 pub struct PrimitivePageDict<T: NativeType> {
@@ -32,21 +25,11 @@ impl<T: NativeType> PrimitivePageDict<T> {
     }
 }
 
-impl<T: NativeType> DictPage for PrimitivePageDict<T> {
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
-
-    fn physical_type(&self) -> &PhysicalType {
-        &T::TYPE
-    }
-}
-
 pub fn read<T: NativeType>(
     buf: &[u8],
     num_values: usize,
     _is_sorted: bool,
-) -> Result<Arc<dyn DictPage>> {
+) -> Result<PrimitivePageDict<T>> {
     let size_of = std::mem::size_of::<T>();
 
     let typed_size = num_values.wrapping_mul(size_of);
@@ -60,5 +43,5 @@ pub fn read<T: NativeType>(
 
     let values = values.chunks_exact(size_of).map(decode::<T>).collect();
 
-    Ok(Arc::new(PrimitivePageDict::new(values)))
+    Ok(PrimitivePageDict::new(values))
 }

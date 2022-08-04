@@ -11,8 +11,8 @@ pub enum Array {
     Int32(Vec<Option<i32>>),
     Int64(Vec<Option<i64>>),
     Int96(Vec<Option<[u32; 3]>>),
-    Float32(Vec<Option<f32>>),
-    Float64(Vec<Option<f64>>),
+    Float(Vec<Option<f32>>),
+    Double(Vec<Option<f64>>),
     Boolean(Vec<Option<bool>>),
     Binary(Vec<Option<Vec<u8>>>),
     FixedLenBinary(Vec<Option<Vec<u8>>>),
@@ -27,8 +27,8 @@ impl Array {
             Array::Int32(a) => a.len(),
             Array::Int64(a) => a.len(),
             Array::Int96(a) => a.len(),
-            Array::Float32(a) => a.len(),
-            Array::Float64(a) => a.len(),
+            Array::Float(a) => a.len(),
+            Array::Double(a) => a.len(),
             Array::Boolean(a) => a.len(),
             Array::Binary(a) => a.len(),
             Array::FixedLenBinary(a) => a.len(),
@@ -110,12 +110,12 @@ pub fn alltypes_plain(column: &str) -> Array {
         "float_col" => {
             let expected = vec![0.0, 1.1, 0.0, 1.1, 0.0, 1.1, 0.0, 1.1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-            Array::Float32(expected)
+            Array::Float(expected)
         }
         "double_col" => {
             let expected = vec![0.0, 10.1, 0.0, 10.1, 0.0, 10.1, 0.0, 10.1];
             let expected = expected.into_iter().map(Some).collect::<Vec<_>>();
-            Array::Float64(expected)
+            Array::Double(expected)
         }
         "date_string_col" => {
             let expected = vec![
@@ -294,7 +294,7 @@ pub fn pyarrow_optional(column: &str) -> Array {
 
     match column {
         "int64" => Array::Int64(i64_values.to_vec()),
-        "float64" => Array::Float64(f64_values.to_vec()),
+        "float64" => Array::Double(f64_values.to_vec()),
         "string" => Array::Binary(string_values.to_vec()),
         "bool" => Array::Boolean(bool_values.to_vec()),
         "date" => Array::Int64(i64_values.to_vec()),
@@ -346,7 +346,7 @@ pub fn pyarrow_required(column: &str) -> Array {
 
     match column {
         "int64" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
-        "float64" => Array::Float64(f64_values.iter().map(|f| Some(*f)).collect()),
+        "float64" => Array::Double(f64_values.iter().map(|f| Some(*f)).collect()),
         "string" => Array::Binary(
             string_values
                 .iter()

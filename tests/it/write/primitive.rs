@@ -73,7 +73,6 @@ pub fn array_to_page_v1<T: NativeType>(
     Ok(EncodedPage::Data(DataPage::new(
         DataPageHeader::V1(header),
         buffer,
-        None,
         descriptor.clone(),
         Some(array.len()),
     )))

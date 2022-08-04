@@ -1,36 +1,33 @@
 use std::{
     collections::VecDeque,
     io::{Cursor, Read, Seek, SeekFrom},
-    sync::Arc,
 };
 
 use crate::{
     error::Error,
     indexes::{FilteredPage, Interval},
     metadata::{ColumnChunkMetaData, Descriptor},
-    page::{CompressedDataPage, DictPage, ParquetPageHeader},
+    page::{CompressedDictPage, CompressedPage, ParquetPageHeader},
     parquet_bridge::Compression,
 };
 
-use super::reader::{finish_page, read_page_header, FinishedPage, PageMetaData};
+use super::reader::{finish_page, read_page_header, PageMetaData};
 
-enum LazyDict {
-    // The dictionary has been read and deserialized
-    Dictionary(Arc<dyn DictPage>),
-    // The range of the dictionary page
-    Range(u64, usize),
+#[derive(Debug, Clone, Copy)]
+enum State {
+    MaybeDict,
+    Data,
 }
 
-/// A fallible [`Iterator`] of [`CompressedDataPage`]. This iterator leverages page indexes
+/// A fallible [`Iterator`] of [`CompressedPage`]. This iterator leverages page indexes
 /// to skip pages that are not needed. Consequently, the pages from this
 /// iterator always have [`Some`] [`CompressedDataPage::rows()`]
 pub struct IndexedPageReader<R: Read + Seek> {
     // The source
     reader: R,
 
+    column_start: u64,
     compression: Compression,
-
-    dictionary: Option<LazyDict>,
 
     // used to deserialize dictionary pages and attach the descriptor to every read page
     descriptor: Descriptor,
@@ -42,9 +39,10 @@ pub struct IndexedPageReader<R: Read + Seek> {
     data_buffer: Vec<u8>,
 
     pages: VecDeque<FilteredPage>,
+
+    state: State,
 }
 
-#[allow(clippy::ptr_arg)] // false positive
 fn read_page<R: Read + Seek>(
     reader: &mut R,
     start: u64,
@@ -80,15 +78,16 @@ fn read_dict_page<R: Read + Seek>(
     data: &mut Vec<u8>,
     compression: Compression,
     descriptor: &Descriptor,
-) -> Result<Arc<dyn DictPage>, Error> {
+) -> Result<CompressedDictPage, Error> {
     let page_header = read_page(reader, start, length, buffer, data)?;
 
-    let result = finish_page(page_header, data, compression, &None, descriptor, None)?;
-    match result {
-        FinishedPage::Data(_) => Err(Error::OutOfSpec(
+    let page = finish_page(page_header, data, compression, descriptor, None)?;
+    if let CompressedPage::Dict(page) = page {
+        Ok(page)
+    } else {
+        Err(Error::OutOfSpec(
             "The first page is not a dictionary page but it should".to_string(),
-        )),
-        FinishedPage::Dict(dict) => Ok(dict),
+        ))
     }
 }
 
@@ -112,30 +111,16 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         buffer: Vec<u8>,
         data_buffer: Vec<u8>,
     ) -> Self {
-        let column_start = column.column_start;
-        // a dictionary page exists iff the first data page is not at the start of
-        // the column
-        let dictionary = match pages.get(0) {
-            Some(page) => {
-                let length = (page.start - column_start) as usize;
-                if length > 0 {
-                    Some(LazyDict::Range(column_start, length))
-                } else {
-                    None
-                }
-            }
-            None => None,
-        };
-
         let pages = pages.into_iter().collect();
         Self {
             reader,
+            column_start: column.column_start,
             compression: column.compression,
             descriptor: column.descriptor,
             buffer,
             data_buffer,
             pages,
-            dictionary,
+            state: State::MaybeDict,
         }
     }
 
@@ -149,37 +134,9 @@ impl<R: Read + Seek> IndexedPageReader<R> {
         start: u64,
         length: usize,
         selected_rows: Vec<Interval>,
-    ) -> Result<FinishedPage, Error> {
+    ) -> Result<CompressedPage, Error> {
         // it will be read - take buffer
         let mut data = std::mem::take(&mut self.data_buffer);
-
-        // read the dictionary if needed
-        let dict = self
-            .dictionary
-            .as_mut()
-            .map(|dict| match &dict {
-                LazyDict::Dictionary(dict) => Ok(dict.clone()),
-                LazyDict::Range(start, length) => {
-                    let maybe_page = read_dict_page(
-                        &mut self.reader,
-                        *start,
-                        *length,
-                        &mut self.buffer,
-                        &mut data,
-                        self.compression,
-                        &self.descriptor,
-                    );
-
-                    match maybe_page {
-                        Ok(d) => {
-                            *dict = LazyDict::Dictionary(d.clone());
-                            Ok(d)
-                        }
-                        Err(e) => Err(e),
-                    }
-                }
-            })
-            .transpose()?;
 
         let page_header = read_page(&mut self.reader, start, length, &mut self.buffer, &mut data)?;
 
@@ -187,34 +144,66 @@ impl<R: Read + Seek> IndexedPageReader<R> {
             page_header,
             &mut data,
             self.compression,
-            &dict,
             &self.descriptor,
             Some(selected_rows),
         )
     }
+
+    fn read_dict(&mut self) -> Option<Result<CompressedPage, Error>> {
+        // a dictionary page exists iff the first data page is not at the start of
+        // the column
+        let (start, length) = match self.pages.get(0) {
+            Some(page) => {
+                let length = (page.start - self.column_start) as usize;
+                if length > 0 {
+                    (self.column_start, length)
+                } else {
+                    return None;
+                }
+            }
+            None => return None,
+        };
+
+        // it will be read - take buffer
+        let mut data = std::mem::take(&mut self.data_buffer);
+
+        let maybe_page = read_dict_page(
+            &mut self.reader,
+            start,
+            length,
+            &mut self.buffer,
+            &mut data,
+            self.compression,
+            &self.descriptor,
+        );
+        Some(maybe_page.map(CompressedPage::Dict))
+    }
 }
 
 impl<R: Read + Seek> Iterator for IndexedPageReader<R> {
-    type Item = Result<CompressedDataPage, Error>;
+    type Item = Result<CompressedPage, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(page) = self.pages.pop_front() {
-            if page.selected_rows.is_empty() {
-                self.next()
-            } else {
-                let page = match self.read_page(page.start, page.length, page.selected_rows) {
-                    Err(e) => return Some(Err(e)),
-                    Ok(header) => header,
-                };
-                match page {
-                    FinishedPage::Data(page) => Some(Ok(page)),
-                    FinishedPage::Dict(_) => Some(Err(Error::OutOfSpec(
-                        "Dictionary pages cannot be selected via indexes".to_string(),
-                    ))),
+        match self.state {
+            State::MaybeDict => {
+                self.state = State::Data;
+                if let Some(dict) = self.read_dict() {
+                    Some(dict)
+                } else {
+                    self.next()
                 }
             }
-        } else {
-            None
+            State::Data => {
+                if let Some(page) = self.pages.pop_front() {
+                    if page.selected_rows.is_empty() {
+                        self.next()
+                    } else {
+                        Some(self.read_page(page.start, page.length, page.selected_rows))
+                    }
+                } else {
+                    None
+                }
+            }
         }
     }
 }

@@ -9,7 +9,7 @@ use crate::indexes::Interval;
 use crate::metadata::{ColumnChunkMetaData, Descriptor};
 
 use crate::page::{
-    read_dict_page, CompressedDataPage, DataPageHeader, DictPage, EncodedDictPage, PageType,
+    CompressedDataPage, CompressedDictPage, CompressedPage, DataPageHeader, PageType,
     ParquetPageHeader,
 };
 use crate::parquet_bridge::Encoding;
@@ -77,9 +77,6 @@ pub struct PageReader<R: Read> {
     // The number of total values in this column chunk.
     total_num_values: i64,
 
-    // Arc: it will be shared between multiple pages and pages should be Send + Sync.
-    current_dictionary: Option<Arc<dyn DictPage>>,
-
     pages_filter: PageFilter,
 
     descriptor: Descriptor,
@@ -115,7 +112,6 @@ impl<R: Read> PageReader<R> {
             total_num_values: reader_meta.num_values,
             compression: reader_meta.compression,
             seen_num_values: 0,
-            current_dictionary: None,
             descriptor: reader_meta.descriptor,
             pages_filter,
             buffer,
@@ -135,14 +131,14 @@ impl<R: Read> PageIterator for PageReader<R> {
 }
 
 impl<R: Read> Iterator for PageReader<R> {
-    type Item = Result<CompressedDataPage>;
+    type Item = Result<CompressedPage>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buffer = std::mem::take(&mut self.buffer);
         let maybe_maybe_page = next_page(self, &mut buffer).transpose();
         if let Some(ref maybe_page) = maybe_maybe_page {
-            if let Ok(page) = maybe_page {
-                // check if we should filter it
+            if let Ok(CompressedPage::Data(page)) = maybe_page {
+                // check if we should filter it (only valid for data pages)
                 let to_consume = (self.pages_filter)(&self.descriptor, page.header());
                 if !to_consume {
                     self.buffer = std::mem::take(&mut buffer);
@@ -169,27 +165,17 @@ pub(super) fn read_page_header<R: Read>(reader: &mut R) -> Result<ParquetPageHea
 fn next_page<R: Read>(
     reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
-) -> Result<Option<CompressedDataPage>> {
-    let total_values = reader.total_num_values;
-    let mut seen_values = reader.seen_num_values;
-    if seen_values >= total_values {
+) -> Result<Option<CompressedPage>> {
+    if reader.seen_num_values >= reader.total_num_values {
         return Ok(None);
     };
-
-    while seen_values < total_values {
-        let page = build_page(reader, buffer)?;
-        seen_values = reader.seen_num_values;
-        if let Some(page) = page {
-            return Ok(Some(page));
-        }
-    }
-    Ok(None)
+    build_page(reader, buffer).map(Some)
 }
 
 pub(super) fn build_page<R: Read>(
     reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
-) -> Result<Option<CompressedDataPage>> {
+) -> Result<CompressedPage> {
     let page_header = read_page_header(&mut reader.reader)?;
     reader.seen_num_values += get_page_header(&page_header)?
         .map(|x| x.num_values() as i64)
@@ -205,38 +191,22 @@ pub(super) fn build_page<R: Read>(
         .take(read_size as u64)
         .read_to_end(buffer)?;
 
-    let result = finish_page(
+    finish_page(
         page_header,
         buffer,
         reader.compression,
-        &reader.current_dictionary,
         &reader.descriptor,
         None,
-    )?;
-
-    match result {
-        FinishedPage::Data(page) => Ok(Some(page)),
-        FinishedPage::Dict(dict) => {
-            reader.current_dictionary = Some(dict);
-            Ok(None)
-        }
-    }
-}
-
-#[allow(clippy::large_enum_variant)]
-pub(super) enum FinishedPage {
-    Data(CompressedDataPage),
-    Dict(Arc<dyn DictPage>),
+    )
 }
 
 pub(super) fn finish_page(
     page_header: ParquetPageHeader,
     data: &mut Vec<u8>,
     compression: Compression,
-    current_dictionary: &Option<Arc<dyn DictPage>>,
     descriptor: &Descriptor,
     selected_rows: Option<Vec<Interval>>,
-) -> Result<FinishedPage> {
+) -> Result<CompressedPage> {
     let type_ = page_header.type_.try_into()?;
     let uncompressed_page_size = page_header.uncompressed_page_size.try_into()?;
     match type_ {
@@ -250,19 +220,15 @@ pub(super) fn finish_page(
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
 
             // move the buffer to `dict_page`
-            let mut dict_page =
-                EncodedDictPage::new(std::mem::take(data), dict_header.num_values as usize);
-
-            let page = read_dict_page(
-                &dict_page,
-                (compression, uncompressed_page_size),
+            let page = CompressedDictPage::new(
+                std::mem::take(data),
+                compression,
+                uncompressed_page_size,
+                dict_header.num_values.try_into()?,
                 is_sorted,
-                descriptor.primitive_type.physical_type,
-            )?;
-            // take the buffer out of the `dict_page` to re-use it
-            std::mem::swap(&mut dict_page.buffer, data);
+            );
 
-            Ok(FinishedPage::Dict(page))
+            Ok(CompressedPage::Dict(page))
         }
         PageType::DataPage => {
             let header = page_header.data_page_header.ok_or_else(|| {
@@ -272,12 +238,11 @@ pub(super) fn finish_page(
                 )
             })?;
 
-            Ok(FinishedPage::Data(CompressedDataPage::new_read(
+            Ok(CompressedPage::Data(CompressedDataPage::new_read(
                 DataPageHeader::V1(header),
                 std::mem::take(data),
                 compression,
                 uncompressed_page_size,
-                current_dictionary.clone(),
                 descriptor.clone(),
                 selected_rows,
             )))
@@ -290,12 +255,11 @@ pub(super) fn finish_page(
                 )
             })?;
 
-            Ok(FinishedPage::Data(CompressedDataPage::new_read(
+            Ok(CompressedPage::Data(CompressedDataPage::new_read(
                 DataPageHeader::V2(header),
                 std::mem::take(data),
                 compression,
                 uncompressed_page_size,
-                current_dictionary.clone(),
                 descriptor.clone(),
                 selected_rows,
             )))
