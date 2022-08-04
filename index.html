@@ -214,19 +214,31 @@ pages do hold values and own potentially large chunks of (compressed) memory.</p
 <p>At this point, we are missing 3 steps: decompress, decode and deserialize.
 Decompression is done via <code>decompress</code>:</p>
 <pre><code class="language-rust no_run noplayground">    let mut decompress_buffer = vec![];
+    let mut dict = None;
     for maybe_page in pages {
         let page = maybe_page?;
         let page = parquet2::read::decompress(page, &amp;mut decompress_buffer)?;
 
-        let _array = deserialize(&amp;page);
+        match page {
+            Page::Dict(page) =&gt; {
+                // the first page may be a dictionary page, which needs to be deserialized
+                // depending on your target in-memory format, you may want to deserialize
+                // the values differently...
+                // let page = deserialize_dict(&amp;page)?;
+                dict = Some(page);
+            }
+            Page::Data(page) =&gt; {
+                let _array = deserialize(&amp;page, dict.as_ref())?;
+            }
+        }
     }
 </code></pre>
 <p>Decoding and deserialization is usually done in the same step, as follows:</p>
 <pre><code class="language-rust no_run noplayground">use parquet2::encoding::Encoding;
-use parquet2::page::{split_buffer, DataPage};
+use parquet2::page::{split_buffer, DataPage, DictPage, Page};
 use parquet2::schema::types::PhysicalType;
 
-fn deserialize(page: &amp;DataPage) -&gt; Result&lt;()&gt; {
+fn deserialize(page: &amp;DataPage, dict: Option&lt;&amp;DictPage&gt;) -&gt; Result&lt;()&gt; {
     // split the data buffer in repetition levels, definition levels and values
     let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page)?;
 
@@ -234,7 +246,7 @@ fn deserialize(page: &amp;DataPage) -&gt; Result&lt;()&gt; {
     match (
         page.descriptor.primitive_type.physical_type,
         page.encoding(),
-        page.dictionary_page(),
+        dict,
     ) {
         (
             PhysicalType::Int32,
