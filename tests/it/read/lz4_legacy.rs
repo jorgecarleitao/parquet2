@@ -29,7 +29,6 @@ fn verify_column_data(column: &str) -> Array {
 
 #[test]
 fn test_lz4_inference() -> Result<()> {
-
     // - file "hadoop_lz4_compressed.parquet" is compressed using the hadoop Lz4Codec
     // - file "non_hadoop_lz4_compressed.parquet" is "the LZ4 block format without the custom Hadoop header".
     //    see https://github.com/apache/parquet-testing/pull/14
@@ -37,7 +36,10 @@ fn test_lz4_inference() -> Result<()> {
     // Those two files, are all marked as compressed as Lz4, the decompressor should
     // be able to distinguish them from each other.
 
-    let files = ["hadoop_lz4_compressed.parquet", "non_hadoop_lz4_compressed.parquet"];
+    let files = [
+        "hadoop_lz4_compressed.parquet",
+        "non_hadoop_lz4_compressed.parquet",
+    ];
     let columns = ["c0", "c1", "v11"];
     for file in files {
         let mut path = get_path();
@@ -53,7 +55,6 @@ fn test_lz4_inference() -> Result<()> {
 
 #[test]
 fn test_lz4_large_file() -> Result<()> {
-
     //File "hadoop_lz4_compressed_larger.parquet" is compressed using the hadoop Lz4Codec,
     //which contains 10000 rows.
 
