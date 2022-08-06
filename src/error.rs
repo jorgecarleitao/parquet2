@@ -78,8 +78,8 @@ impl From<lz4_flex::block::CompressError> for Error {
     }
 }
 
-impl From<parquet_format_async_temp::thrift::Error> for Error {
-    fn from(e: parquet_format_async_temp::thrift::Error) -> Error {
+impl From<parquet_format_safe::thrift::Error> for Error {
+    fn from(e: parquet_format_safe::thrift::Error) -> Error {
         Error::General(format!("underlying thrift error: {}", e))
     }
 }

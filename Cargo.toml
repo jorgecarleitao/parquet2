@@ -15,7 +15,7 @@ name = "parquet2"
 bench = false
 
 [dependencies]
-parquet-format-async-temp = "0.3.1"
+parquet-format-safe = "0.1"
 bitpacking = { version = "0.8.2", default-features = false, features = ["bitpacker1x"] }
 streaming-decompression = "0.1"
 

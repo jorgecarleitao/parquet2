@@ -1,12 +1,12 @@
 use crate::{error::Error, metadata::get_sort_order};
 
 use super::{column_order::ColumnOrder, schema_descriptor::SchemaDescriptor, RowGroupMetaData};
-use parquet_format_async_temp::ColumnOrder as TColumnOrder;
+use parquet_format_safe::ColumnOrder as TColumnOrder;
 
 pub use crate::thrift_format::KeyValue;
 
 /// Metadata for a Parquet file.
-// This is almost equal to [`parquet_format_async_temp::FileMetaData`] but contains the descriptors,
+// This is almost equal to [`parquet_format_safe::FileMetaData`] but contains the descriptors,
 // which are crucial to deserialize pages.
 #[derive(Debug, Clone)]
 pub struct FileMetaData {
@@ -60,9 +60,7 @@ impl FileMetaData {
     }
 
     /// Deserializes [`crate::thrift_format::FileMetaData`] into this struct
-    pub fn try_from_thrift(
-        metadata: parquet_format_async_temp::FileMetaData,
-    ) -> Result<Self, Error> {
+    pub fn try_from_thrift(metadata: parquet_format_safe::FileMetaData) -> Result<Self, Error> {
         let schema_descr = SchemaDescriptor::try_from_thrift(&metadata.schema)?;
 
         let row_groups = metadata
@@ -86,9 +84,9 @@ impl FileMetaData {
         })
     }
 
-    /// Serializes itself to thrift's [`parquet_format_async_temp::FileMetaData`].
-    pub fn into_thrift(self) -> parquet_format_async_temp::FileMetaData {
-        parquet_format_async_temp::FileMetaData {
+    /// Serializes itself to thrift's [`parquet_format_safe::FileMetaData`].
+    pub fn into_thrift(self) -> parquet_format_safe::FileMetaData {
+        parquet_format_safe::FileMetaData {
             version: self.version,
             schema: self.schema_descr.into_thrift(),
             num_rows: self.num_rows as i64,

@@ -82,5 +82,8 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
         &buffer
     };
 
-    deserialize_metadata(reader)
+    // a highly nested but sparse struct could result in many allocations
+    let max_size = reader.len() * 2 + 1024;
+
+    deserialize_metadata(reader, max_size)
 }

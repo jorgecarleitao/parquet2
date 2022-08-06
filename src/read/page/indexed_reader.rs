@@ -60,7 +60,7 @@ fn read_page<R: Read + Seek>(
 
     // deserialize [header]
     let mut reader = Cursor::new(buffer);
-    let page_header = read_page_header(&mut reader)?;
+    let page_header = read_page_header(&mut reader, 1024 * 1024)?;
     let header_size = reader.seek(SeekFrom::Current(0)).unwrap() as usize;
     let buffer = reader.into_inner();
 

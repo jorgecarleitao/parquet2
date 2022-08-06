@@ -1,4 +1,4 @@
-use parquet_format_async_temp::RowGroup;
+use parquet_format_safe::RowGroup;
 
 use super::{column_chunk_metadata::ColumnChunkMetaData, schema_descriptor::SchemaDescriptor};
 use crate::{

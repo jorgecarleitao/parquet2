@@ -45,13 +45,20 @@ pub fn get_page_iterator<R: Read + Seek>(
     column_chunk: &ColumnChunkMetaData,
     mut reader: R,
     pages_filter: Option<PageFilter>,
-    buffer: Vec<u8>,
+    scratch: Vec<u8>,
+    max_header_size: usize,
 ) -> Result<PageReader<R>> {
     let pages_filter = pages_filter.unwrap_or_else(|| Arc::new(|_, _| true));
 
     let (col_start, _) = column_chunk.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
-    Ok(PageReader::new(reader, column_chunk, pages_filter, buffer))
+    Ok(PageReader::new(
+        reader,
+        column_chunk,
+        pages_filter,
+        scratch,
+        max_header_size,
+    ))
 }
 
 /// Returns an [`Iterator`] of [`ColumnChunkMetaData`] corresponding to the columns
@@ -72,24 +79,35 @@ pub fn get_field_columns<'a>(
 }
 
 /// Returns a [`ColumnIterator`] of column chunks corresponding to `field`.
+///
 /// Contrarily to [`get_page_iterator`] that returns a single iterator of pages, this iterator
 /// returns multiple iterators, one per physical column of the `field`.
 /// For primitive fields (e.g. `i64`), [`ColumnIterator`] yields exactly one column.
 /// For complex fields, it yields multiple columns.
+/// `max_header_size` is the maximum number of bytes thrift is allowed to allocate
+/// to read a page header.
 pub fn get_column_iterator<R: Read + Seek>(
     reader: R,
     metadata: &FileMetaData,
     row_group: usize,
     field: usize,
     page_filter: Option<PageFilter>,
-    page_buffer: Vec<u8>,
+    scratch: Vec<u8>,
+    max_header_size: usize,
 ) -> ColumnIterator<R> {
     let field = metadata.schema().fields()[field].clone();
     let columns = get_field_columns(metadata, row_group, &field)
         .cloned()
         .collect::<Vec<_>>();
 
-    ColumnIterator::new(reader, field, columns, page_filter, page_buffer)
+    ColumnIterator::new(
+        reader,
+        field,
+        columns,
+        page_filter,
+        scratch,
+        max_header_size,
+    )
 }
 
 /// State of [`MutStreamingIterator`].
@@ -126,26 +144,31 @@ pub struct ColumnIterator<R: Read + Seek> {
     columns: Vec<ColumnChunkMetaData>,
     page_filter: Option<PageFilter>,
     current: Option<(PageReader<R>, ColumnChunkMetaData)>,
-    page_buffer: Vec<u8>,
+    scratch: Vec<u8>,
+    max_header_size: usize,
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
     /// Returns a new [`ColumnIterator`]
+    /// `max_header_size` is the maximum number of bytes thrift is allowed to allocate
+    /// to read a page header.
     pub fn new(
         reader: R,
         field: ParquetType,
         mut columns: Vec<ColumnChunkMetaData>,
         page_filter: Option<PageFilter>,
-        page_buffer: Vec<u8>,
+        scratch: Vec<u8>,
+        max_header_size: usize,
     ) -> Self {
         columns.reverse();
         Self {
             reader: Some(reader),
             field,
-            page_buffer,
+            scratch,
             columns,
             page_filter,
             current: None,
+            max_header_size,
         }
     }
 }
@@ -155,17 +178,23 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
     type Error = Error;
 
     fn advance(mut self) -> Result<State<Self>> {
-        let (reader, buffer) = if let Some((iter, _)) = self.current {
+        let (reader, scratch) = if let Some((iter, _)) = self.current {
             iter.into_inner()
         } else {
-            (self.reader.unwrap(), self.page_buffer)
+            (self.reader.unwrap(), self.scratch)
         };
         if self.columns.is_empty() {
-            return Ok(State::Finished(buffer));
+            return Ok(State::Finished(scratch));
         };
         let column = self.columns.pop().unwrap();
 
-        let iter = get_page_iterator(&column, reader, self.page_filter.clone(), buffer)?;
+        let iter = get_page_iterator(
+            &column,
+            reader,
+            self.page_filter.clone(),
+            scratch,
+            self.max_header_size,
+        )?;
         let current = Some((iter, column));
         Ok(State::Some(Self {
             reader: None,
@@ -173,7 +202,8 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
             columns: self.columns,
             page_filter: self.page_filter,
             current,
-            page_buffer: vec![],
+            scratch: vec![],
+            max_header_size: self.max_header_size,
         }))
     }
 
@@ -262,7 +292,7 @@ mod tests {
         let column = 0;
         let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![];
-        let mut iter = get_page_iterator(column_metadata, &mut file, None, buffer)?;
+        let mut iter = get_page_iterator(column_metadata, &mut file, None, buffer, 1024 * 1024)?;
 
         let dict = iter.next().unwrap().unwrap();
         assert_eq!(dict.num_values(), 0);
@@ -283,7 +313,7 @@ mod tests {
         let column = 0;
         let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![0];
-        let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
+        let iterator = get_page_iterator(column_metadata, &mut file, None, buffer, 1024 * 1024)?;
 
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
@@ -311,7 +341,7 @@ mod tests {
         let column = 0;
         let column_metadata = &metadata.row_groups[row_group].columns()[column];
         let buffer = vec![1];
-        let iterator = get_page_iterator(column_metadata, &mut file, None, buffer)?;
+        let iterator = get_page_iterator(column_metadata, &mut file, None, buffer, 1024 * 1024)?;
 
         let buffer = vec![];
         let mut iterator = Decompressor::new(iterator, buffer);
@@ -341,8 +371,8 @@ mod tests {
         let row_group = 0;
         let column = 0;
         let column_metadata = &metadata.row_groups[row_group].columns()[column];
-        let buffer = vec![];
-        let iter: Vec<_> = get_page_iterator(column_metadata, &mut file, None, buffer)?.collect();
+        let iter: Vec<_> =
+            get_page_iterator(column_metadata, &mut file, None, vec![], usize::MAX)?.collect();
 
         let field = metadata.schema().fields()[0].clone();
         let mut iter = ReadColumnIterator::new(field, vec![(iter, column_metadata.clone())]);
@@ -382,6 +412,7 @@ mod tests {
             metadata.row_groups[0].columns().to_vec(),
             None,
             vec![],
+            usize::MAX, // we trust the file is correct
         );
 
         loop {

@@ -118,7 +118,7 @@ fn main() -> Result<()> {
 
     // ANCHOR: pages
     use parquet2::read::get_page_iterator;
-    let pages = get_page_iterator(column_metadata, &mut reader, None, vec![])?;
+    let pages = get_page_iterator(column_metadata, &mut reader, None, vec![], 1024 * 1024)?;
     // ANCHOR_END: pages
 
     // ANCHOR: decompress

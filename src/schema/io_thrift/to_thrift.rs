@@ -1,4 +1,4 @@
-use parquet_format_async_temp::{ConvertedType, SchemaElement};
+use parquet_format_safe::{ConvertedType, SchemaElement};
 
 use crate::schema::types::PrimitiveType;
 

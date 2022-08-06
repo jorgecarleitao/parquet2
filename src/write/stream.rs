@@ -2,7 +2,7 @@ use std::io::Write;
 
 use futures::{AsyncWrite, AsyncWriteExt};
 
-use parquet_format_async_temp::{
+use parquet_format_safe::{
     thrift::protocol::{TCompactOutputStreamProtocol, TOutputStreamProtocol},
     FileMetaData, RowGroup,
 };

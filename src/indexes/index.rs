@@ -1,6 +1,6 @@
 use std::any::Any;
 
-use parquet_format_async_temp::ColumnIndex;
+use parquet_format_safe::ColumnIndex;
 
 use crate::parquet_bridge::BoundaryOrder;
 use crate::schema::types::PrimitiveType;
