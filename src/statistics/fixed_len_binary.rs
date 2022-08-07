@@ -8,7 +8,7 @@ use crate::{
     schema::types::{PhysicalType, PrimitiveType},
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FixedLenStatistics {
     pub primitive_type: PrimitiveType,
     pub null_count: Option<i64>,
