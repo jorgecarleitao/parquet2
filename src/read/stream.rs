@@ -1,4 +1,4 @@
-use std::io::{Cursor, Seek, SeekFrom};
+use std::io::SeekFrom;
 
 use futures::{AsyncRead, AsyncReadExt, AsyncSeek, AsyncSeekExt};
 
@@ -28,10 +28,9 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
 ) -> Result<FileMetaData> {
     let file_size = stream_len(reader).await?;
 
-    // check file is large enough to hold footer
     if file_size < HEADER_SIZE + FOOTER_SIZE {
         return Err(general_err!(
-            "Invalid Parquet file. Size is smaller than footer"
+            "Invalid Parquet file. Size is smaller than header + footer"
         ));
     }
 
@@ -50,37 +49,27 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
 
     // check this is indeed a parquet file
     if buffer[default_end_len - 4..] != PARQUET_MAGIC {
-        return Err(general_err!(
-            "Invalid file. The footer does not contain Parquet's magic numbers"
+        return Err(Error::OutOfSpec(
+            "Invalid Parquet file. Corrupt footer".to_string(),
         ));
     }
 
-    let metadata = metadata_len(&buffer, default_end_len);
-
-    let metadata_len: u64 = metadata.try_into().map_err(|_| {
-        general_err!(
-            "Invalid Parquet file. Metadata length is less than zero ({})",
-            metadata
-        )
-    })?;
+    let metadata_len = metadata_len(&buffer, default_end_len);
+    let metadata_len: u64 = metadata_len.try_into()?;
 
     let footer_len = FOOTER_SIZE + metadata_len;
     if footer_len > file_size {
-        return Err(general_err!(
-            "Invalid Parquet file. Metadata start is less than zero ({})",
-            file_size as i64 - footer_len as i64
+        return Err(Error::OutOfSpec(
+            "The footer size must be smaller or equal to the file's size".to_string(),
         ));
     }
 
     let reader = if (footer_len as usize) < buffer.len() {
         // the whole metadata is in the bytes we already read
-        // build up the reader covering the entire metadata
-        let mut reader = Cursor::new(buffer);
-        reader.seek(SeekFrom::End(-(footer_len as i64)))?;
-
-        reader
+        let remaining = buffer.len() - footer_len as usize;
+        &buffer[remaining..]
     } else {
-        // the end of file read by default is not long enough, read again including all metadata.
+        // the end of file read by default is not long enough, read again including the metadata.
         reader.seek(SeekFrom::End(-(footer_len as i64))).await?;
 
         buffer.clear();
@@ -90,7 +79,7 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
             .read_to_end(&mut buffer)
             .await?;
 
-        Cursor::new(buffer)
+        &buffer
     };
 
     deserialize_metadata(reader)
