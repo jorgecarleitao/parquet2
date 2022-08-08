@@ -96,7 +96,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
     pub fn new(
         reader: R,
         column: &ColumnChunkMetaData,
-        pages: Vec<FilteredPage>,
+        pages: VecDeque<FilteredPage>,
         buffer: Vec<u8>,
         data_buffer: Vec<u8>,
     ) -> Self {
@@ -107,7 +107,7 @@ impl<R: Read + Seek> IndexedPageReader<R> {
     pub fn new_with_page_meta(
         reader: R,
         column: PageMetaData,
-        pages: Vec<FilteredPage>,
+        pages: VecDeque<FilteredPage>,
         buffer: Vec<u8>,
         data_buffer: Vec<u8>,
     ) -> Self {

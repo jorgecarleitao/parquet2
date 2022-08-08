@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use parquet_format_async_temp::PageLocation;
 
 use crate::error::Error;
@@ -103,7 +105,7 @@ pub fn select_pages(
     intervals: &[Interval],
     locations: &[PageLocation],
     num_rows: usize,
-) -> Result<Vec<FilteredPage>, Error> {
+) -> Result<VecDeque<FilteredPage>, Error> {
     let page_intervals = compute_page_row_intervals(locations, num_rows)?;
 
     page_intervals
