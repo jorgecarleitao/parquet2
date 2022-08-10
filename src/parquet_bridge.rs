@@ -135,7 +135,7 @@ impl From<CompressionOptions> for CompressionCodec {
 }
 
 /// Defines valid compression levels.
-pub trait CompressionLevel<T: std::fmt::Display + std::cmp::PartialOrd> {
+pub(crate) trait CompressionLevel<T: std::fmt::Display + std::cmp::PartialOrd> {
     const MINIMUM_LEVEL: T;
     const MAXIMUM_LEVEL: T;
 

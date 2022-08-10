@@ -1,6 +1,6 @@
 //! Functionality to compress and decompress data according to the parquet specification
 pub use super::parquet_bridge::{
-    BrotliLevel, Compression, CompressionLevel, CompressionOptions, GzipLevel, ZstdLevel,
+    BrotliLevel, Compression, CompressionOptions, GzipLevel, ZstdLevel,
 };
 
 use crate::error::{Error, Result};
