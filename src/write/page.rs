@@ -2,8 +2,12 @@ use std::convert::TryInto;
 use std::io::Write;
 use std::sync::Arc;
 
+#[cfg(feature = "async")]
 use futures::{AsyncWrite, AsyncWriteExt};
-use parquet_format_safe::thrift::protocol::{TCompactOutputProtocol, TCompactOutputStreamProtocol};
+#[cfg(feature = "async")]
+use parquet_format_safe::thrift::protocol::TCompactOutputStreamProtocol;
+
+use parquet_format_safe::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_safe::{DictionaryPageHeader, Encoding, PageType};
 
 use crate::compression::Compression;
@@ -91,6 +95,8 @@ pub fn write_page<W: Write>(
     })
 }
 
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
     writer: &mut W,
     offset: u64,
@@ -197,6 +203,8 @@ fn write_page_header<W: Write>(mut writer: &mut W, header: &ParquetPageHeader) -
     Ok(header.write_to_out_protocol(&mut protocol)? as u64)
 }
 
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 /// writes the page header into `writer`, returning the number of bytes used in the process.
 async fn write_page_header_async<W: AsyncWrite + Unpin + Send>(
     mut writer: &mut W,

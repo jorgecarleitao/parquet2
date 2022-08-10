@@ -6,7 +6,10 @@ pub(crate) mod page;
 mod row_group;
 pub(self) mod statistics;
 
+#[cfg(feature = "async")]
 mod stream;
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use stream::FileStreamer;
 
 mod dyn_iter;

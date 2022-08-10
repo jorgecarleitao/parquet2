@@ -1,11 +1,13 @@
 use std::collections::HashSet;
 use std::io::Write;
 
-use futures::AsyncWrite;
-use parquet_format_safe::thrift::protocol::{
-    TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
-};
+use parquet_format_safe::thrift::protocol::{TCompactOutputProtocol, TOutputProtocol};
 use parquet_format_safe::{ColumnChunk, ColumnMetaData, Type};
+
+#[cfg(feature = "async")]
+use futures::AsyncWrite;
+#[cfg(feature = "async")]
+use parquet_format_safe::thrift::protocol::{TCompactOutputStreamProtocol, TOutputStreamProtocol};
 
 use crate::statistics::serialize_statistics;
 use crate::FallibleStreamingIterator;
@@ -17,7 +19,10 @@ use crate::{
     page::{CompressedPage, PageType},
 };
 
-use super::page::{write_page, write_page_async, PageWriteSpec};
+#[cfg(feature = "async")]
+use super::page::write_page_async;
+
+use super::page::{write_page, PageWriteSpec};
 use super::statistics::reduce;
 use super::DynStreamingIterator;
 
@@ -58,6 +63,8 @@ where
     Ok((column_chunk, specs, bytes_written))
 }
 
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub async fn write_column_chunk_async<W, E>(
     writer: &mut W,
     mut offset: u64,

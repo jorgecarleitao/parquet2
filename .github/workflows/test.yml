@@ -23,9 +23,11 @@ jobs:
           python tests/write_pyarrow.py
           deactivate
       - name: Run
-        run: cargo test
+        run: |
+          cargo test --features full
+          cargo check # compiles without async
       - name: Run lz4-flex
-        run: cargo test --no-default-features --features lz4_flex,bloom_filter,snappy,brotli,zstd,gzip
+        run: cargo test --no-default-features --features lz4_flex,bloom_filter,snappy,brotli,zstd,gzip,async
 
   clippy:
     name: Clippy
