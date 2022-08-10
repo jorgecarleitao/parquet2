@@ -19,7 +19,10 @@ impl Interval {
 }
 
 /// Returns the set of (row) intervals of the pages.
-fn compute_page_row_intervals(
+/// # Errors
+/// This function errors if the locations are not castable to `usize` or such that
+/// their ranges of row are larger than `num_rows`.
+pub fn compute_page_row_intervals(
     locations: &[PageLocation],
     num_rows: usize,
 ) -> Result<Vec<Interval>, Error> {
@@ -29,15 +32,27 @@ fn compute_page_row_intervals(
 
     let last = (|| {
         let start: usize = locations.last().unwrap().first_row_index.try_into()?;
-        let length = num_rows - start;
+        let length = num_rows.checked_sub(start).ok_or_else(|| {
+            Error::OutOfSpec("Page start cannot be smaller than the number of rows".to_string())
+        })?;
         Result::<_, Error>::Ok(Interval::new(start, length))
     })();
 
     let pages_lengths = locations
         .windows(2)
         .map(|x| {
-            let start = usize::try_from(x[0].first_row_index)?;
-            let length = usize::try_from(x[1].first_row_index - x[0].first_row_index)?;
+            let start = x[0].first_row_index.try_into()?;
+
+            let length = x[1]
+                .first_row_index
+                .checked_sub(x[0].first_row_index)
+                .ok_or_else(|| {
+                    Error::OutOfSpec(
+                        "Page start cannot be smaller than the number of rows".to_string(),
+                    )
+                })?
+                .try_into()?;
+
             Ok(Interval::new(start, length))
         })
         .chain(std::iter::once(last));
