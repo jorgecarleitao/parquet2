@@ -1,5 +1,34 @@
 # Changelog
 
+## [v0.15.0](https://github.com/jorgecarleitao/parquet2/tree/v0.15.0) (2022-08-10)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.14.2...v0.15.0)
+
+**Breaking changes:**
+
+- Add `max_size` to `get_page_stream` and `get_page_iterator`  [\#173](https://github.com/jorgecarleitao/parquet2/issues/173)
+- Optional `async` [\#174](https://github.com/jorgecarleitao/parquet2/pull/174) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Privatized `CompressionLevel` [\#170](https://github.com/jorgecarleitao/parquet2/pull/170) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Delay deserialization of dictionary pages [\#160](https://github.com/jorgecarleitao/parquet2/pull/160) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**New features:**
+
+- Added feature flag to use zlib-ng backend for gzip [\#165](https://github.com/jorgecarleitao/parquet2/pull/165) ([ritchie46](https://github.com/ritchie46))
+
+**Fixed bugs:**
+
+- Fixed OOM on malicious/malformed thrift [\#172](https://github.com/jorgecarleitao/parquet2/pull/172) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- Made `compute_page_row_intervals` public [\#171](https://github.com/jorgecarleitao/parquet2/pull/171) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Simplified interal code [\#168](https://github.com/jorgecarleitao/parquet2/pull/168) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- cargo fmt [\#166](https://github.com/jorgecarleitao/parquet2/pull/166) ([ritchie46](https://github.com/ritchie46))
+
+**Testing updates:**
+
+- Improved coverage report [\#175](https://github.com/jorgecarleitao/parquet2/pull/175) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.14.2](https://github.com/jorgecarleitao/parquet2/tree/v0.14.2) (2022-07-26)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.14.1...v0.14.2)
