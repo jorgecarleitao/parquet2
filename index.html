@@ -207,7 +207,7 @@ Here we will focus on a single column to show how we can read it.</p>
 <code>parquet2::read::get_page_iterator</code> or a stream (async) of compressed
 pages, <code>parquet2::read::get_page_stream</code>:</p>
 <pre><code class="language-rust no_run noplayground">    use parquet2::read::get_page_iterator;
-    let pages = get_page_iterator(column_metadata, &amp;mut reader, None, vec![])?;
+    let pages = get_page_iterator(column_metadata, &amp;mut reader, None, vec![], 1024 * 1024)?;
 </code></pre>
 <p>in both cases, they yield individual <code>CompressedDataPage</code>s. Note that these
 pages do hold values and own potentially large chunks of (compressed) memory.</p>
