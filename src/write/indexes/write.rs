@@ -1,7 +1,11 @@
-use futures::AsyncWrite;
 use std::io::Write;
 
-use parquet_format_safe::thrift::protocol::{TCompactOutputProtocol, TCompactOutputStreamProtocol};
+#[cfg(feature = "async")]
+use futures::AsyncWrite;
+#[cfg(feature = "async")]
+use parquet_format_safe::thrift::protocol::TCompactOutputStreamProtocol;
+
+use parquet_format_safe::thrift::protocol::TCompactOutputProtocol;
 
 use crate::error::Result;
 pub use crate::metadata::KeyValue;
@@ -16,6 +20,8 @@ pub fn write_column_index<W: Write>(writer: &mut W, pages: &[PageWriteSpec]) -> 
     Ok(index.write_to_out_protocol(&mut protocol)? as u64)
 }
 
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub async fn write_column_index_async<W: AsyncWrite + Unpin + Send>(
     writer: &mut W,
     pages: &[PageWriteSpec],
@@ -31,6 +37,8 @@ pub fn write_offset_index<W: Write>(writer: &mut W, pages: &[PageWriteSpec]) -> 
     Ok(index.write_to_out_protocol(&mut protocol)? as u64)
 }
 
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub async fn write_offset_index_async<W: AsyncWrite + Unpin + Send>(
     writer: &mut W,
     pages: &[PageWriteSpec],

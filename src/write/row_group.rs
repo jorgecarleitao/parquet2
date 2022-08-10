@@ -1,6 +1,8 @@
 use std::io::Write;
 
+#[cfg(feature = "async")]
 use futures::AsyncWrite;
+
 use parquet_format_safe::{ColumnChunk, RowGroup};
 
 use crate::{
@@ -9,8 +11,11 @@ use crate::{
     page::CompressedPage,
 };
 
+#[cfg(feature = "async")]
+use super::column_chunk::write_column_chunk_async;
+
 use super::{
-    column_chunk::{write_column_chunk, write_column_chunk_async},
+    column_chunk::write_column_chunk,
     page::{is_data_page, PageWriteSpec},
     DynIter, DynStreamingIterator,
 };
@@ -137,6 +142,8 @@ where
     ))
 }
 
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub async fn write_row_group_async<
     'a,
     W,

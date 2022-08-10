@@ -3,6 +3,7 @@ mod indexes;
 pub mod levels;
 mod metadata;
 mod page;
+#[cfg(feature = "async")]
 mod stream;
 
 use std::io::{Read, Seek, SeekFrom};
@@ -11,8 +12,13 @@ use std::vec::IntoIter;
 
 pub use compression::{decompress, BasicDecompressor, Decompressor};
 pub use metadata::{deserialize_metadata, read_metadata};
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use page::{get_page_stream, get_page_stream_from_column_start};
 pub use page::{IndexedPageReader, PageFilter, PageIterator, PageMetaData, PageReader};
+
+#[cfg(feature = "async")]
+#[cfg_attr(docsrs, doc(cfg(feature = "async")))]
 pub use stream::read_metadata as read_metadata_async;
 
 use crate::error::Error;
