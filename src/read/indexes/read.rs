@@ -1,10 +1,8 @@
 use std::convert::TryInto;
 use std::io::{Cursor, Read, Seek, SeekFrom};
 
-use parquet_format_async_temp::ColumnChunk;
-use parquet_format_async_temp::{
-    thrift::protocol::TCompactInputProtocol, OffsetIndex, PageLocation,
-};
+use parquet_format_safe::ColumnChunk;
+use parquet_format_safe::{thrift::protocol::TCompactInputProtocol, OffsetIndex, PageLocation};
 
 use crate::error::Error;
 use crate::indexes::Index;
@@ -102,11 +100,12 @@ fn deserialize_page_locations(
     data: &[u8],
     column_number: usize,
 ) -> Result<Vec<Vec<PageLocation>>, Error> {
-    let mut d = Cursor::new(data);
+    let len = data.len() * 2 + 1024;
+    let mut reader = Cursor::new(data);
 
     (0..column_number)
         .map(|_| {
-            let mut prot = TCompactInputProtocol::new(&mut d);
+            let mut prot = TCompactInputProtocol::new(&mut reader, len);
             let offset = OffsetIndex::read_from_in_protocol(&mut prot)?;
             Ok(offset.page_locations)
         })

@@ -1,4 +1,4 @@
-use parquet_format_async_temp::SchemaElement;
+use parquet_format_safe::SchemaElement;
 
 use crate::{
     error::Error,

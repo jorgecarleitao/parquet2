@@ -4,8 +4,8 @@ use std::{
     io::{Read, Seek, SeekFrom},
 };
 
-use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
-use parquet_format_async_temp::FileMetaData as TFileMetaData;
+use parquet_format_safe::thrift::protocol::TCompactInputProtocol;
+use parquet_format_safe::FileMetaData as TFileMetaData;
 
 use super::super::{
     metadata::FileMetaData, DEFAULT_FOOTER_READ_SIZE, FOOTER_SIZE, HEADER_SIZE, PARQUET_MAGIC,
@@ -31,7 +31,7 @@ fn stream_len(seek: &mut impl Seek) -> std::result::Result<u64, std::io::Error> 
     Ok(len)
 }
 
-/// Reads from the end of the reader a [`FileMetaData`].
+/// Reads a [`FileMetaData`] from the reader, located at the end of the file.
 pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     // check file is large enough to hold footer
     let file_size = stream_len(reader)?;
@@ -53,9 +53,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
     // check this is indeed a parquet file
     if buffer[default_end_len - 4..] != PARQUET_MAGIC {
-        return Err(Error::OutOfSpec(
-            "Invalid Parquet file. Corrupt footer".to_string(),
-        ));
+        return Err(Error::OutOfSpec("The file must end with PAR1".to_string()));
     }
 
     let metadata_len = metadata_len(&buffer, default_end_len);
@@ -69,7 +67,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         ));
     }
 
-    let reader = if (footer_len as usize) < buffer.len() {
+    let reader: &[u8] = if (footer_len as usize) < buffer.len() {
         // the whole metadata is in the bytes we already read
         let remaining = buffer.len() - footer_len as usize;
         &buffer[remaining..]
@@ -84,12 +82,15 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
         &buffer
     };
 
-    deserialize_metadata(reader)
+    // a highly nested but sparse struct could result in many allocations
+    let max_size = reader.len() * 2 + 1024;
+
+    deserialize_metadata(reader, max_size)
 }
 
 /// Parse loaded metadata bytes
-pub fn deserialize_metadata<R: Read>(reader: R) -> Result<FileMetaData> {
-    let mut prot = TCompactInputProtocol::new(reader);
+pub fn deserialize_metadata<R: Read>(reader: R, max_size: usize) -> Result<FileMetaData> {
+    let mut prot = TCompactInputProtocol::new(reader, max_size);
     let metadata = TFileMetaData::read_from_in_protocol(&mut prot)?;
 
     FileMetaData::try_from_thrift(metadata)

@@ -2,10 +2,10 @@ use std::collections::HashSet;
 use std::io::Write;
 
 use futures::AsyncWrite;
-use parquet_format_async_temp::thrift::protocol::{
+use parquet_format_safe::thrift::protocol::{
     TCompactOutputProtocol, TCompactOutputStreamProtocol, TOutputProtocol, TOutputStreamProtocol,
 };
-use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Type};
+use parquet_format_safe::{ColumnChunk, ColumnMetaData, Type};
 
 use crate::statistics::serialize_statistics;
 use crate::FallibleStreamingIterator;

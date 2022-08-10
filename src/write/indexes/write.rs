@@ -1,9 +1,7 @@
 use futures::AsyncWrite;
 use std::io::Write;
 
-use parquet_format_async_temp::thrift::protocol::{
-    TCompactOutputProtocol, TCompactOutputStreamProtocol,
-};
+use parquet_format_safe::thrift::protocol::{TCompactOutputProtocol, TCompactOutputStreamProtocol};
 
 use crate::error::Result;
 pub use crate::metadata::KeyValue;

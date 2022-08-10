@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use futures::AsyncWrite;
-use parquet_format_async_temp::{ColumnChunk, RowGroup};
+use parquet_format_safe::{ColumnChunk, RowGroup};
 
 use crate::{
     error::{Error, Result},

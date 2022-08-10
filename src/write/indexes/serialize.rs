@@ -1,7 +1,7 @@
-use parquet_format_async_temp::BoundaryOrder;
-use parquet_format_async_temp::ColumnIndex;
-use parquet_format_async_temp::OffsetIndex;
-use parquet_format_async_temp::PageLocation;
+use parquet_format_safe::BoundaryOrder;
+use parquet_format_safe::ColumnIndex;
+use parquet_format_safe::OffsetIndex;
+use parquet_format_safe::PageLocation;
 
 use crate::error::{Error, Result};
 pub use crate::metadata::KeyValue;

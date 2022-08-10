@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use parquet_format_async_temp::Statistics as ParquetStatistics;
+use parquet_format_safe::Statistics as ParquetStatistics;
 
 use super::Statistics;
 use crate::{

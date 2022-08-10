@@ -1,4 +1,4 @@
-use parquet_format_async_temp::PageLocation;
+use parquet_format_safe::PageLocation;
 
 use crate::error::Error;
 

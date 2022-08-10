@@ -3,10 +3,8 @@ use std::io::Write;
 use std::sync::Arc;
 
 use futures::{AsyncWrite, AsyncWriteExt};
-use parquet_format_async_temp::thrift::protocol::{
-    TCompactOutputProtocol, TCompactOutputStreamProtocol,
-};
-use parquet_format_async_temp::{DictionaryPageHeader, Encoding, PageType};
+use parquet_format_safe::thrift::protocol::{TCompactOutputProtocol, TCompactOutputStreamProtocol};
+use parquet_format_safe::{DictionaryPageHeader, Encoding, PageType};
 
 use crate::compression::Compression;
 use crate::error::{Error, Result};

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use parquet_format_async_temp::{ColumnChunk, ColumnMetaData, Encoding};
+use parquet_format_safe::{ColumnChunk, ColumnMetaData, Encoding};
 
 use super::column_descriptor::ColumnDescriptor;
 use crate::compression::Compression;
@@ -117,17 +117,14 @@ impl ColumnChunkMetaData {
 
     /// Returns the offset and length in bytes of the column chunk within the file
     pub fn byte_range(&self) -> (u64, u64) {
-        let col_start = if let Some(dict_page_offset) = self.dictionary_page_offset() {
-            dict_page_offset
+        let start = if let Some(dict_page_offset) = self.dictionary_page_offset() {
+            dict_page_offset as u64
         } else {
-            self.data_page_offset()
+            self.data_page_offset() as u64
         };
-        let col_len = self.compressed_size();
-        assert!(
-            col_start >= 0 && col_len >= 0,
-            "column start and length should not be negative"
-        );
-        (col_start as u64, col_len as u64)
+        let length = self.compressed_size() as u64;
+        // this has been validated in [`try_from_thrift`]
+        (start, length)
     }
 
     /// Method to convert from Thrift.
@@ -137,12 +134,12 @@ impl ColumnChunkMetaData {
     ) -> Result<Self> {
         // validate metadata
         if let Some(meta) = &column_chunk.meta_data {
-            let _: usize = meta.total_compressed_size.try_into()?;
+            let _: u64 = meta.total_compressed_size.try_into()?;
 
             if let Some(offset) = meta.dictionary_page_offset {
-                let _: usize = offset.try_into()?;
+                let _: u64 = offset.try_into()?;
             }
-            let _: usize = meta.data_page_offset.try_into()?;
+            let _: u64 = meta.data_page_offset.try_into()?;
 
             let _: Compression = meta.codec.try_into()?;
         } else {

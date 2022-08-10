@@ -1,6 +1,6 @@
 use std::io::{Read, Seek, SeekFrom};
 
-use parquet_format_async_temp::{
+use parquet_format_safe::{
     thrift::protocol::TCompactInputProtocol, BloomFilterAlgorithm, BloomFilterCompression,
     BloomFilterHeader, SplitBlockAlgorithm, Uncompressed,
 };
@@ -27,7 +27,7 @@ pub fn read<R: Read + Seek>(
     reader.seek(SeekFrom::Start(offset))?;
 
     // deserialize header
-    let mut prot = TCompactInputProtocol::new(&mut reader);
+    let mut prot = TCompactInputProtocol::new(&mut reader, usize::MAX); // max is ok since `BloomFilterHeader` never allocates
     let header = BloomFilterHeader::read_from_in_protocol(&mut prot)?;
 
     if header.algorithm != BloomFilterAlgorithm::BLOCK(SplitBlockAlgorithm {}) {

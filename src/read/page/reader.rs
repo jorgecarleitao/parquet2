@@ -1,7 +1,7 @@
 use std::convert::TryInto;
 use std::{io::Read, sync::Arc};
 
-use parquet_format_async_temp::thrift::protocol::TCompactInputProtocol;
+use parquet_format_safe::thrift::protocol::TCompactInputProtocol;
 
 use crate::compression::Compression;
 use crate::error::{Error, Result};
@@ -82,20 +82,30 @@ pub struct PageReader<R: Read> {
     descriptor: Descriptor,
 
     // The currently allocated buffer.
-    pub(crate) buffer: Vec<u8>,
+    pub(crate) scratch: Vec<u8>,
+
+    max_header_size: usize,
 }
 
 impl<R: Read> PageReader<R> {
     /// Returns a new [`PageReader`].
     ///
     /// It assumes that the reader has been `seeked` to the beginning of `column`.
+    /// The parameter `max_header_size`
     pub fn new(
         reader: R,
         column: &ColumnChunkMetaData,
         pages_filter: PageFilter,
-        buffer: Vec<u8>,
+        scratch: Vec<u8>,
+        max_header_size: usize,
     ) -> Self {
-        Self::new_with_page_meta(reader, column.into(), pages_filter, buffer)
+        Self::new_with_page_meta(
+            reader,
+            column.into(),
+            pages_filter,
+            scratch,
+            max_header_size,
+        )
     }
 
     /// Create a a new [`PageReader`] with [`PageMetaData`].
@@ -105,7 +115,8 @@ impl<R: Read> PageReader<R> {
         reader: R,
         reader_meta: PageMetaData,
         pages_filter: PageFilter,
-        buffer: Vec<u8>,
+        scratch: Vec<u8>,
+        max_header_size: usize,
     ) -> Self {
         Self {
             reader,
@@ -114,19 +125,20 @@ impl<R: Read> PageReader<R> {
             seen_num_values: 0,
             descriptor: reader_meta.descriptor,
             pages_filter,
-            buffer,
+            scratch,
+            max_header_size,
         }
     }
 
     /// Returns the reader and this Readers' interval buffer
     pub fn into_inner(self) -> (R, Vec<u8>) {
-        (self.reader, self.buffer)
+        (self.reader, self.scratch)
     }
 }
 
 impl<R: Read> PageIterator for PageReader<R> {
-    fn swap_buffer(&mut self, buffer: &mut Vec<u8>) {
-        std::mem::swap(&mut self.buffer, buffer)
+    fn swap_buffer(&mut self, scratch: &mut Vec<u8>) {
+        std::mem::swap(&mut self.scratch, scratch)
     }
 }
 
@@ -134,28 +146,31 @@ impl<R: Read> Iterator for PageReader<R> {
     type Item = Result<CompressedPage>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut buffer = std::mem::take(&mut self.buffer);
+        let mut buffer = std::mem::take(&mut self.scratch);
         let maybe_maybe_page = next_page(self, &mut buffer).transpose();
         if let Some(ref maybe_page) = maybe_maybe_page {
             if let Ok(CompressedPage::Data(page)) = maybe_page {
                 // check if we should filter it (only valid for data pages)
                 let to_consume = (self.pages_filter)(&self.descriptor, page.header());
                 if !to_consume {
-                    self.buffer = std::mem::take(&mut buffer);
+                    self.scratch = std::mem::take(&mut buffer);
                     return self.next();
                 }
             }
         } else {
             // no page => we take back the buffer
-            self.buffer = std::mem::take(&mut buffer);
+            self.scratch = std::mem::take(&mut buffer);
         }
         maybe_maybe_page
     }
 }
 
 /// Reads Page header from Thrift.
-pub(super) fn read_page_header<R: Read>(reader: &mut R) -> Result<ParquetPageHeader> {
-    let mut prot = TCompactInputProtocol::new(reader);
+pub(super) fn read_page_header<R: Read>(
+    reader: &mut R,
+    max_size: usize,
+) -> Result<ParquetPageHeader> {
+    let mut prot = TCompactInputProtocol::new(reader, max_size);
     let page_header = ParquetPageHeader::read_from_in_protocol(&mut prot)?;
     Ok(page_header)
 }
@@ -169,14 +184,15 @@ fn next_page<R: Read>(
     if reader.seen_num_values >= reader.total_num_values {
         return Ok(None);
     };
-    build_page(reader, buffer).map(Some)
+    build_page(reader, buffer)
 }
 
 pub(super) fn build_page<R: Read>(
     reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
-) -> Result<CompressedPage> {
-    let page_header = read_page_header(&mut reader.reader)?;
+) -> Result<Option<CompressedPage>> {
+    let page_header = read_page_header(&mut reader.reader, reader.max_header_size)?;
+
     reader.seen_num_values += get_page_header(&page_header)?
         .map(|x| x.num_values() as i64)
         .unwrap_or_default();
@@ -198,6 +214,7 @@ pub(super) fn build_page<R: Read>(
         &reader.descriptor,
         None,
     )
+    .map(Some)
 }
 
 pub(super) fn finish_page(

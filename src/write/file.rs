@@ -1,8 +1,8 @@
 use std::io::Write;
 
-use parquet_format_async_temp::thrift::protocol::TCompactOutputProtocol;
-use parquet_format_async_temp::thrift::protocol::TOutputProtocol;
-use parquet_format_async_temp::RowGroup;
+use parquet_format_safe::thrift::protocol::TCompactOutputProtocol;
+use parquet_format_safe::thrift::protocol::TOutputProtocol;
+use parquet_format_safe::RowGroup;
 
 use crate::metadata::ThriftFileMetaData;
 use crate::{
@@ -273,6 +273,7 @@ mod tests {
 
         // read it again:
         let result = read_metadata(&mut Cursor::new(a));
+        println!("{result:?}");
         assert!(result.is_ok());
 
         Ok(())

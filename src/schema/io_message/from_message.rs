@@ -42,7 +42,7 @@
 //! println!("{:?}", schema);
 //! ```
 
-use parquet_format_async_temp::Type;
+use parquet_format_safe::Type;
 use types::PrimitiveLogicalType;
 
 use super::super::types::{ParquetType, TimeUnit};

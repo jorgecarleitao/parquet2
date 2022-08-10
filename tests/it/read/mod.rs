@@ -225,7 +225,15 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .next()
         .ok_or_else(|| Error::OutOfSpec("column does not exist".to_string()))?;
 
-    let columns = get_column_iterator(reader, &metadata, row_group, field, None, vec![]);
+    let columns = get_column_iterator(
+        reader,
+        &metadata,
+        row_group,
+        field,
+        None,
+        vec![],
+        usize::MAX,
+    );
     let field = &metadata.schema().fields()[field];
 
     let mut statistics = get_field_columns(&metadata, row_group, field)
@@ -257,7 +265,8 @@ pub async fn read_column_async<
 
     let column = &metadata.row_groups[0].columns()[0];
 
-    let pages = get_page_stream(column, reader, vec![], Arc::new(|_, _| true)).await?;
+    let pages = get_page_stream(column, reader, vec![], Arc::new(|_, _| true), usize::MAX).await?;
+
     let field = &metadata.schema().fields()[field];
 
     let mut statistics = get_field_columns(&metadata, row_group, field)
