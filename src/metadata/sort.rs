@@ -10,7 +10,7 @@ use crate::schema::types::{
 ///
 /// See reference in
 /// <https://github.com/apache/parquet-cpp/blob/master/src/parquet/types.h>
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SortOrder {
     /// Signed (either value or legacy byte-wise) comparison.
     Signed,

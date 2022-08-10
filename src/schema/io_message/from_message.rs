@@ -71,14 +71,28 @@ fn is_logical_type(s: &str) -> bool {
 }
 
 fn is_converted_type(s: &str) -> bool {
-    match s {
-        "UTF8" | "ENUM" | "DECIMAL" | "DATE" | "TIME_MILLIS" | "TIME_MICROS"
-        | "TIMESTAMP_MILLIS" | "TIMESTAMP_MICROS" | "UINT_8" | "UINT_16" | "UINT_32"
-        | "UINT_64" | "INT_8" | "INT_16" | "INT_32" | "INT_64" | "JSON" | "BSON" | "INTERVAL" => {
-            true
-        }
-        _ => false,
-    }
+    matches!(
+        s,
+        "UTF8"
+            | "ENUM"
+            | "DECIMAL"
+            | "DATE"
+            | "TIME_MILLIS"
+            | "TIME_MICROS"
+            | "TIMESTAMP_MILLIS"
+            | "TIMESTAMP_MICROS"
+            | "UINT_8"
+            | "UINT_16"
+            | "UINT_32"
+            | "UINT_64"
+            | "INT_8"
+            | "INT_16"
+            | "INT_32"
+            | "INT_64"
+            | "JSON"
+            | "BSON"
+            | "INTERVAL"
+    )
 }
 
 fn converted_group_from_str(s: &str) -> Result<GroupConvertedType> {

@@ -63,7 +63,7 @@ mod tests {
         let selector = |page: &PageIndex<Vec<u8>>| {
             page.max
                 .as_ref()
-                .map(|x| x.as_slice() > &[97])
+                .map(|x| x.as_slice()[0] > 97)
                 .unwrap_or(false) // no max is present => all nulls => not selected
         };
         let selected = index.indexes.iter().map(selector).collect::<Vec<_>>();

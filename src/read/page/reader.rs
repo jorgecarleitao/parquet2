@@ -17,7 +17,7 @@ use crate::parquet_bridge::Encoding;
 use super::PageIterator;
 
 /// This meta is a small part of [`ColumnChunkMetaData`].
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PageMetaData {
     /// The start offset of this column chunk in file.
     pub column_start: u64,

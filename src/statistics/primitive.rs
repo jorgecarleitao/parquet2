@@ -7,7 +7,7 @@ use crate::error::{Error, Result};
 use crate::schema::types::{PhysicalType, PrimitiveType};
 use crate::types;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PrimitiveStatistics<T: types::NativeType> {
     pub primitive_type: PrimitiveType,
     pub null_count: Option<i64>,

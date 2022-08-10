@@ -8,7 +8,7 @@ use crate::{
     schema::types::PhysicalType,
 };
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BooleanStatistics {
     pub null_count: Option<i64>,
     pub distinct_count: Option<i64>,
@@ -49,8 +49,16 @@ pub fn read(v: &ParquetStatistics) -> Result<Arc<dyn Statistics>> {
     Ok(Arc::new(BooleanStatistics {
         null_count: v.null_count,
         distinct_count: v.distinct_count,
-        max_value: v.max_value.as_ref().and_then(|x| x.get(0)).map(|x| *x != 0),
-        min_value: v.min_value.as_ref().and_then(|x| x.get(0)).map(|x| *x != 0),
+        max_value: v
+            .max_value
+            .as_ref()
+            .and_then(|x| x.first())
+            .map(|x| *x != 0),
+        min_value: v
+            .min_value
+            .as_ref()
+            .and_then(|x| x.first())
+            .map(|x| *x != 0),
     }))
 }
 
