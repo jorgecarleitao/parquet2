@@ -273,7 +273,6 @@ mod tests {
 
         // read it again:
         let result = read_metadata(&mut Cursor::new(a));
-        println!("{result:?}");
         assert!(result.is_ok());
 
         Ok(())

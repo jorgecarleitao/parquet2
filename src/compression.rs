@@ -286,7 +286,7 @@ fn try_decompress_hadoop(input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> 
     }
 }
 
-//#[cfg(all(feature = "lz4", not(feature = "lz4_flex")))]
+#[cfg(all(feature = "lz4", not(feature = "lz4_flex")))]
 #[inline]
 fn lz4_decompress_to_buffer(
     src: &[u8],
