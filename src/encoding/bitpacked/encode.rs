@@ -2,7 +2,12 @@ use std::convert::TryInto;
 
 use super::{Packed, Unpackable, Unpacked};
 
-/// Encodes `u32` values into a buffer using `num_bits`.
+/// Encodes (packs) a slice of [`Unpackable`] into bitpacked bytes `packed`, using `num_bits` per value.
+///
+/// This function assumes that the maximum value in `unpacked` fits in `num_bits` bits
+/// and saturates higher values.
+///
+/// Only the first `ceil8(unpacked.len() * num_bits)` of `packed` are populated.
 pub fn encode<T: Unpackable>(unpacked: &[T], num_bits: usize, packed: &mut [u8]) {
     let chunks = unpacked.chunks_exact(T::Unpacked::LENGTH);
 
@@ -30,12 +35,19 @@ pub fn encode<T: Unpackable>(unpacked: &[T], num_bits: usize, packed: &mut [u8])
     }
 }
 
+/// Encodes (packs) a potentially incomplete pack of [`Unpackable`] into bitpacked
+/// bytes `packed`, using `num_bits` per value.
+///
+/// This function assumes that the maximum value in `unpacked` fits in `num_bits` bits
+/// and saturates higher values.
+///
+/// Only the first `ceil8(unpacked.len() * num_bits)` of `packed` are populated.
 #[inline]
 pub fn encode_pack<T: Unpackable>(unpacked: &[T], num_bits: usize, packed: &mut [u8]) {
     if unpacked.len() < T::Packed::LENGTH {
-        let mut buf = T::Unpacked::zero();
-        buf.as_mut()[..unpacked.len()].copy_from_slice(unpacked);
-        T::pack(&buf, num_bits, packed)
+        let mut complete_unpacked = T::Unpacked::zero();
+        complete_unpacked.as_mut()[..unpacked.len()].copy_from_slice(unpacked);
+        T::pack(&complete_unpacked, num_bits, packed)
     } else {
         T::pack(&unpacked.try_into().unwrap(), num_bits, packed)
     }
