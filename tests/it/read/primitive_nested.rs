@@ -3,7 +3,7 @@ use std::convert::TryInto;
 use super::{dictionary::PrimitivePageDict, Array};
 
 use parquet2::{
-    encoding::{bitpacking, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
+    encoding::{bitpacked, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
     error::{Error, Result},
     page::{split_buffer, DataPage},
     read::levels::get_bit_width,
@@ -179,7 +179,7 @@ fn read_dict_array<T: NativeType>(
     let (_, consumed) = uleb128::decode(values);
     let values = &values[consumed..];
 
-    let indices = bitpacking::Decoder::new(values, bit_width, length as usize);
+    let indices = bitpacked::Decoder::<u32>::new(values, bit_width as usize, length as usize);
 
     let values = indices.map(|id| dict_values[id as usize]);
 

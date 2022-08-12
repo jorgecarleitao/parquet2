@@ -1,6 +1,6 @@
 use crate::encoding::ceil8;
 
-use super::super::bitpacking;
+use super::super::bitpacked;
 use super::super::uleb128;
 use super::super::zigzag_leb128;
 
@@ -15,7 +15,7 @@ struct Block<'a> {
     remaining: usize,     // number of elements
     current_index: usize, // invariant: < values_per_mini_block
     // None represents a relative delta of zero, in which case there is no miniblock.
-    current_miniblock: Option<bitpacking::Decoder<'a>>,
+    current_miniblock: Option<bitpacked::Decoder<'a, u32>>,
     // number of bytes consumed.
     consumed_bytes: usize,
 }
@@ -57,19 +57,19 @@ impl<'a> Block<'a> {
     }
 
     fn advance_miniblock(&mut self) {
-        let num_bits = self.bitwidths[0];
+        let num_bits = self.bitwidths[0] as usize;
         self.bitwidths = &self.bitwidths[1..];
 
         self.current_miniblock = if num_bits > 0 {
             let length = std::cmp::min(self.remaining, self.values_per_mini_block);
 
-            let miniblock_length = ceil8(self.values_per_mini_block * num_bits as usize);
+            let miniblock_length = ceil8(self.values_per_mini_block * num_bits);
             let (miniblock, remainder) = self.values.split_at(miniblock_length);
 
             self.values = remainder;
             self.consumed_bytes += miniblock_length;
 
-            Some(bitpacking::Decoder::new(miniblock, num_bits, length))
+            Some(bitpacked::Decoder::new(miniblock, num_bits, length))
         } else {
             None
         };

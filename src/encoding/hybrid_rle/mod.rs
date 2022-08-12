@@ -6,7 +6,7 @@ pub use bitmap::{encode_bool as bitpacked_encode, BitmapIter};
 pub use decoder::Decoder;
 pub use encoder::{encode_bool, encode_u32};
 
-use super::bitpacking;
+use super::bitpacked;
 
 /// The two possible states of an RLE-encoded run.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,7 +21,7 @@ pub enum HybridEncoded<'a> {
 #[derive(Debug, Clone)]
 enum State<'a> {
     None,
-    Bitpacked(bitpacking::Decoder<'a>),
+    Bitpacked(bitpacked::Decoder<'a, u32>),
     Rle(std::iter::Take<std::iter::Repeat<u32>>),
 }
 
@@ -42,8 +42,8 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
     match decoder.next() {
         Some(HybridEncoded::Bitpacked(packed)) => {
             let num_bits = decoder.num_bits();
-            let length = std::cmp::min(packed.len() * 8 / num_bits as usize, remaining);
-            let decoder = bitpacking::Decoder::new(packed, num_bits as u8, length);
+            let length = std::cmp::min(packed.len() * 8 / num_bits, remaining);
+            let decoder = bitpacked::Decoder::<u32>::new(packed, num_bits, length);
             State::Bitpacked(decoder)
         }
         Some(HybridEncoded::Rle(pack, additional)) => {
@@ -61,6 +61,7 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
 impl<'a> HybridRleDecoder<'a> {
     /// Returns a new [`HybridRleDecoder`]
     pub fn new(data: &'a [u8], num_bits: u32, num_values: usize) -> Self {
+        let num_bits = num_bits as usize;
         let mut decoder = Decoder::new(data, num_bits);
         let state = read_next(&mut decoder, num_values);
         Self {
@@ -106,13 +107,13 @@ mod tests {
     #[test]
     fn roundtrip() {
         let mut buffer = vec![];
-        let num_bits = 10;
+        let num_bits = 10u32;
 
         let data = (0..1000).collect::<Vec<_>>();
 
         encode_u32(&mut buffer, data.iter().cloned(), num_bits).unwrap();
 
-        let decoder = HybridRleDecoder::new(&buffer, num_bits as u32, data.len());
+        let decoder = HybridRleDecoder::new(&buffer, num_bits, data.len());
 
         let result = decoder.collect::<Vec<_>>();
 
@@ -195,7 +196,7 @@ mod tests {
         ];
         let num_bits = 10;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 1000);
+        let decoder = HybridRleDecoder::new(&data, num_bits, 1000);
 
         let result = decoder.collect::<Vec<_>>();
 
@@ -208,7 +209,7 @@ mod tests {
 
         let num_bits = 3;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 1);
+        let decoder = HybridRleDecoder::new(&data, num_bits, 1);
 
         let result = decoder.collect::<Vec<_>>();
 
@@ -221,7 +222,7 @@ mod tests {
 
         let num_bits = 0;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 2);
+        let decoder = HybridRleDecoder::new(&data, num_bits, 2);
 
         let result = decoder.collect::<Vec<_>>();
 
@@ -234,7 +235,7 @@ mod tests {
 
         let num_bits = 1;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits as u32, 100);
+        let decoder = HybridRleDecoder::new(&data, num_bits, 100);
 
         let result = decoder.collect::<Vec<_>>();
 

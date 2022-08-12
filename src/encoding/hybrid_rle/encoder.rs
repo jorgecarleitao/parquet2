@@ -1,4 +1,4 @@
-use crate::encoding::bitpacking;
+use crate::encoding::bitpacked;
 use crate::encoding::{ceil8, uleb128};
 
 use std::io::Write;
@@ -9,8 +9,9 @@ use super::bitpacked_encode;
 pub fn encode_u32<W: Write, I: Iterator<Item = u32>>(
     writer: &mut W,
     iterator: I,
-    num_bits: u8,
+    num_bits: u32,
 ) -> std::io::Result<()> {
+    let num_bits = num_bits as u8;
     // the length of the iterator.
     let length = iterator.size_hint().1.unwrap();
 
@@ -27,6 +28,8 @@ pub fn encode_u32<W: Write, I: Iterator<Item = u32>>(
     Ok(())
 }
 
+const U32_BLOCK_LEN: usize = 32;
+
 fn bitpacked_encode_u32<W: Write, I: Iterator<Item = u32>>(
     writer: &mut W,
     mut iterator: I,
@@ -35,21 +38,21 @@ fn bitpacked_encode_u32<W: Write, I: Iterator<Item = u32>>(
     // the length of the iterator.
     let length = iterator.size_hint().1.unwrap();
 
-    let chunks = length / bitpacking::BLOCK_LEN;
-    let remainder = length - chunks * bitpacking::BLOCK_LEN;
-    let mut buffer = [0u32; bitpacking::BLOCK_LEN];
+    let chunks = length / U32_BLOCK_LEN;
+    let remainder = length - chunks * U32_BLOCK_LEN;
+    let mut buffer = [0u32; U32_BLOCK_LEN];
 
-    let compressed_chunk_size = ceil8(bitpacking::BLOCK_LEN * num_bits as usize);
+    let compressed_chunk_size = ceil8(U32_BLOCK_LEN * num_bits as usize);
     // this is the upper bound: we do not know `num_bits` at compile time and thus can't allocate (on the stack)
     // the exact length.
-    let mut compressed_chunk = [0u8; 4 * bitpacking::BLOCK_LEN];
+    let mut compressed_chunk = [0u8; 4 * U32_BLOCK_LEN];
 
     for _ in 0..chunks {
-        (0..bitpacking::BLOCK_LEN).for_each(|i| {
+        (0..U32_BLOCK_LEN).for_each(|i| {
             // infalible by construction
             buffer[i] = iterator.next().unwrap()
         });
-        bitpacking::encode_pack(buffer, num_bits, compressed_chunk.as_mut());
+        bitpacked::encode_pack(buffer, num_bits, compressed_chunk.as_mut());
         writer.write_all(&compressed_chunk[..compressed_chunk_size])?;
     }
 
@@ -58,7 +61,7 @@ fn bitpacked_encode_u32<W: Write, I: Iterator<Item = u32>>(
             buffer[i] = x;
         });
         let compressed_remainder_size = ceil8(remainder * num_bits as usize);
-        bitpacking::encode_pack(buffer, num_bits, compressed_chunk.as_mut());
+        bitpacked::encode_pack(buffer, num_bits, compressed_chunk.as_mut());
         writer.write_all(&compressed_chunk[..compressed_remainder_size])?;
     };
     Ok(())
