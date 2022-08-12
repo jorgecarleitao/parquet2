@@ -6,6 +6,7 @@ mod unpack;
 pub use decode::Decoder;
 pub use encode::{encode, encode_pack};
 
+/// A byte slice (e.g. `[u8; 8]`) denoting types that represent complete packs.
 pub trait Packed:
     Copy
     + Sized
@@ -50,6 +51,7 @@ impl Packed for [u8; 64 * 64] {
     }
 }
 
+/// A byte slice of [`Unpackable`] denoting complete unpacked arrays.
 pub trait Unpacked<T>:
     Copy
     + Sized
@@ -95,6 +97,7 @@ impl Unpacked<u64> for [u64; 64] {
     }
 }
 
+/// A type representing a type that can be bitpacked and unpacked by this crate.
 pub trait Unpackable: Copy + Sized + Default {
     type Packed: Packed;
     type Unpacked: Unpacked<Self>;
@@ -166,27 +169,7 @@ impl Unpackable for u64 {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_decode_rle() {
-        // Test data: 0-7 with bit width 3
-        // 0: 000
-        // 1: 001
-        // 2: 010
-        // 3: 011
-        // 4: 100
-        // 5: 101
-        // 6: 110
-        // 7: 111
-        let num_bits = 3;
-        let length = 8;
-        // encoded: 0b10001000u8, 0b11000110, 0b11111010
-        let data = vec![0b10001000u8, 0b11000110, 0b11111010];
-
-        let decoded = Decoder::<u32>::new(&data, num_bits, length).collect::<Vec<_>>();
-        assert_eq!(decoded, vec![0, 1, 2, 3, 4, 5, 6, 7]);
-    }
-
-    fn case1() -> (usize, Vec<u32>, Vec<u8>) {
+    pub fn case1() -> (usize, Vec<u32>, Vec<u8>) {
         let num_bits = 3;
         let compressed = vec![
             0b10001000u8,
@@ -213,14 +196,6 @@ mod tests {
     }
 
     #[test]
-    fn decode_large() {
-        let (num_bits, expected, data) = case1();
-
-        let decoded = Decoder::<u32>::new(&data, num_bits, expected.len()).collect::<Vec<_>>();
-        assert_eq!(decoded, expected);
-    }
-
-    #[test]
     fn encode_large() {
         let (num_bits, unpacked, expected) = case1();
         let mut packed = vec![0u8; 4 * 32];
@@ -241,61 +216,5 @@ mod tests {
         let expected = vec![0b10001000u8, 0b11000110, 0b11111010];
 
         assert_eq!(&packed[..3], expected);
-    }
-
-    #[test]
-    fn test_decode_bool() {
-        let num_bits = 1;
-        let length = 8;
-        let data = vec![0b10101010];
-
-        let decoded = Decoder::<u32>::new(&data, num_bits, length).collect::<Vec<_>>();
-        assert_eq!(decoded, vec![0, 1, 0, 1, 0, 1, 0, 1]);
-    }
-
-    #[test]
-    fn even_case() {
-        // [0, 1, 2, 3, 4, 5, 6, 0]x99
-        let data = &[0b10001000u8, 0b11000110, 0b00011010];
-        let num_bits = 3;
-        let copies = 99; // 8 * 99 % 32 != 0
-        let expected = std::iter::repeat(&[0u32, 1, 2, 3, 4, 5, 6, 0])
-            .take(copies)
-            .flatten()
-            .copied()
-            .collect::<Vec<_>>();
-        let data = std::iter::repeat(data)
-            .take(copies)
-            .flatten()
-            .copied()
-            .collect::<Vec<_>>();
-        let length = expected.len();
-
-        let decoded = Decoder::<u32>::new(&data, num_bits, length).collect::<Vec<_>>();
-        assert_eq!(decoded, expected);
-    }
-
-    #[test]
-    fn odd_case() {
-        // [0, 1, 2, 3, 4, 5, 6, 0]x4 + [2]
-        let data = &[0b10001000u8, 0b11000110, 0b00011010];
-        let num_bits = 3;
-        let copies = 4;
-        let expected = std::iter::repeat(&[0u32, 1, 2, 3, 4, 5, 6, 0])
-            .take(copies)
-            .flatten()
-            .copied()
-            .chain(std::iter::once(2))
-            .collect::<Vec<_>>();
-        let data = std::iter::repeat(data)
-            .take(copies)
-            .flatten()
-            .copied()
-            .chain(std::iter::once(0b00000010u8))
-            .collect::<Vec<_>>();
-        let length = expected.len();
-
-        let decoded = Decoder::<u32>::new(&data, num_bits, length).collect::<Vec<_>>();
-        assert_eq!(decoded, expected);
     }
 }
