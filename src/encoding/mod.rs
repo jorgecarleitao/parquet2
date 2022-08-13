@@ -20,7 +20,7 @@ pub fn get_length(values: &[u8]) -> Option<usize> {
         .map(|x| u32::from_le_bytes(x.try_into().unwrap()) as usize)
 }
 
-/// Returns the ceil of value/divisor
+/// Returns the ceil of value / 8
 #[inline]
 pub fn ceil8(value: usize) -> usize {
     value / 8 + ((value % 8 != 0) as usize)
