@@ -57,7 +57,7 @@ impl RowGroupMetaData {
         rg: RowGroup,
     ) -> Result<RowGroupMetaData> {
         if schema_descr.columns().len() != rg.columns.len() {
-            return Err(Error::OutOfSpec(format!("The number of columns in the row group ({}) must be equal to the number of columns in the schema ({})", rg.columns.len(), schema_descr.columns().len())));
+            return Err(Error::oos(format!("The number of columns in the row group ({}) must be equal to the number of columns in the schema ({})", rg.columns.len(), schema_descr.columns().len())));
         }
         let total_byte_size = rg.total_byte_size.try_into()?;
         let num_rows = rg.num_rows.try_into()?;

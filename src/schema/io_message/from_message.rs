@@ -100,7 +100,7 @@ fn converted_group_from_str(s: &str) -> Result<GroupConvertedType> {
         "MAP" => GroupConvertedType::Map,
         "MAP_KEY_VALUE" => GroupConvertedType::MapKeyValue,
         "LIST" => GroupConvertedType::List,
-        other => return Err(general_err!("Invalid converted type {}", other)),
+        other => return Err(Error::oos(format!("Invalid converted type {}", other))),
     })
 }
 
@@ -135,7 +135,7 @@ fn repetition_from_str(s: &str) -> Result<Repetition> {
         "REQUIRED" => Repetition::Required,
         "OPTIONAL" => Repetition::Optional,
         "REPEATED" => Repetition::Repeated,
-        other => return Err(general_err!("Invalid repetition {}", other)),
+        other => return Err(Error::oos(format!("Invalid repetition {}", other))),
     })
 }
 
@@ -149,7 +149,7 @@ fn type_from_str(s: &str) -> Result<Type> {
         "DOUBLE" => Ok(Type::DOUBLE),
         "BYTE_ARRAY" | "BINARY" => Ok(Type::BYTE_ARRAY),
         "FIXED_LEN_BYTE_ARRAY" => Ok(Type::FIXED_LEN_BYTE_ARRAY),
-        other => Err(general_err!("Invalid type {}", other)),
+        other => Err(Error::oos(format!("Invalid type {}", other))),
     }
 }
 
@@ -242,34 +242,33 @@ struct Parser<'a> {
 fn assert_token(token: Option<&str>, expected: &str) -> Result<()> {
     match token {
         Some(value) if value == expected => Ok(()),
-        Some(other) => Err(general_err!(
+        Some(other) => Err(Error::oos(format!(
             "Expected '{}', found token '{}'",
-            expected,
-            other
-        )),
-        None => Err(general_err!(
+            expected, other
+        ))),
+        None => Err(Error::oos(format!(
             "Expected '{}', but no token found (None)",
             expected
-        )),
+        ))),
     }
 }
 
 // Utility function to parse i32 or return general error.
 fn parse_i32(value: Option<&str>, not_found_msg: &str, parse_fail_msg: &str) -> Result<i32> {
     value
-        .ok_or_else(|| general_err!(not_found_msg))
-        .and_then(|v| v.parse::<i32>().map_err(|_| general_err!(parse_fail_msg)))
+        .ok_or_else(|| Error::oos(not_found_msg))
+        .and_then(|v| v.parse::<i32>().map_err(|_| Error::oos(parse_fail_msg)))
 }
 
 // Utility function to parse boolean or return general error.
 #[inline]
 fn parse_bool(value: Option<&str>, not_found_msg: &str, parse_fail_msg: &str) -> Result<bool> {
     value
-        .ok_or_else(|| general_err!(not_found_msg))
+        .ok_or_else(|| Error::oos(not_found_msg))
         .and_then(|v| {
             v.to_lowercase()
                 .parse::<bool>()
-                .map_err(|_| general_err!(parse_fail_msg))
+                .map_err(|_| Error::oos(parse_fail_msg))
         })
 }
 
@@ -280,12 +279,12 @@ fn parse_timeunit(
     parse_fail_msg: &str,
 ) -> Result<TimeUnit> {
     value
-        .ok_or_else(|| general_err!(not_found_msg))
+        .ok_or_else(|| Error::oos(not_found_msg))
         .and_then(|v| match v.to_uppercase().as_str() {
             "MILLIS" => Ok(TimeUnit::Milliseconds),
             "MICROS" => Ok(TimeUnit::Microseconds),
             "NANOS" => Ok(TimeUnit::Nanoseconds),
-            _ => Err(general_err!(parse_fail_msg)),
+            _ => Err(Error::oos(parse_fail_msg)),
         })
 }
 
@@ -298,11 +297,11 @@ impl<'a> Parser<'a> {
                 let name = self
                     .tokenizer
                     .next()
-                    .ok_or_else(|| general_err!("Expected name, found None"))?;
+                    .ok_or_else(|| Error::oos("Expected name, found None"))?;
                 let fields = self.parse_child_types()?;
                 Ok(ParquetType::new_root(name.to_string(), fields))
             }
-            _ => Err(general_err!("Message type does not start with 'message'")),
+            _ => Err(Error::oos("Message type does not start with 'message'")),
         }
     }
 
@@ -327,7 +326,7 @@ impl<'a> Parser<'a> {
         let repetition = self
             .tokenizer
             .next()
-            .ok_or_else(|| general_err!("Expected repetition, found None"))
+            .ok_or_else(|| Error::oos("Expected repetition, found None"))
             .and_then(|v| repetition_from_str(&v.to_uppercase()))?;
 
         match self.tokenizer.next() {
@@ -336,7 +335,7 @@ impl<'a> Parser<'a> {
                 let physical_type = type_from_str(&type_string.to_uppercase())?;
                 self.add_primitive_type(repetition, physical_type)
             }
-            None => Err(general_err!("Invalid type, could not extract next token")),
+            None => Err(Error::oos("Invalid type, could not extract next token")),
         }
     }
 
@@ -345,14 +344,14 @@ impl<'a> Parser<'a> {
         let name = self
             .tokenizer
             .next()
-            .ok_or_else(|| general_err!("Expected name, found None"))?;
+            .ok_or_else(|| Error::oos("Expected name, found None"))?;
 
         // Parse converted type if exists
         let converted_type = if let Some("(") = self.tokenizer.next() {
             let converted_type = self
                 .tokenizer
                 .next()
-                .ok_or_else(|| general_err!("Expected converted type, found None"))
+                .ok_or_else(|| Error::oos("Expected converted type, found None"))
                 .and_then(|v| converted_group_from_str(&v.to_uppercase()))?;
             assert_token(self.tokenizer.next(), ")")?;
             Some(converted_type)
@@ -403,14 +402,14 @@ impl<'a> Parser<'a> {
         let name = self
             .tokenizer
             .next()
-            .ok_or_else(|| general_err!("Expected name, found None"))?;
+            .ok_or_else(|| Error::oos("Expected name, found None"))?;
 
         // Parse logical types
         let (converted_type, logical_type) = if let Some("(") = self.tokenizer.next() {
             let (is_logical_type, converted_type, token) = self
                 .tokenizer
                 .next()
-                .ok_or_else(|| general_err!("Expected converted or logical type, found None"))
+                .ok_or_else(|| Error::oos("Expected converted or logical type, found None"))
                 .and_then(|v| {
                     let string = v.to_uppercase();
                     Ok(if is_logical_type(&string) {
@@ -418,10 +417,10 @@ impl<'a> Parser<'a> {
                     } else if is_converted_type(&string) {
                         (false, converted_primitive_from_str(&string), string)
                     } else {
-                        return Err(general_err!(
+                        return Err(Error::oos(format!(
                             "Expected converted or logical type, found {}",
                             string
-                        ));
+                        )));
                     })
                 })?;
 
@@ -596,14 +595,14 @@ impl<'a> Parser<'a> {
                     } else {
                         // Invalid token for unit
                         self.tokenizer.backtrack();
-                        return Err(general_err!("INTEGER requires sign"));
+                        return Err(Error::oos("INTEGER requires sign"));
                     };
                     assert_token(self.tokenizer.next(), ")")?;
                     (bit_width, is_signed)
                 } else {
                     // Invalid token for unit
                     self.tokenizer.backtrack();
-                    return Err(general_err!("INTEGER requires width and sign"));
+                    return Err(Error::oos("INTEGER requires width and sign"));
                 };
                 PrimitiveLogicalType::Integer((bit_width, is_signed).into())
             }
@@ -612,7 +611,7 @@ impl<'a> Parser<'a> {
             "BSON" => PrimitiveLogicalType::Bson,
             "UUID" => PrimitiveLogicalType::Uuid,
             "UNKNOWN" => PrimitiveLogicalType::Unknown,
-            "INTERVAL" => return Err(general_err!("Interval logical type not yet supported")),
+            "INTERVAL" => return Err(Error::oos("Interval logical type not yet supported")),
             _ => unreachable!(),
         })
     }
@@ -728,7 +727,7 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(
             result.unwrap_err().to_string(),
-            "Message type does not start with 'message'"
+            "File out of specification: Message type does not start with 'message'"
         );
     }
 
@@ -740,7 +739,10 @@ mod tests {
         }
         .parse_message_type();
         assert!(result.is_err());
-        assert_eq!(result.unwrap_err().to_string(), "Expected name, found None");
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "File out of specification: Expected name, found None"
+        );
     }
 
     #[test]

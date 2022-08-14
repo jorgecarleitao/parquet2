@@ -106,7 +106,9 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
             self.state = State::Started;
             Ok(())
         } else {
-            Err(Error::General("Start cannot be called twice".to_string()))
+            Err(Error::InvalidParameter(
+                "Start cannot be called twice".to_string(),
+            ))
         }
     }
 
@@ -143,7 +145,9 @@ impl<W: AsyncWrite + Unpin + Send> FileStreamer<W> {
         }
 
         if self.state != State::Started {
-            return Err(Error::General("End cannot be called twice".to_string()));
+            return Err(Error::InvalidParameter(
+                "End cannot be called twice".to_string(),
+            ));
         }
         // compute file stats
         let num_rows = self.row_groups.iter().map(|group| group.num_rows).sum();

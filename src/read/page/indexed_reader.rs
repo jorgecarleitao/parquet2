@@ -85,8 +85,8 @@ fn read_dict_page<R: Read + Seek>(
     if let CompressedPage::Dict(page) = page {
         Ok(page)
     } else {
-        Err(Error::OutOfSpec(
-            "The first page is not a dictionary page but it should".to_string(),
+        Err(Error::oos(
+            "The first page is not a dictionary page but it should",
         ))
     }
 }

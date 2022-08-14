@@ -66,9 +66,7 @@ fn compute_num_rows(columns: &[(ColumnChunk, Vec<PageWriteSpec>)]) -> Result<i64
                 .filter(|x| is_data_page(x))
                 .try_for_each(|spec| {
                     num_rows += spec.num_rows.ok_or_else(|| {
-                        Error::OutOfSpec(
-                            "All data pages must declare the number of rows on it".to_string(),
-                        )
+                        Error::oos("All data pages must declare the number of rows on it")
                     })? as i64;
                     Result::Ok(())
                 })?;

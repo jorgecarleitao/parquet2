@@ -23,14 +23,14 @@ pub(crate) fn is_data_page(page: &PageWriteSpec) -> bool {
 
 fn maybe_bytes(uncompressed: usize, compressed: usize) -> Result<(i32, i32)> {
     let uncompressed_page_size: i32 = uncompressed.try_into().map_err(|_| {
-        Error::OutOfSpec(format!(
+        Error::oos(format!(
             "A page can only contain i32::MAX uncompressed bytes. This one contains {}",
             uncompressed
         ))
     })?;
 
     let compressed_page_size: i32 = compressed.try_into().map_err(|_| {
-        Error::OutOfSpec(format!(
+        Error::oos(format!(
             "A page can only contain i32::MAX compressed bytes. This one contains {}",
             compressed
         ))
@@ -175,7 +175,7 @@ fn assemble_dict_page_header(page: &CompressedDictPage) -> Result<ParquetPageHea
         maybe_bytes(page.uncompressed_page_size, page.buffer.len())?;
 
     let num_values: i32 = page.num_values.try_into().map_err(|_| {
-        Error::OutOfSpec(format!(
+        Error::oos(format!(
             "A dictionary page can only contain i32::MAX items. This one contains {}",
             page.num_values
         ))

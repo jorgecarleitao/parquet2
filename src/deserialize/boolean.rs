@@ -33,7 +33,7 @@ impl<'a> BooleanPageState<'a> {
                 let (_, _, values) = split_buffer(page)?;
                 Ok(Self::Required(values, page.num_values()))
             }
-            _ => Err(Error::General(format!(
+            _ => Err(Error::InvalidParameter(format!(
                 "Viewing page for encoding {:?} for boolean type not supported",
                 page.encoding(),
             ))),

@@ -15,8 +15,8 @@ pub type Casted<'a, T> = std::iter::Map<std::slice::ChunksExact<'a, u8>, fn(&'a 
 pub fn native_cast<T: NativeType>(page: &DataPage) -> Result<Casted<T>, Error> {
     let (_, _, values) = split_buffer(page)?;
     if values.len() % std::mem::size_of::<T>() != 0 {
-        return Err(Error::OutOfSpec(
-            "A primitive page data's len must be a multiple of the type".to_string(),
+        return Err(Error::oos(
+            "A primitive page data's len must be a multiple of the type",
         ));
     }
 
@@ -90,8 +90,8 @@ impl<'a, T: NativeType, P> NativePageState<'a, T, P> {
                 Ok(Self::Optional(validity, values))
             }
             (Encoding::Plain, _, false) => native_cast(page).map(Self::Required),
-            _ => Err(Error::General(format!(
-                "Viewing page for encoding {:?} for native type {} not supported",
+            _ => Err(Error::FeatureNotSupported(format!(
+                "Viewing page for encoding {:?} for native type {}",
                 page.encoding(),
                 std::any::type_name::<T>()
             ))),

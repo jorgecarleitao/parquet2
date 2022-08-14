@@ -74,9 +74,7 @@ impl SchemaDescriptor {
             ParquetType::GroupType {
                 field_info, fields, ..
             } => Ok(Self::new(field_info.name, fields)),
-            _ => Err(Error::OutOfSpec(
-                "The parquet schema MUST be a group type".to_string(),
-            )),
+            _ => Err(Error::oos("The parquet schema MUST be a group type")),
         }
     }
 

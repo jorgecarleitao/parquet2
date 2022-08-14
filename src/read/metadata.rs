@@ -36,8 +36,8 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     // check file is large enough to hold footer
     let file_size = stream_len(reader)?;
     if file_size < HEADER_SIZE + FOOTER_SIZE {
-        return Err(Error::OutOfSpec(
-            "A parquet file must containt a header and footer with at least 12 bytes".to_string(),
+        return Err(Error::oos(
+            "A parquet file must containt a header and footer with at least 12 bytes",
         ));
     }
 
@@ -53,7 +53,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
     // check this is indeed a parquet file
     if buffer[default_end_len - 4..] != PARQUET_MAGIC {
-        return Err(Error::OutOfSpec("The file must end with PAR1".to_string()));
+        return Err(Error::oos("The file must end with PAR1"));
     }
 
     let metadata_len = metadata_len(&buffer, default_end_len);
@@ -62,8 +62,8 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
     let footer_len = FOOTER_SIZE + metadata_len;
     if footer_len > file_size {
-        return Err(Error::OutOfSpec(
-            "The footer size must be smaller or equal to the file's size".to_string(),
+        return Err(Error::oos(
+            "The footer size must be smaller or equal to the file's size",
         ));
     }
 

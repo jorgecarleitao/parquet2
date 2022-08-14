@@ -22,9 +22,9 @@ pub fn serialize_column_index(pages: &[PageWriteSpec]) -> Result<ColumnIndex> {
             if let Some(stats) = &spec.statistics {
                 let stats = serialize_statistics(stats.as_ref());
 
-                let null_count = stats.null_count.ok_or_else(|| {
-                    Error::OutOfSpec("null count of a page is required".to_string())
-                })?;
+                let null_count = stats
+                    .null_count
+                    .ok_or_else(|| Error::oos("null count of a page is required"))?;
 
                 null_counts.push(null_count);
                 if null_count as usize == spec.num_values {
@@ -32,19 +32,23 @@ pub fn serialize_column_index(pages: &[PageWriteSpec]) -> Result<ColumnIndex> {
                     max_values.push(vec![0]);
                     null_pages.push(true)
                 } else {
-                    min_values.push(stats.min_value.ok_or_else(|| {
-                        Error::OutOfSpec("min value of a page is required".to_string())
-                    })?);
-                    max_values.push(stats.max_value.ok_or_else(|| {
-                        Error::OutOfSpec("max value of a page is required".to_string())
-                    })?);
+                    min_values.push(
+                        stats
+                            .min_value
+                            .ok_or_else(|| Error::oos("min value of a page is required"))?,
+                    );
+                    max_values.push(
+                        stats
+                            .max_value
+                            .ok_or_else(|| Error::oos("max value of a page is required"))?,
+                    );
                     null_pages.push(false)
                 };
 
                 Result::Ok(())
             } else {
-                Err(Error::OutOfSpec(
-                    "options were set to write statistics but some pages miss them".to_string(),
+                Err(Error::oos(
+                    "options were set to write statistics but some pages miss them",
                 ))
             }
         })?;
@@ -69,9 +73,8 @@ pub fn serialize_offset_index(pages: &[PageWriteSpec]) -> Result<OffsetIndex> {
                 first_row_index,
             };
             let num_rows = spec.num_rows.ok_or_else(|| {
-                Error::OutOfSpec(
-                    "options were set to write statistics but some data pages miss number of rows"
-                        .to_string(),
+                Error::oos(
+                    "options were set to write statistics but some data pages miss number of rows",
                 )
             })?;
             first_row_index += num_rows as i64;

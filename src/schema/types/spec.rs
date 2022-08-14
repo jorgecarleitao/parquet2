@@ -9,35 +9,34 @@ fn check_decimal_invariants(
     scale: usize,
 ) -> Result<()> {
     if precision < 1 {
-        return Err(general_err!(
+        return Err(Error::oos(format!(
             "DECIMAL precision must be larger than 0; It is {}",
-            precision
-        ));
+            precision,
+        )));
     }
     if scale >= precision {
-        return Err(general_err!(
+        return Err(Error::oos(format!(
             "Invalid DECIMAL: scale ({}) cannot be greater than or equal to precision \
             ({})",
-            scale,
-            precision
-        ));
+            scale, precision
+        )));
     }
 
     match physical_type {
         PhysicalType::Int32 => {
             if !(1..=9).contains(&precision) {
-                return Err(general_err!(
+                return Err(Error::oos(format!(
                     "Cannot represent INT32 as DECIMAL with precision {}",
                     precision
-                ));
+                )));
             }
         }
         PhysicalType::Int64 => {
             if !(1..=18).contains(&precision) {
-                return Err(general_err!(
+                return Err(Error::oos(format!(
                     "Cannot represent INT64 as DECIMAL with precision {}",
                     precision
-                ));
+                )));
             }
         }
         PhysicalType::FixedLenByteArray(length) => {
@@ -45,19 +44,18 @@ fn check_decimal_invariants(
                 (2f64.powi(8 * (*length as i32) - 1) - 1f64).log10().floor() as usize;
 
             if precision > max_precision {
-                return Err(general_err!(
+                return Err(Error::oos(format!(
                     "Cannot represent FIXED_LEN_BYTE_ARRAY as DECIMAL with length {} and \
                     precision {}. The max precision can only be {}",
-                    length,
-                    precision,
-                    max_precision
-                ));
+                    length, precision, max_precision
+                )));
             }
         }
         PhysicalType::ByteArray => {}
         _ => {
-            return Err(general_err!(
+            return Err(Error::oos(
                 "DECIMAL can only annotate INT32, INT64, BYTE_ARRAY and FIXED_LEN_BYTE_ARRAY"
+                    .to_string(),
             ))
         }
     };
@@ -77,10 +75,10 @@ pub fn check_converted_invariants(
     match converted_type {
         Utf8 | Bson | Json => {
             if physical_type != &PhysicalType::ByteArray {
-                return Err(general_err!(
+                return Err(Error::oos(format!(
                     "{:?} can only annotate BYTE_ARRAY fields",
                     converted_type
-                ));
+                )));
             }
         }
         Decimal(precision, scale) => {
@@ -88,24 +86,32 @@ pub fn check_converted_invariants(
         }
         Date | TimeMillis | Uint8 | Uint16 | Uint32 | Int8 | Int16 | Int32 => {
             if physical_type != &PhysicalType::Int32 {
-                return Err(general_err!("{:?} can only annotate INT32", converted_type));
+                return Err(Error::oos(format!(
+                    "{:?} can only annotate INT32",
+                    converted_type
+                )));
             }
         }
         TimeMicros | TimestampMillis | TimestampMicros | Uint64 | Int64 => {
             if physical_type != &PhysicalType::Int64 {
-                return Err(general_err!("{:?} can only annotate INT64", converted_type));
+                return Err(Error::oos(format!(
+                    "{:?} can only annotate INT64",
+                    converted_type
+                )));
             }
         }
         Interval => {
             if physical_type != &PhysicalType::FixedLenByteArray(12) {
-                return Err(general_err!(
-                    "INTERVAL can only annotate FIXED_LEN_BYTE_ARRAY(12)"
+                return Err(Error::oos(
+                    "INTERVAL can only annotate FIXED_LEN_BYTE_ARRAY(12)".to_string(),
                 ));
             }
         }
         Enum => {
             if physical_type != &PhysicalType::ByteArray {
-                return Err(general_err!("ENUM can only annotate BYTE_ARRAY fields"));
+                return Err(Error::oos(
+                    "ENUM can only annotate BYTE_ARRAY fields".to_string(),
+                ));
             }
         }
     };
@@ -138,7 +144,9 @@ pub fn check_logical_invariants(
         ) => {}
         (Time { unit, .. }, PhysicalType::Int64) => {
             if unit == TimeUnit::Milliseconds {
-                return Err(general_err!("Cannot use millisecond unit on INT64 type"));
+                return Err(Error::oos(
+                    "Cannot use millisecond unit on INT64 type".to_string(),
+                ));
             }
         }
         (Timestamp { .. }, PhysicalType::Int64) => {}
@@ -155,7 +163,12 @@ pub fn check_logical_invariants(
         (String | Json | Bson, PhysicalType::ByteArray) => {}
         // https://github.com/apache/parquet-format/blob/master/LogicalTypes.md#uuid
         (Uuid, PhysicalType::FixedLenByteArray(16)) => {}
-        (a, b) => return Err(general_err!("Cannot annotate {:?} from {:?} fields", a, b)),
+        (a, b) => {
+            return Err(Error::oos(format!(
+                "Cannot annotate {:?} from {:?} fields",
+                a, b
+            )))
+        }
     };
     Ok(())
 }

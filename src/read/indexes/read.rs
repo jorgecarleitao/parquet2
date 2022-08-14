@@ -37,7 +37,7 @@ fn prepare_read<F: Fn(&ColumnChunk) -> Option<i64>, G: Fn(&ColumnChunk) -> Optio
         .map(|x| get_length(x.column_chunk()))
         .map(|maybe_length| {
             let index_length = maybe_length.ok_or_else(|| {
-                Error::OutOfSpec("The column length must exist if column offset exists".to_string())
+                Error::oos("The column length must exist if column offset exists")
             })?;
 
             Ok(index_length.try_into()?)

@@ -113,7 +113,7 @@ impl TryFrom<(ConvertedType, Option<(i32, i32)>)> for PrimitiveConvertedType {
                 if let Some((precision, scale)) = maybe_decimal {
                     Decimal(precision.try_into()?, scale.try_into()?)
                 } else {
-                    return Err(general_err!("Decimal requires a precision and scale"));
+                    return Err(Error::oos("Decimal requires a precision and scale"));
                 }
             }
             ConvertedType::DATE => Date,
@@ -133,10 +133,10 @@ impl TryFrom<(ConvertedType, Option<(i32, i32)>)> for PrimitiveConvertedType {
             ConvertedType::BSON => Bson,
             ConvertedType::INTERVAL => Interval,
             _ => {
-                return Err(general_err!(
+                return Err(Error::oos(format!(
                     "Converted type \"{:?}\" cannot be applied to a primitive type",
                     ty
-                ))
+                )))
             }
         })
     }
@@ -150,11 +150,7 @@ impl TryFrom<ConvertedType> for GroupConvertedType {
             ConvertedType::LIST => GroupConvertedType::List,
             ConvertedType::MAP => GroupConvertedType::Map,
             ConvertedType::MAP_KEY_VALUE => GroupConvertedType::MapKeyValue,
-            _ => {
-                return Err(Error::OutOfSpec(
-                    "LogicalType value out of range".to_string(),
-                ))
-            }
+            _ => return Err(Error::oos("LogicalType value out of range")),
         })
     }
 }

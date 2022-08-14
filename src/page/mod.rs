@@ -358,22 +358,17 @@ pub fn split_buffer_v1(
 ) -> Result<(&[u8], &[u8], &[u8])> {
     let (rep, buffer) = if has_rep {
         let level_buffer_length = get_length(buffer).ok_or_else(|| {
-            Error::OutOfSpec(
-                "The number of bytes declared in v1 rep levels is higher than the page size"
-                    .to_string(),
-            )
+            Error::oos("The number of bytes declared in v1 rep levels is higher than the page size")
         })?;
         (
             buffer.get(4..4 + level_buffer_length).ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The number of bytes declared in v1 rep levels is higher than the page size"
-                        .to_string(),
+                Error::oos(
+                    "The number of bytes declared in v1 rep levels is higher than the page size",
                 )
             })?,
             buffer.get(4 + level_buffer_length..).ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The number of bytes declared in v1 rep levels is higher than the page size"
-                        .to_string(),
+                Error::oos(
+                    "The number of bytes declared in v1 rep levels is higher than the page size",
                 )
             })?,
         )
@@ -383,22 +378,17 @@ pub fn split_buffer_v1(
 
     let (def, buffer) = if has_def {
         let level_buffer_length = get_length(buffer).ok_or_else(|| {
-            Error::OutOfSpec(
-                "The number of bytes declared in v1 rep levels is higher than the page size"
-                    .to_string(),
-            )
+            Error::oos("The number of bytes declared in v1 rep levels is higher than the page size")
         })?;
         (
             buffer.get(4..4 + level_buffer_length).ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The number of bytes declared in v1 def levels is higher than the page size"
-                        .to_string(),
+                Error::oos(
+                    "The number of bytes declared in v1 def levels is higher than the page size",
                 )
             })?,
             buffer.get(4 + level_buffer_length..).ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The number of bytes declared in v1 def levels is higher than the page size"
-                        .to_string(),
+                Error::oos(
+                    "The number of bytes declared in v1 def levels is higher than the page size",
                 )
             })?,
         )

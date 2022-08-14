@@ -29,8 +29,8 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
     let file_size = stream_len(reader).await?;
 
     if file_size < HEADER_SIZE + FOOTER_SIZE {
-        return Err(general_err!(
-            "Invalid Parquet file. Size is smaller than header + footer"
+        return Err(Error::oos(
+            "A parquet file must containt a header and footer with at least 12 bytes",
         ));
     }
 
@@ -49,9 +49,7 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
 
     // check this is indeed a parquet file
     if buffer[default_end_len - 4..] != PARQUET_MAGIC {
-        return Err(Error::OutOfSpec(
-            "Invalid Parquet file. Corrupt footer".to_string(),
-        ));
+        return Err(Error::oos("Invalid Parquet file. Corrupt footer"));
     }
 
     let metadata_len = metadata_len(&buffer, default_end_len);
@@ -59,8 +57,8 @@ pub async fn read_metadata<R: AsyncRead + AsyncSeek + Send + std::marker::Unpin>
 
     let footer_len = FOOTER_SIZE + metadata_len;
     if footer_len > file_size {
-        return Err(Error::OutOfSpec(
-            "The footer size must be smaller or equal to the file's size".to_string(),
+        return Err(Error::oos(
+            "The footer size must be smaller or equal to the file's size",
         ));
     }
 

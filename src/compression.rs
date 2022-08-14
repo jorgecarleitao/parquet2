@@ -119,13 +119,13 @@ pub fn compress(
             crate::error::Feature::Zstd,
             "compress to zstd".to_string(),
         )),
-        CompressionOptions::Uncompressed => {
-            Err(general_err!("Compressing without compression is not valid"))
-        }
-        _ => Err(general_err!(
-            "Compression {:?} is not supported",
-            compression
+        CompressionOptions::Uncompressed => Err(Error::InvalidParameter(
+            "Compressing uncompressed".to_string(),
         )),
+        _ => Err(Error::FeatureNotSupported(format!(
+            "Compression {:?} is not supported",
+            compression,
+        ))),
     }
 }
 
@@ -212,13 +212,13 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             crate::error::Feature::Zstd,
             "decompress with zstd".to_string(),
         )),
-        Compression::Uncompressed => {
-            Err(general_err!("Compressing without compression is not valid"))
-        }
-        _ => Err(general_err!(
-            "Compression {:?} is not yet supported",
-            compression
+        Compression::Uncompressed => Err(Error::InvalidParameter(
+            "Compressing uncompressed".to_string(),
         )),
+        _ => Err(Error::FeatureNotSupported(format!(
+            "Compression {:?} is not supported",
+            compression,
+        ))),
     }
 }
 
@@ -254,13 +254,11 @@ fn try_decompress_hadoop(input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> 
         input_len -= PREFIX_LEN;
 
         if input_len < expected_compressed_size as usize {
-            return Err(general_err!("Not enough bytes for Hadoop frame".to_owned()));
+            return Err(Error::oos("Not enough bytes for Hadoop frame"));
         }
 
         if output_len < expected_decompressed_size as usize {
-            return Err(general_err!(
-                "Not enough bytes to hold advertised output".to_owned()
-            ));
+            return Err(Error::oos("Not enough bytes to hold advertised output"));
         }
         let decompressed_size = lz4_decompress_to_buffer(
             &input[..expected_compressed_size as usize],
@@ -268,7 +266,7 @@ fn try_decompress_hadoop(input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> 
             output,
         )?;
         if decompressed_size != expected_decompressed_size as usize {
-            return Err(general_err!("unexpected decompressed size"));
+            return Err(Error::oos("unexpected decompressed size"));
         }
         input_len -= expected_compressed_size as usize;
         output_len -= expected_decompressed_size as usize;
@@ -282,7 +280,7 @@ fn try_decompress_hadoop(input_buf: &[u8], output_buf: &mut [u8]) -> Result<()> 
     if input_len == 0 {
         Ok(())
     } else {
-        Err(general_err!("Not all input are consumed"))
+        Err(Error::oos("Not all input are consumed"))
     }
 }
 

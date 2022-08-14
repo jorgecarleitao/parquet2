@@ -229,9 +229,8 @@ pub(super) fn finish_page(
     match type_ {
         PageType::DictionaryPage => {
             let dict_header = page_header.dictionary_page_header.as_ref().ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The page header type is a dictionary page but the dictionary header is empty"
-                        .to_string(),
+                Error::oos(
+                    "The page header type is a dictionary page but the dictionary header is empty",
                 )
             })?;
             let is_sorted = dict_header.is_sorted.unwrap_or(false);
@@ -249,10 +248,7 @@ pub(super) fn finish_page(
         }
         PageType::DataPage => {
             let header = page_header.data_page_header.ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The page header type is a v1 data page but the v1 data header is empty"
-                        .to_string(),
-                )
+                Error::oos("The page header type is a v1 data page but the v1 data header is empty")
             })?;
 
             Ok(CompressedPage::Data(CompressedDataPage::new_read(
@@ -266,10 +262,7 @@ pub(super) fn finish_page(
         }
         PageType::DataPageV2 => {
             let header = page_header.data_page_header_v2.ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The page header type is a v2 data page but the v2 data header is empty"
-                        .to_string(),
-                )
+                Error::oos("The page header type is a v2 data page but the v2 data header is empty")
             })?;
 
             Ok(CompressedPage::Data(CompressedDataPage::new_read(
@@ -289,9 +282,7 @@ pub(super) fn get_page_header(header: &ParquetPageHeader) -> Result<Option<DataP
     Ok(match type_ {
         PageType::DataPage => {
             let header = header.data_page_header.clone().ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The page header type is a v1 data page but the v1 header is empty".to_string(),
-                )
+                Error::oos("The page header type is a v1 data page but the v1 header is empty")
             })?;
             let _: Encoding = header.encoding.try_into()?;
             let _: Encoding = header.repetition_level_encoding.try_into()?;
@@ -301,9 +292,7 @@ pub(super) fn get_page_header(header: &ParquetPageHeader) -> Result<Option<DataP
         }
         PageType::DataPageV2 => {
             let header = header.data_page_header_v2.clone().ok_or_else(|| {
-                Error::OutOfSpec(
-                    "The page header type is a v1 data page but the v1 header is empty".to_string(),
-                )
+                Error::oos("The page header type is a v1 data page but the v1 header is empty")
             })?;
             let _: Encoding = header.encoding.try_into()?;
             Some(DataPageHeader::V2(header))

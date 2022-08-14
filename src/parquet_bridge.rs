@@ -29,7 +29,7 @@ impl TryFrom<FieldRepetitionType> for Repetition {
             FieldRepetitionType::REQUIRED => Repetition::Required,
             FieldRepetitionType::OPTIONAL => Repetition::Optional,
             FieldRepetitionType::REPEATED => Repetition::Repeated,
-            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::oos("Thrift out of range")),
         })
     }
 }
@@ -69,7 +69,7 @@ impl TryFrom<CompressionCodec> for Compression {
             CompressionCodec::LZ4 => Compression::Lz4,
             CompressionCodec::ZSTD => Compression::Zstd,
             CompressionCodec::LZ4_RAW => Compression::Lz4Raw,
-            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::oos("Thrift out of range")),
         })
     }
 }
@@ -145,7 +145,7 @@ pub(crate) trait CompressionLevel<T: std::fmt::Display + std::cmp::PartialOrd> {
         if compression_range.contains(&level) {
             Ok(())
         } else {
-            Err(Error::General(format!(
+            Err(Error::InvalidParameter(format!(
                 "valid compression range {}..={} exceeded.",
                 compression_range.start(),
                 compression_range.end()
@@ -275,7 +275,7 @@ impl TryFrom<ParquetPageType> for PageType {
             ParquetPageType::DATA_PAGE => PageType::DataPage,
             ParquetPageType::DATA_PAGE_V2 => PageType::DataPageV2,
             ParquetPageType::DICTIONARY_PAGE => PageType::DictionaryPage,
-            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::oos("Thrift out of range")),
         })
     }
 }
@@ -346,7 +346,7 @@ impl TryFrom<ParquetEncoding> for Encoding {
             ParquetEncoding::DELTA_BYTE_ARRAY => Encoding::DeltaByteArray,
             ParquetEncoding::RLE_DICTIONARY => Encoding::RleDictionary,
             ParquetEncoding::BYTE_STREAM_SPLIT => Encoding::ByteStreamSplit,
-            _ => return Err(Error::OutOfSpec("Thrift out of range".to_string())),
+            _ => return Err(Error::oos("Thrift out of range")),
         })
     }
 }
@@ -390,11 +390,7 @@ impl TryFrom<ParquetBoundaryOrder> for BoundaryOrder {
             ParquetBoundaryOrder::UNORDERED => BoundaryOrder::Unordered,
             ParquetBoundaryOrder::ASCENDING => BoundaryOrder::Ascending,
             ParquetBoundaryOrder::DESCENDING => BoundaryOrder::Descending,
-            _ => {
-                return Err(Error::OutOfSpec(
-                    "BoundaryOrder Thrift value out of range".to_string(),
-                ))
-            }
+            _ => return Err(Error::oos("BoundaryOrder Thrift value out of range")),
         })
     }
 }
@@ -579,11 +575,7 @@ impl TryFrom<ParquetLogicalType> for PrimitiveLogicalType {
             ParquetLogicalType::JSON(_) => PrimitiveLogicalType::Json,
             ParquetLogicalType::BSON(_) => PrimitiveLogicalType::Bson,
             ParquetLogicalType::UUID(_) => PrimitiveLogicalType::Uuid,
-            _ => {
-                return Err(Error::OutOfSpec(
-                    "LogicalType value out of range".to_string(),
-                ))
-            }
+            _ => return Err(Error::oos("LogicalType value out of range")),
         })
     }
 }
@@ -595,11 +587,7 @@ impl TryFrom<ParquetLogicalType> for GroupLogicalType {
         Ok(match type_ {
             ParquetLogicalType::LIST(_) => GroupLogicalType::List,
             ParquetLogicalType::MAP(_) => GroupLogicalType::Map,
-            _ => {
-                return Err(Error::OutOfSpec(
-                    "LogicalType value out of range".to_string(),
-                ))
-            }
+            _ => return Err(Error::oos("LogicalType value out of range")),
         })
     }
 }

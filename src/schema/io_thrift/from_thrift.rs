@@ -18,10 +18,10 @@ impl ParquetType {
             schema_nodes.push(t.1);
         }
         if schema_nodes.len() != 1 {
-            return Err(general_err!(
+            return Err(Error::oos(format!(
                 "Expected exactly one root node, but found {}",
                 schema_nodes.len()
-            ));
+            )));
         }
 
         Ok(schema_nodes.remove(0))
@@ -37,9 +37,9 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
     // There is only one message type node in the schema tree.
     let is_root_node = index == 0;
 
-    let element = elements.get(index).ok_or_else(|| {
-        Error::OutOfSpec(format!("index {} on SchemaElement is not valid", index))
-    })?;
+    let element = elements
+        .get(index)
+        .ok_or_else(|| Error::oos(format!("index {} on SchemaElement is not valid", index)))?;
     let name = element.name.clone();
     let converted_type = element.converted_type;
 
@@ -54,13 +54,11 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
             // primitive type
             let repetition = element
                 .repetition_type
-                .ok_or_else(|| {
-                    general_err!("Repetition level must be defined for a primitive type")
-                })?
+                .ok_or_else(|| Error::oos("Repetition level must be defined for a primitive type"))?
                 .try_into()?;
-            let physical_type = element.type_.ok_or_else(|| {
-                general_err!("Physical type must be defined for a primitive type")
-            })?;
+            let physical_type = element
+                .type_
+                .ok_or_else(|| Error::oos("Physical type must be defined for a primitive type"))?;
 
             let converted_type = converted_type
                 .map(|converted_type| {
@@ -68,8 +66,8 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
                         (Some(precision), Some(scale)) => Some((precision, scale)),
                         (None, None) => None,
                         _ => {
-                            return Err(general_err!(
-                                "When precision or scale are defined, both must be defined"
+                            return Err(Error::oos(
+                                "When precision or scale are defined, both must be defined",
                             ))
                         }
                     };
@@ -109,8 +107,8 @@ fn from_thrift_helper(elements: &[SchemaElement], index: usize) -> Result<(usize
                 let repetition = if let Some(repetition) = element.repetition_type {
                     repetition.try_into()?
                 } else {
-                    return Err(Error::OutOfSpec(
-                        "The repetition level of a non-root must be non-null".to_string(),
+                    return Err(Error::oos(
+                        "The repetition level of a non-root must be non-null",
                     ));
                 };
 
