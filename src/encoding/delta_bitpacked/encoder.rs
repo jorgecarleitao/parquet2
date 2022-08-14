@@ -1,11 +1,10 @@
 use crate::encoding::ceil8;
-use crate::read::levels::get_bit_width;
 
 use super::super::bitpacking;
 use super::super::uleb128;
 use super::super::zigzag_leb128;
 
-/// Encodes an iterator of `i32` according to parquet's `DELTA_BINARY_PACKED`.
+/// Encodes an iterator of `i64` according to parquet's `DELTA_BINARY_PACKED`.
 /// # Implementation
 /// * This function does not allocate on the heap.
 /// * The number of mini-blocks is always 1. This may change in the future.
@@ -52,8 +51,8 @@ pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
         let (container, encoded_len) = zigzag_leb128::encode(min_delta);
         buffer.extend_from_slice(&container[..encoded_len]);
 
-        let num_bits = get_bit_width((max_delta - min_delta) as i16) as u8;
-        buffer.push(num_bits);
+        let num_bits = 64 - (max_delta - min_delta).leading_zeros();
+        buffer.push(num_bits as u8);
 
         if num_bits > 0 {
             let start = buffer.len();
@@ -61,7 +60,7 @@ pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
             // bitpack encode all (deltas.len = 128 which is a multiple of 32)
             let bytes_needed = start + ceil8(deltas.len() * num_bits as usize);
             buffer.resize(bytes_needed, 0);
-            bitpacking::encode(deltas.as_ref(), num_bits, &mut buffer[start..]);
+            bitpacking::encode(deltas.as_ref(), num_bits as u8, &mut buffer[start..]);
 
             let bytes_needed = start + ceil8(deltas.len() * num_bits as usize);
             buffer.truncate(bytes_needed);
