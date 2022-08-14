@@ -13,7 +13,7 @@ struct Block<'a> {
     _num_mini_blocks: usize,
     /// Number of values that each mini block has.
     values_per_mini_block: usize,
-    bitwidths: &'a [u8],
+    bitwidths: std::slice::Iter<'a, u8>,
     values: &'a [u8],
     remaining: usize,     // number of elements
     current_index: usize, // invariant: < values_per_mini_block
@@ -37,15 +37,20 @@ impl<'a> Block<'a> {
         consumed_bytes += consumed;
         values = &values[consumed..];
 
-        let bitwidths = &values[..num_mini_blocks];
+        if num_mini_blocks > values.len() {
+            return Err(Error::oos(
+                "Block must contain at least num_mini_blocks bytes (the bitwidths)",
+            ));
+        }
+        let (bitwidths, remaining) = values.split_at(num_mini_blocks);
         consumed_bytes += num_mini_blocks;
-        values = &values[num_mini_blocks..];
+        values = remaining;
 
         let mut block = Block {
             min_delta,
             _num_mini_blocks: num_mini_blocks,
             values_per_mini_block,
-            bitwidths,
+            bitwidths: bitwidths.iter(),
             remaining: length,
             values,
             current_index: 0,
@@ -54,19 +59,24 @@ impl<'a> Block<'a> {
         };
 
         // Set up first mini-block
-        block.advance_miniblock();
+        block.advance_miniblock()?;
 
         Ok(block)
     }
 
-    fn advance_miniblock(&mut self) {
-        let num_bits = self.bitwidths[0] as usize;
-        self.bitwidths = &self.bitwidths[1..];
+    fn advance_miniblock(&mut self) -> Result<(), Error> {
+        // unwrap is ok: we sliced it by num_mini_blocks in try_new
+        let num_bits = self.bitwidths.next().copied().unwrap() as usize;
 
         self.current_miniblock = if num_bits > 0 {
             let length = std::cmp::min(self.remaining, self.values_per_mini_block);
 
             let miniblock_length = ceil8(self.values_per_mini_block * num_bits);
+            if miniblock_length > self.values.len() {
+                return Err(Error::oos(
+                    "block must contain at least miniblock_length bytes (the mini block)",
+                ));
+            }
             let (miniblock, remainder) = self.values.split_at(miniblock_length);
 
             self.values = remainder;
@@ -77,11 +87,13 @@ impl<'a> Block<'a> {
             None
         };
         self.current_index = 0;
+
+        Ok(())
     }
 }
 
 impl<'a> Iterator for Block<'a> {
-    type Item = i64;
+    type Item = Result<i64, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -91,16 +103,18 @@ impl<'a> Iterator for Block<'a> {
             + self
                 .current_miniblock
                 .as_mut()
-                .map(|x| x.next().unwrap())
+                .map(|x| x.next().unwrap_or_default())
                 .unwrap_or(0) as i64;
         self.current_index += 1;
         self.remaining -= 1;
 
         if self.remaining > 0 && self.current_index == self.values_per_mini_block {
-            self.advance_miniblock();
+            if let Err(e) = self.advance_miniblock() {
+                return Some(Err(e));
+            }
         }
 
-        Some(result)
+        Some(Ok(result))
     }
 }
 
@@ -168,26 +182,11 @@ impl<'a> Decoder<'a> {
     pub fn consumed_bytes(&self) -> usize {
         self.consumed_bytes + self.current_block.as_ref().map_or(0, |b| b.consumed_bytes)
     }
-}
 
-impl<'a> Iterator for Decoder<'a> {
-    type Item = Result<i64, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.values_remaining == 0 {
-            return None;
-        }
-
-        let result = Some(Ok(self.next_value));
-
-        self.values_remaining -= 1;
-        if self.values_remaining == 0 {
-            return result;
-        }
-
+    fn load_delta(&mut self) -> Result<i64, Error> {
         // At this point we must have at least one block and value available
         let current_block = self.current_block.as_mut().unwrap();
-        let delta = if let Some(x) = current_block.next() {
+        if let Some(x) = current_block.next() {
             x
         } else {
             // load next block
@@ -202,12 +201,37 @@ impl<'a> Iterator for Decoder<'a> {
             );
             match next_block {
                 Ok(mut next_block) => {
-                    let delta = next_block.next()?;
+                    let delta = next_block
+                        .next()
+                        .ok_or_else(|| Error::oos("Missing block"))?;
                     self.current_block = Some(next_block);
                     delta
                 }
-                Err(e) => return Some(Err(e)),
+                Err(e) => Err(e),
             }
+        }
+    }
+}
+
+impl<'a> Iterator for Decoder<'a> {
+    type Item = Result<i64, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.values_remaining == 0 {
+            return None;
+        }
+
+        let result = Some(Ok(self.next_value));
+
+        self.values_remaining -= 1;
+        if self.values_remaining == 0 {
+            // do not try to load another block
+            return result;
+        }
+
+        let delta = match self.load_delta() {
+            Ok(delta) => delta,
+            Err(e) => return Some(Err(e)),
         };
 
         self.next_value += delta;
