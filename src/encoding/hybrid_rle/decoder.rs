@@ -1,3 +1,5 @@
+use crate::error::Error;
+
 use super::super::uleb128;
 use super::{super::ceil8, HybridEncoded};
 
@@ -22,7 +24,7 @@ impl<'a> Decoder<'a> {
 }
 
 impl<'a> Iterator for Decoder<'a> {
-    type Item = HybridEncoded<'a>;
+    type Item = Result<HybridEncoded<'a>, Error>;
 
     #[inline] // -18% improvement in bench
     fn next(&mut self) -> Option<Self::Item> {
@@ -34,7 +36,10 @@ impl<'a> Iterator for Decoder<'a> {
             return None;
         }
 
-        let (indicator, consumed) = uleb128::decode(self.values);
+        let (indicator, consumed) = match uleb128::decode(self.values) {
+            Ok((indicator, consumed)) => (indicator, consumed),
+            Err(e) => return Some(Err(e)),
+        };
         self.values = &self.values[consumed..];
         if self.values.is_empty() {
             return None;
@@ -46,7 +51,7 @@ impl<'a> Iterator for Decoder<'a> {
             let bytes = std::cmp::min(bytes, self.values.len());
             let (result, remaining) = self.values.split_at(bytes);
             self.values = remaining;
-            Some(HybridEncoded::Bitpacked(result))
+            Some(Ok(HybridEncoded::Bitpacked(result)))
         } else {
             // is rle
             let run_length = indicator as usize >> 1;
@@ -54,7 +59,7 @@ impl<'a> Iterator for Decoder<'a> {
             let rle_bytes = ceil8(self.num_bits);
             let (result, remaining) = self.values.split_at(rle_bytes);
             self.values = remaining;
-            Some(HybridEncoded::Rle(result, run_length))
+            Some(Ok(HybridEncoded::Rle(result, run_length)))
         }
     }
 }
@@ -78,7 +83,7 @@ mod tests {
 
         let run = decoder.next().unwrap();
 
-        if let HybridEncoded::Bitpacked(values) = run {
+        if let HybridEncoded::Bitpacked(values) = run.unwrap() {
             assert_eq!(values, &[0b00001011]);
             let result =
                 bitpacked::Decoder::<u32>::new(values, bit_width, length).collect::<Vec<_>>();
@@ -103,7 +108,7 @@ mod tests {
 
         let run = decoder.next().unwrap();
 
-        if let HybridEncoded::Bitpacked(values) = run {
+        if let HybridEncoded::Bitpacked(values) = run.unwrap() {
             assert_eq!(values, &[0b11101011, 0b00000010]);
             let result = bitpacked::Decoder::<u32>::new(values, bit_width, 10).collect::<Vec<_>>();
             assert_eq!(result, expected);
@@ -126,7 +131,7 @@ mod tests {
 
         let run = decoder.next().unwrap();
 
-        if let HybridEncoded::Rle(values, items) = run {
+        if let HybridEncoded::Rle(values, items) = run.unwrap() {
             assert_eq!(values, &[0b00000001]);
             assert_eq!(items, length);
         } else {

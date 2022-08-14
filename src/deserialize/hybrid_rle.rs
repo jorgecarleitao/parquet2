@@ -1,3 +1,5 @@
+use crate::error::Error;
+
 use crate::encoding::hybrid_rle::{self, BitmapIter};
 
 /// The decoding state of the hybrid-RLE decoder with a maximum definition level of 1
@@ -26,7 +28,7 @@ impl<'a> HybridEncoded<'a> {
     }
 }
 
-pub trait HybridRleRunsIterator<'a>: Iterator<Item = HybridEncoded<'a>> {
+pub trait HybridRleRunsIterator<'a>: Iterator<Item = Result<HybridEncoded<'a>, Error>> {
     /// Number of elements remaining. This may not be the items of the iterator - an item
     /// of the iterator may contain more than one element.
     fn number_of_elements(&self) -> usize;
@@ -34,13 +36,19 @@ pub trait HybridRleRunsIterator<'a>: Iterator<Item = HybridEncoded<'a>> {
 
 /// An iterator of [`HybridEncoded`], adapter over [`hybrid_rle::HybridEncoded`].
 #[derive(Debug, Clone)]
-pub struct HybridRleIter<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> {
+pub struct HybridRleIter<'a, I>
+where
+    I: Iterator<Item = Result<hybrid_rle::HybridEncoded<'a>, Error>>,
+{
     iter: I,
     length: usize,
     consumed: usize,
 }
 
-impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> HybridRleIter<'a, I> {
+impl<'a, I> HybridRleIter<'a, I>
+where
+    I: Iterator<Item = Result<hybrid_rle::HybridEncoded<'a>, Error>>,
+{
     /// Returns a new [`HybridRleIter`]
     #[inline]
     pub fn new(iter: I, length: usize) -> Self {
@@ -63,16 +71,20 @@ impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> HybridRleIter<'a, I>
     }
 }
 
-impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> HybridRleRunsIterator<'a>
-    for HybridRleIter<'a, I>
+impl<'a, I> HybridRleRunsIterator<'a> for HybridRleIter<'a, I>
+where
+    I: Iterator<Item = Result<hybrid_rle::HybridEncoded<'a>, Error>>,
 {
     fn number_of_elements(&self) -> usize {
         self.len()
     }
 }
 
-impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> Iterator for HybridRleIter<'a, I> {
-    type Item = HybridEncoded<'a>;
+impl<'a, I> Iterator for HybridRleIter<'a, I>
+where
+    I: Iterator<Item = Result<hybrid_rle::HybridEncoded<'a>, Error>>,
+{
+    type Item = Result<HybridEncoded<'a>, Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
@@ -81,7 +93,7 @@ impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> Iterator for HybridR
         };
         let run = self.iter.next()?;
 
-        Some(match run {
+        Some(run.map(|run| match run {
             hybrid_rle::HybridEncoded::Bitpacked(pack) => {
                 // a pack has at most `pack.len() * 8` bits
                 let pack_size = pack.len() * 8;
@@ -99,7 +111,7 @@ impl<'a, I: Iterator<Item = hybrid_rle::HybridEncoded<'a>>> Iterator for HybridR
                 self.consumed += additional;
                 HybridEncoded::Repeated(is_set, additional)
             }
-        })
+        }))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -122,12 +134,18 @@ enum HybridBooleanState<'a> {
 /// An iterator adapter that maps an iterator of [`HybridEncoded`] into an iterator
 /// over [`bool`].
 #[derive(Debug)]
-pub struct HybridRleBooleanIter<'a, I: Iterator<Item = HybridEncoded<'a>>> {
+pub struct HybridRleBooleanIter<'a, I>
+where
+    I: Iterator<Item = Result<HybridEncoded<'a>, Error>>,
+{
     iter: I,
     current_run: Option<HybridBooleanState<'a>>,
 }
 
-impl<'a, I: Iterator<Item = HybridEncoded<'a>>> HybridRleBooleanIter<'a, I> {
+impl<'a, I> HybridRleBooleanIter<'a, I>
+where
+    I: Iterator<Item = Result<HybridEncoded<'a>, Error>>,
+{
     pub fn new(iter: I) -> Self {
         Self {
             iter,
@@ -136,25 +154,27 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> HybridRleBooleanIter<'a, I> {
     }
 }
 
-impl<'a, I: HybridRleRunsIterator<'a>> Iterator for HybridRleBooleanIter<'a, I> {
-    type Item = bool;
+impl<'a, I> Iterator for HybridRleBooleanIter<'a, I>
+where
+    I: HybridRleRunsIterator<'a>,
+{
+    type Item = Result<bool, Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(run) = &mut self.current_run {
             match run {
-                HybridBooleanState::Bitmap(bitmap) => bitmap.next(),
-                HybridBooleanState::Repeated(value, remaining) => {
-                    if *remaining == 0 {
-                        None
-                    } else {
-                        *remaining -= 1;
-                        Some(*value)
-                    }
+                HybridBooleanState::Bitmap(bitmap) => bitmap.next().map(Ok),
+                HybridBooleanState::Repeated(value, remaining) => if *remaining == 0 {
+                    None
+                } else {
+                    *remaining -= 1;
+                    Some(*value)
                 }
+                .map(Ok),
             }
         } else if let Some(run) = self.iter.next() {
-            self.current_run = Some(match run {
+            let run = run.map(|run| match run {
                 HybridEncoded::Bitmap(bitmap, length) => {
                     HybridBooleanState::Bitmap(BitmapIter::new(bitmap, 0, length))
                 }
@@ -162,7 +182,13 @@ impl<'a, I: HybridRleRunsIterator<'a>> Iterator for HybridRleBooleanIter<'a, I> 
                     HybridBooleanState::Repeated(value, length)
                 }
             });
-            self.next()
+            match run {
+                Ok(run) => {
+                    self.current_run = Some(run);
+                    self.next()
+                }
+                Err(e) => Some(Err(e)),
+            }
         } else {
             None
         }

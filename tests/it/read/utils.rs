@@ -22,7 +22,7 @@ fn deserialize_bitmap<C: Clone, I: Iterator<Item = Result<C, Error>>>(
 ) -> Result<Vec<Option<C>>, Error> {
     let mut deserialized = Vec::with_capacity(validity.len());
 
-    validity.try_for_each(|run| match run {
+    validity.try_for_each(|run| match run? {
         HybridEncoded::Bitmap(bitmap, length) => BitmapIter::new(bitmap, 0, length)
             .into_iter()
             .try_for_each(|x| {
@@ -56,7 +56,7 @@ fn deserialize_levels<C: Clone, I: Iterator<Item = Result<C, Error>>>(
     levels
         .into_iter()
         .map(|x| {
-            if x == max {
+            if x? == max {
                 values.next().transpose()
             } else {
                 Ok(None)

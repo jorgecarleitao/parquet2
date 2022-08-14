@@ -1,3 +1,5 @@
+use crate::error::Error;
+
 use super::super::delta_bitpacked;
 
 /// Decodes [Delta-length byte array](https://github.com/apache/parquet-format/blob/master/Encodings.md#delta-length-byte-array-delta_length_byte_array--6)
@@ -16,10 +18,10 @@ use super::super::delta_bitpacked;
 ///     128, 1, 4, 2, 10, 0, 0, 0, 0, 0, 72, 101, 108, 108, 111, 87, 111, 114, 108, 100,
 /// ];
 ///
-/// let mut decoder = Decoder::new(data);
+/// let mut decoder = Decoder::try_new(data).unwrap();
 ///
 /// // Extract the lengths
-/// let lengths = decoder.by_ref().collect::<Vec<_>>();
+/// let lengths = decoder.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
 /// assert_eq!(lengths, expected_lengths);
 ///
 /// // Extract the values. This _must_ be called after consuming all lengths by reference (see above).
@@ -34,13 +36,13 @@ pub struct Decoder<'a> {
 }
 
 impl<'a> Decoder<'a> {
-    pub fn new(values: &'a [u8]) -> Self {
-        let lengths = delta_bitpacked::Decoder::new(values);
-        Self {
+    pub fn try_new(values: &'a [u8]) -> Result<Self, Error> {
+        let lengths = delta_bitpacked::Decoder::try_new(values)?;
+        Ok(Self {
             values,
             lengths,
             total_length: 0,
-        }
+        })
     }
 
     /// Consumes this decoder and returns the slice of concatenated values.
@@ -63,13 +65,17 @@ impl<'a> Decoder<'a> {
 }
 
 impl<'a> Iterator for Decoder<'a> {
-    type Item = i32;
+    type Item = Result<i32, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let result = self.lengths.next();
-        if let Some(result) = result {
-            self.total_length += result as u32
+        match result {
+            Some(Ok(v)) => {
+                self.total_length += v as u32;
+                Some(Ok(v as i32))
+            }
+            Some(Err(error)) => Some(Err(error)),
+            None => None,
         }
-        result.map(|x| x as i32)
     }
 }

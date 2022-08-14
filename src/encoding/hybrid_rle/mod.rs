@@ -6,6 +6,8 @@ pub use bitmap::{encode_bool as bitpacked_encode, BitmapIter};
 pub use decoder::Decoder;
 pub use encoder::{encode_bool, encode_u32};
 
+use crate::error::Error;
+
 use super::bitpacked;
 
 /// The two possible states of an RLE-encoded run.
@@ -34,8 +36,8 @@ pub struct HybridRleDecoder<'a> {
 }
 
 #[inline]
-fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a> {
-    match decoder.next() {
+fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> Result<State<'a>, Error> {
+    Ok(match decoder.next().transpose()? {
         Some(HybridEncoded::Bitpacked(packed)) => {
             let num_bits = decoder.num_bits();
             let length = std::cmp::min(packed.len() * 8 / num_bits, remaining);
@@ -51,25 +53,25 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a
             State::Rle(std::iter::repeat(value).take(additional))
         }
         None => State::None,
-    }
+    })
 }
 
 impl<'a> HybridRleDecoder<'a> {
     /// Returns a new [`HybridRleDecoder`]
-    pub fn new(data: &'a [u8], num_bits: u32, num_values: usize) -> Self {
+    pub fn try_new(data: &'a [u8], num_bits: u32, num_values: usize) -> Result<Self, Error> {
         let num_bits = num_bits as usize;
         let mut decoder = Decoder::new(data, num_bits);
-        let state = read_next(&mut decoder, num_values);
-        Self {
+        let state = read_next(&mut decoder, num_values)?;
+        Ok(Self {
             decoder,
             state,
             remaining: num_values,
-        }
+        })
     }
 }
 
 impl<'a> Iterator for HybridRleDecoder<'a> {
-    type Item = u32;
+    type Item = Result<u32, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -82,10 +84,15 @@ impl<'a> Iterator for HybridRleDecoder<'a> {
         };
         if let Some(result) = result {
             self.remaining -= 1;
-            Some(result)
+            Some(Ok(result))
         } else {
-            self.state = read_next(&mut self.decoder, self.remaining);
-            self.next()
+            match read_next(&mut self.decoder, self.remaining) {
+                Ok(state) => {
+                    self.state = state;
+                    self.next()
+                }
+                Err(e) => Some(Err(e)),
+            }
         }
     }
 
@@ -101,7 +108,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn roundtrip() {
+    fn roundtrip() -> Result<(), Error> {
         let mut buffer = vec![];
         let num_bits = 10u32;
 
@@ -109,15 +116,16 @@ mod tests {
 
         encode_u32(&mut buffer, data.iter().cloned(), num_bits).unwrap();
 
-        let decoder = HybridRleDecoder::new(&buffer, num_bits, data.len());
+        let decoder = HybridRleDecoder::try_new(&buffer, num_bits, data.len())?;
 
-        let result = decoder.collect::<Vec<_>>();
+        let result = decoder.collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(result, data);
+        Ok(())
     }
 
     #[test]
-    fn pyarrow_integration() {
+    fn pyarrow_integration() -> Result<(), Error> {
         // data encoded from pyarrow representing (0..1000)
         let data = vec![
             127, 0, 4, 32, 192, 0, 4, 20, 96, 192, 1, 8, 36, 160, 192, 2, 12, 52, 224, 192, 3, 16,
@@ -192,49 +200,53 @@ mod tests {
         ];
         let num_bits = 10;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits, 1000);
+        let decoder = HybridRleDecoder::try_new(&data, num_bits, 1000)?;
 
-        let result = decoder.collect::<Vec<_>>();
+        let result = decoder.collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(result, (0..1000).collect::<Vec<_>>());
+        Ok(())
     }
 
     #[test]
-    fn small() {
+    fn small() -> Result<(), Error> {
         let data = vec![3, 2];
 
         let num_bits = 3;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits, 1);
+        let decoder = HybridRleDecoder::try_new(&data, num_bits, 1)?;
 
-        let result = decoder.collect::<Vec<_>>();
+        let result = decoder.collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(result, &[2]);
+        Ok(())
     }
 
     #[test]
-    fn zero_bit_width() {
+    fn zero_bit_width() -> Result<(), Error> {
         let data = vec![3];
 
         let num_bits = 0;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits, 2);
+        let decoder = HybridRleDecoder::try_new(&data, num_bits, 2)?;
 
-        let result = decoder.collect::<Vec<_>>();
+        let result = decoder.collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(result, &[0, 0]);
+        Ok(())
     }
 
     #[test]
-    fn empty_values() {
+    fn empty_values() -> Result<(), Error> {
         let data = [];
 
         let num_bits = 1;
 
-        let decoder = HybridRleDecoder::new(&data, num_bits, 100);
+        let decoder = HybridRleDecoder::try_new(&data, num_bits, 100)?;
 
-        let result = decoder.collect::<Vec<_>>();
+        let result = decoder.collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(result, vec![0; 100]);
+        Ok(())
     }
 }

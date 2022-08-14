@@ -16,8 +16,12 @@ pub fn extend_validity(val: &mut Vec<bool>, page: &DataPage) -> Result<(), Error
         page.descriptor.max_def_level,
     );
 
-    let def_levels = HybridRleDecoder::new(def_levels, get_bit_width(def_level_encoding.1), length);
+    let mut def_levels =
+        HybridRleDecoder::try_new(def_levels, get_bit_width(def_level_encoding.1), length)?;
 
-    val.extend(def_levels.map(|x| x != 0));
-    Ok(())
+    val.reserve(length);
+    def_levels.try_for_each(|x| {
+        val.push(x? != 0);
+        Ok(())
+    })
 }
