@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":[["BLOCK_LEN",""]],"fn":[["encode","Encodes `u32` values into a buffer using `num_bits`."],["encode_pack","Encodes `u32` values into a buffer using `num_bits`."]],"struct":[["Decoder",""]]};
