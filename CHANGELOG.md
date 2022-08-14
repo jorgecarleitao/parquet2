@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.15.1](https://github.com/jorgecarleitao/parquet2/tree/v0.15.1) (2022-08-14)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.15.0...v0.15.1)
+
+**Fixed bugs:**
+
+- Fixed error in encoding large bitpacked deltas [\#179](https://github.com/jorgecarleitao/parquet2/pull/179) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.15.0](https://github.com/jorgecarleitao/parquet2/tree/v0.15.0) (2022-08-10)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.14.2...v0.15.0)
