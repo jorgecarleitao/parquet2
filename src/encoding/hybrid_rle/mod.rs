@@ -41,7 +41,7 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> Result<S
         Some(HybridEncoded::Bitpacked(packed)) => {
             let num_bits = decoder.num_bits();
             let length = std::cmp::min(packed.len() * 8 / num_bits, remaining);
-            let decoder = bitpacked::Decoder::<u32>::new(packed, num_bits, length);
+            let decoder = bitpacked::Decoder::<u32>::try_new(packed, num_bits, length)?;
             State::Bitpacked(decoder)
         }
         Some(HybridEncoded::Rle(pack, additional)) => {

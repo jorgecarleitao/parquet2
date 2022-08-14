@@ -18,7 +18,7 @@ struct Block<'a> {
     remaining: usize,     // number of elements
     current_index: usize, // invariant: < values_per_mini_block
     // None represents a relative delta of zero, in which case there is no miniblock.
-    current_miniblock: Option<bitpacked::Decoder<'a, u32>>,
+    current_miniblock: Option<bitpacked::Decoder<'a, u64>>,
     // number of bytes consumed.
     consumed_bytes: usize,
 }
@@ -72,7 +72,7 @@ impl<'a> Block<'a> {
             self.values = remainder;
             self.consumed_bytes += miniblock_length;
 
-            Some(bitpacked::Decoder::new(miniblock, num_bits, length))
+            Some(bitpacked::Decoder::try_new(miniblock, num_bits, length).unwrap())
         } else {
             None
         };
