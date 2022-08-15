@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":[["Decoder","Decodes according to Delta strings, prefixes, lengths and values"]]};
