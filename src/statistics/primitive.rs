@@ -36,15 +36,15 @@ pub fn read<T: types::NativeType>(
 ) -> Result<Arc<dyn Statistics>> {
     if let Some(ref v) = v.max_value {
         if v.len() != std::mem::size_of::<T>() {
-            return Err(Error::OutOfSpec(
-                "The max_value of statistics MUST be plain encoded".to_string(),
+            return Err(Error::oos(
+                "The max_value of statistics MUST be plain encoded",
             ));
         }
     };
     if let Some(ref v) = v.min_value {
         if v.len() != std::mem::size_of::<T>() {
-            return Err(Error::OutOfSpec(
-                "The min_value of statistics MUST be plain encoded".to_string(),
+            return Err(Error::oos(
+                "The min_value of statistics MUST be plain encoded",
             ));
         }
     };

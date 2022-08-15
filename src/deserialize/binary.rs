@@ -63,8 +63,8 @@ impl<'a, P> BinaryPageState<'a, P> {
 
                 Ok(Self::Required(values))
             }
-            _ => Err(Error::General(format!(
-                "Viewing page for encoding {:?} for binary type not supported",
+            _ => Err(Error::FeatureNotSupported(format!(
+                "Viewing page for encoding {:?} for binary type",
                 page.encoding(),
             ))),
         }

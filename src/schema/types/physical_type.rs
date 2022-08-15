@@ -29,10 +29,10 @@ impl TryFrom<(Type, Option<i32>)> for PhysicalType {
             Type::BYTE_ARRAY => PhysicalType::ByteArray,
             Type::FIXED_LEN_BYTE_ARRAY => {
                 let length = length
-                    .ok_or_else(|| general_err!("Length must be defined for FixedLenByteArray"))?;
+                    .ok_or_else(|| Error::oos("Length must be defined for FixedLenByteArray"))?;
                 PhysicalType::FixedLenByteArray(length.try_into()?)
             }
-            _ => return Err(general_err!("Type out of length")),
+            _ => return Err(Error::oos("Unknown type")),
         })
     }
 }

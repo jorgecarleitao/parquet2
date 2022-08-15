@@ -17,8 +17,8 @@ pub(super) fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::Hybrid
     // SPEC: followed by the values encoded using RLE/Bit packed described above (with the given bit width).
     let bit_width = indices_buffer[0];
     if bit_width > 32 {
-        return Err(Error::OutOfSpec(
-            "Bit width of dictionary pages cannot be larger than 32".to_string(),
+        return Err(Error::oos(
+            "Bit width of dictionary pages cannot be larger than 32",
         ));
     }
     let indices_buffer = &indices_buffer[1..];

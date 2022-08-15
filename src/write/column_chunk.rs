@@ -112,8 +112,8 @@ fn build_column_chunk(
         .map(|spec| spec.compression)
         .collect::<HashSet<_>>();
     if compression.len() > 1 {
-        return Err(crate::error::Error::OutOfSpec(
-            "All pages within a column chunk must be compressed with the same codec".to_string(),
+        return Err(crate::error::Error::oos(
+            "All pages within a column chunk must be compressed with the same codec",
         ));
     }
     let compression = compression

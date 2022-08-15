@@ -32,9 +32,9 @@ pub fn compute_page_row_intervals(
 
     let last = (|| {
         let start: usize = locations.last().unwrap().first_row_index.try_into()?;
-        let length = num_rows.checked_sub(start).ok_or_else(|| {
-            Error::OutOfSpec("Page start cannot be smaller than the number of rows".to_string())
-        })?;
+        let length = num_rows
+            .checked_sub(start)
+            .ok_or_else(|| Error::oos("Page start cannot be smaller than the number of rows"))?;
         Result::<_, Error>::Ok(Interval::new(start, length))
     })();
 
@@ -46,11 +46,7 @@ pub fn compute_page_row_intervals(
             let length = x[1]
                 .first_row_index
                 .checked_sub(x[0].first_row_index)
-                .ok_or_else(|| {
-                    Error::OutOfSpec(
-                        "Page start cannot be smaller than the number of rows".to_string(),
-                    )
-                })?
+                .ok_or_else(|| Error::oos("Page start cannot be smaller than the number of rows"))?
                 .try_into()?;
 
             Ok(Interval::new(start, length))

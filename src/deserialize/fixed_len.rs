@@ -71,7 +71,7 @@ impl<'a, P> FixedLenBinaryPageState<'a, P> {
         {
             size
         } else {
-            return Err(Error::General(
+            return Err(Error::InvalidParameter(
                 "FixedLenBinaryPageState must be initialized by pages of FixedLenByteArray"
                     .to_string(),
             ));
@@ -101,8 +101,8 @@ impl<'a, P> FixedLenBinaryPageState<'a, P> {
 
                 Ok(Self::Required(values))
             }
-            _ => Err(Error::General(format!(
-                "Viewing page for encoding {:?} for binary type not supported",
+            _ => Err(Error::FeatureNotSupported(format!(
+                "Viewing page for encoding {:?} for binary type",
                 page.encoding(),
             ))),
         }

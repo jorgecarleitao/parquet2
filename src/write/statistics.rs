@@ -43,9 +43,7 @@ pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn S
         .skip(1)
         .all(|x| x.physical_type() == stats[0].physical_type());
     if !same_type {
-        return Err(Error::OutOfSpec(
-            "The statistics do not have the same data_type".to_string(),
-        ));
+        return Err(Error::oos("The statistics do not have the same data_type"));
     };
     Ok(match stats[0].physical_type() {
         PhysicalType::Boolean => {

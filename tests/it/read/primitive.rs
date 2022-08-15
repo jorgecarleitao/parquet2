@@ -72,8 +72,8 @@ impl<'a, T: NativeType> PageState<'a, T> {
                     );
                     Ok(Self::Filtered(FilteredPageState::Required(values)))
                 }
-                _ => Err(Error::General(format!(
-                    "Viewing page for encoding {:?} for native type {} not supported",
+                _ => Err(Error::FeatureNotSupported(format!(
+                    "Viewing page for encoding {:?} for native type {}",
                     page.encoding(),
                     std::any::type_name::<T>()
                 ))),

@@ -143,9 +143,7 @@ impl ColumnChunkMetaData {
 
             let _: Compression = meta.codec.try_into()?;
         } else {
-            return Err(Error::OutOfSpec(
-                "Column chunk requires metdata".to_string(),
-            ));
+            return Err(Error::oos("Column chunk requires metdata"));
         }
 
         Ok(Self {
