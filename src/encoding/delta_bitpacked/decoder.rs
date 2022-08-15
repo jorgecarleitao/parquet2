@@ -4,6 +4,7 @@ use super::super::bitpacked;
 use super::super::uleb128;
 use super::super::zigzag_leb128;
 
+/// An [`Iterator`] of [`i64`]
 #[derive(Debug)]
 struct Block<'a> {
     // this is the minimum delta that must be added to every value.
