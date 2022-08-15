@@ -8,17 +8,20 @@ pub fn set(byte: u8, i: usize) -> u8 {
     byte | BIT_MASK[i]
 }
 
-/// An iterator of bits according to the LSB format
+/// An [`Iterator`] of bool that decodes a bitmap.
+/// This is a specialization of [`super::super::bitpacked::Decoder`] for `num_bits == 1`.
 #[derive(Debug)]
 pub struct BitmapIter<'a> {
     iter: std::slice::Iter<'a, u8>,
     current_byte: &'a u8,
-    len: usize,
-    index: usize,
+    remaining: usize,
     mask: u8,
 }
 
 impl<'a> BitmapIter<'a> {
+    /// Returns a new [`BitmapIter`].
+    /// # Panics
+    /// This function panics iff `offset / 8 > slice.len()`
     #[inline]
     pub fn new(slice: &'a [u8], offset: usize, len: usize) -> Self {
         let bytes = &slice[offset / 8..];
@@ -30,8 +33,7 @@ impl<'a> BitmapIter<'a> {
         Self {
             iter,
             mask: 1u8.rotate_left(offset as u32),
-            len,
-            index: 0,
+            remaining: len,
             current_byte,
         }
     }
@@ -43,10 +45,10 @@ impl<'a> Iterator for BitmapIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         // easily predictable in branching
-        if self.index == self.len {
+        if self.remaining == 0 {
             return None;
         } else {
-            self.index += 1;
+            self.remaining -= 1;
         }
         let value = self.current_byte & self.mask != 0;
         self.mask = self.mask.rotate_left(1);
@@ -61,7 +63,7 @@ impl<'a> Iterator for BitmapIter<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len - self.index, Some(self.len - self.index))
+        (self.remaining, Some(self.remaining))
     }
 }
 

@@ -35,10 +35,6 @@ pub struct HybridRleDecoder<'a> {
 
 #[inline]
 fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> State<'a> {
-    if decoder.num_bits() == 0 {
-        return State::None;
-    };
-
     match decoder.next() {
         Some(HybridEncoded::Bitpacked(packed)) => {
             let num_bits = decoder.num_bits();
