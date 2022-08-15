@@ -5,17 +5,17 @@ use super::{super::ceil8, HybridEncoded};
 #[derive(Debug, Clone)]
 pub struct Decoder<'a> {
     values: &'a [u8],
-    num_bits: u32,
+    num_bits: usize,
 }
 
 impl<'a> Decoder<'a> {
-    pub fn new(values: &'a [u8], num_bits: u32) -> Self {
+    pub fn new(values: &'a [u8], num_bits: usize) -> Self {
         Self { values, num_bits }
     }
 
     /// Returns the number of bits being used by this decoder.
     #[inline]
-    pub fn num_bits(&self) -> u32 {
+    pub fn num_bits(&self) -> usize {
         self.num_bits
     }
 }
@@ -35,7 +35,7 @@ impl<'a> Iterator for Decoder<'a> {
         };
         if indicator & 1 == 1 {
             // is bitpacking
-            let bytes = (indicator as usize >> 1) * self.num_bits as usize;
+            let bytes = (indicator as usize >> 1) * self.num_bits;
             let bytes = std::cmp::min(bytes, self.values.len());
             let (result, remaining) = self.values.split_at(bytes);
             let result = Some(HybridEncoded::Bitpacked(result));
@@ -45,7 +45,7 @@ impl<'a> Iterator for Decoder<'a> {
             // is rle
             let run_length = indicator as usize >> 1;
             // repeated-value := value that is repeated, using a fixed-width of round-up-to-next-byte(bit-width)
-            let rle_bytes = ceil8(self.num_bits as usize);
+            let rle_bytes = ceil8(self.num_bits);
             let (result, remaining) = self.values.split_at(rle_bytes);
             let result = Some(HybridEncoded::Rle(result, run_length));
             self.values = remaining;
@@ -58,11 +58,11 @@ impl<'a> Iterator for Decoder<'a> {
 mod tests {
     use super::*;
 
-    use super::super::super::bitpacking;
+    use super::super::super::bitpacked;
 
     #[test]
     fn basics_1() {
-        let bit_width = 1;
+        let bit_width = 1usize;
         let length = 5;
         let values = vec![
             2, 0, 0, 0, // length
@@ -76,7 +76,7 @@ mod tests {
         if let HybridEncoded::Bitpacked(values) = run {
             assert_eq!(values, &[0b00001011]);
             let result =
-                bitpacking::Decoder::new(values, bit_width as u8, length).collect::<Vec<_>>();
+                bitpacked::Decoder::<u32>::new(values, bit_width, length).collect::<Vec<_>>();
             assert_eq!(result, &[1, 1, 0, 1, 0]);
         } else {
             panic!()
@@ -100,7 +100,7 @@ mod tests {
 
         if let HybridEncoded::Bitpacked(values) = run {
             assert_eq!(values, &[0b11101011, 0b00000010]);
-            let result = bitpacking::Decoder::new(values, bit_width as u8, 10).collect::<Vec<_>>();
+            let result = bitpacked::Decoder::<u32>::new(values, bit_width, 10).collect::<Vec<_>>();
             assert_eq!(result, expected);
         } else {
             panic!()

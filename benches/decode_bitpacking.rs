@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use parquet2::encoding::bitpacking::Decoder;
+use parquet2::encoding::bitpacked::Decoder;
 
 fn add_benchmark(c: &mut Criterion) {
     (10..=20).step_by(2).for_each(|log2_size| {
@@ -11,7 +11,7 @@ fn add_benchmark(c: &mut Criterion) {
             .collect::<Vec<_>>();
 
         c.bench_function(&format!("bitpacking 2^{}", log2_size), |b| {
-            b.iter(|| Decoder::new(&bytes, 1, size).count())
+            b.iter(|| Decoder::<u32>::new(&bytes, 1, size).count())
         });
     })
 }
