@@ -32,6 +32,7 @@ mod tests {
         assert_eq!(result, data);
     }
 
+    #[test]
     fn some() {
         let data = vec![
             -2147483648,

@@ -1,6 +1,6 @@
 use crate::encoding::ceil8;
 
-use super::super::bitpacking;
+use super::super::bitpacked;
 use super::super::uleb128;
 use super::super::zigzag_leb128;
 
@@ -53,16 +53,17 @@ pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
 
         let num_bits = 64 - (max_delta - min_delta).leading_zeros();
         buffer.push(num_bits as u8);
+        let num_bits = num_bits as usize;
 
         if num_bits > 0 {
             let start = buffer.len();
 
             // bitpack encode all (deltas.len = 128 which is a multiple of 32)
-            let bytes_needed = start + ceil8(deltas.len() * num_bits as usize);
+            let bytes_needed = start + ceil8(deltas.len() * num_bits);
             buffer.resize(bytes_needed, 0);
-            bitpacking::encode(deltas.as_ref(), num_bits as u8, &mut buffer[start..]);
+            bitpacked::encode(deltas.as_ref(), num_bits, &mut buffer[start..]);
 
-            let bytes_needed = start + ceil8(deltas.len() * num_bits as usize);
+            let bytes_needed = start + ceil8(deltas.len() * num_bits);
             buffer.truncate(bytes_needed);
         }
 

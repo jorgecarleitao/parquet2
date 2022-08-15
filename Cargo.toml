@@ -16,7 +16,7 @@ bench = false
 
 [dependencies]
 parquet-format-safe = "0.2"
-bitpacking = { version = "0.8.2", default-features = false, features = ["bitpacker1x"] }
+seq-macro = { version = "0.3", default-features = false }
 streaming-decompression = "0.1"
 
 async-stream = { version = "0.3.2", optional = true }
