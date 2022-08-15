@@ -12,6 +12,7 @@ use parquet2::metadata::SchemaDescriptor;
 use parquet2::read::read_metadata;
 use parquet2::schema::types::{ParquetType, PhysicalType};
 use parquet2::statistics::Statistics;
+#[cfg(feature = "async")]
 use parquet2::write::FileStreamer;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
 use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
@@ -42,6 +43,7 @@ fn read_column<R: Read + Seek>(reader: &mut R) -> Result<(Array, Option<Arc<dyn 
     Ok((a, statistics))
 }
 
+#[cfg(feature = "async")]
 async fn read_column_async<
     R: futures::AsyncRead + futures::AsyncSeek + Send + std::marker::Unpin,
 >(
@@ -232,6 +234,7 @@ fn basic() -> Result<()> {
     Ok(())
 }
 
+#[cfg(feature = "async")]
 async fn test_column_async(column: &str, compression: CompressionOptions) -> Result<()> {
     let array = alltypes_plain(column);
 
@@ -287,6 +290,7 @@ async fn test_column_async(column: &str, compression: CompressionOptions) -> Res
     Ok(())
 }
 
+#[cfg(feature = "async")]
 #[tokio::test]
 async fn test_async() -> Result<()> {
     test_column_async("float_col", CompressionOptions::Uncompressed).await

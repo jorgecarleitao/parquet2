@@ -1,4 +1,5 @@
 use crate::encoding::ceil8;
+use crate::error::Error;
 
 use super::super::bitpacked;
 use super::super::uleb128;
@@ -10,40 +11,46 @@ struct Block<'a> {
     // this is the minimum delta that must be added to every value.
     min_delta: i64,
     _num_mini_blocks: usize,
+    /// Number of values that each mini block has.
     values_per_mini_block: usize,
-    bitwidths: &'a [u8],
+    bitwidths: std::slice::Iter<'a, u8>,
     values: &'a [u8],
     remaining: usize,     // number of elements
     current_index: usize, // invariant: < values_per_mini_block
     // None represents a relative delta of zero, in which case there is no miniblock.
-    current_miniblock: Option<bitpacked::Decoder<'a, u32>>,
+    current_miniblock: Option<bitpacked::Decoder<'a, u64>>,
     // number of bytes consumed.
     consumed_bytes: usize,
 }
 
 impl<'a> Block<'a> {
-    pub fn new(
+    pub fn try_new(
         mut values: &'a [u8],
         num_mini_blocks: usize,
         values_per_mini_block: usize,
         length: usize,
-    ) -> Self {
+    ) -> Result<Self, Error> {
         let length = std::cmp::min(length, num_mini_blocks * values_per_mini_block);
 
         let mut consumed_bytes = 0;
-        let (min_delta, consumed) = zigzag_leb128::decode(values);
+        let (min_delta, consumed) = zigzag_leb128::decode(values)?;
         consumed_bytes += consumed;
         values = &values[consumed..];
 
-        let bitwidths = &values[..num_mini_blocks];
+        if num_mini_blocks > values.len() {
+            return Err(Error::oos(
+                "Block must contain at least num_mini_blocks bytes (the bitwidths)",
+            ));
+        }
+        let (bitwidths, remaining) = values.split_at(num_mini_blocks);
         consumed_bytes += num_mini_blocks;
-        values = &values[num_mini_blocks..];
+        values = remaining;
 
         let mut block = Block {
             min_delta,
             _num_mini_blocks: num_mini_blocks,
             values_per_mini_block,
-            bitwidths,
+            bitwidths: bitwidths.iter(),
             remaining: length,
             values,
             current_index: 0,
@@ -52,34 +59,41 @@ impl<'a> Block<'a> {
         };
 
         // Set up first mini-block
-        block.advance_miniblock();
+        block.advance_miniblock()?;
 
-        block
+        Ok(block)
     }
 
-    fn advance_miniblock(&mut self) {
-        let num_bits = self.bitwidths[0] as usize;
-        self.bitwidths = &self.bitwidths[1..];
+    fn advance_miniblock(&mut self) -> Result<(), Error> {
+        // unwrap is ok: we sliced it by num_mini_blocks in try_new
+        let num_bits = self.bitwidths.next().copied().unwrap() as usize;
 
         self.current_miniblock = if num_bits > 0 {
             let length = std::cmp::min(self.remaining, self.values_per_mini_block);
 
             let miniblock_length = ceil8(self.values_per_mini_block * num_bits);
+            if miniblock_length > self.values.len() {
+                return Err(Error::oos(
+                    "block must contain at least miniblock_length bytes (the mini block)",
+                ));
+            }
             let (miniblock, remainder) = self.values.split_at(miniblock_length);
 
             self.values = remainder;
             self.consumed_bytes += miniblock_length;
 
-            Some(bitpacked::Decoder::new(miniblock, num_bits, length))
+            Some(bitpacked::Decoder::try_new(miniblock, num_bits, length).unwrap())
         } else {
             None
         };
         self.current_index = 0;
+
+        Ok(())
     }
 }
 
 impl<'a> Iterator for Block<'a> {
-    type Item = i64;
+    type Item = Result<i64, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.remaining == 0 {
@@ -89,16 +103,18 @@ impl<'a> Iterator for Block<'a> {
             + self
                 .current_miniblock
                 .as_mut()
-                .map(|x| x.next().unwrap())
+                .map(|x| x.next().unwrap_or_default())
                 .unwrap_or(0) as i64;
         self.current_index += 1;
         self.remaining -= 1;
 
         if self.remaining > 0 && self.current_index == self.values_per_mini_block {
-            self.advance_miniblock();
+            if let Err(e) = self.advance_miniblock() {
+                return Some(Err(e));
+            }
         }
 
-        Some(result)
+        Some(Ok(result))
     }
 }
 
@@ -118,21 +134,21 @@ pub struct Decoder<'a> {
 }
 
 impl<'a> Decoder<'a> {
-    pub fn new(mut values: &'a [u8]) -> Self {
+    pub fn try_new(mut values: &'a [u8]) -> Result<Self, Error> {
         let mut consumed_bytes = 0;
-        let (block_size, consumed) = uleb128::decode(values);
+        let (block_size, consumed) = uleb128::decode(values)?;
         consumed_bytes += consumed;
         assert_eq!(block_size % 128, 0);
         values = &values[consumed..];
-        let (num_mini_blocks, consumed) = uleb128::decode(values);
+        let (num_mini_blocks, consumed) = uleb128::decode(values)?;
         let num_mini_blocks = num_mini_blocks as usize;
         consumed_bytes += consumed;
         values = &values[consumed..];
-        let (total_count, consumed) = uleb128::decode(values);
+        let (total_count, consumed) = uleb128::decode(values)?;
         let total_count = total_count as usize;
         consumed_bytes += consumed;
         values = &values[consumed..];
-        let (first_value, consumed) = zigzag_leb128::decode(values);
+        let (first_value, consumed) = zigzag_leb128::decode(values)?;
         consumed_bytes += consumed;
         values = &values[consumed..];
 
@@ -141,17 +157,17 @@ impl<'a> Decoder<'a> {
 
         // If we only have one value (first_value), there are no blocks.
         let current_block = if total_count > 1 {
-            Some(Block::new(
+            Some(Block::try_new(
                 values,
                 num_mini_blocks,
                 values_per_mini_block,
                 total_count - 1,
-            ))
+            )?)
         } else {
             None
         };
 
-        Self {
+        Ok(Self {
             num_mini_blocks,
             values_per_mini_block,
             values_remaining: total_count,
@@ -159,50 +175,63 @@ impl<'a> Decoder<'a> {
             values,
             current_block,
             consumed_bytes,
-        }
+        })
     }
 
     /// Returns the total number of bytes consumed up to this point by [`Decoder`].
     pub fn consumed_bytes(&self) -> usize {
         self.consumed_bytes + self.current_block.as_ref().map_or(0, |b| b.consumed_bytes)
     }
-}
 
-impl<'a> Iterator for Decoder<'a> {
-    type Item = i64;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.values_remaining == 0 {
-            return None;
-        }
-
-        let result = Some(self.next_value);
-
-        self.values_remaining -= 1;
-        if self.values_remaining == 0 {
-            return result;
-        }
-
+    fn load_delta(&mut self) -> Result<i64, Error> {
         // At this point we must have at least one block and value available
         let current_block = self.current_block.as_mut().unwrap();
-        let delta = if let Some(x) = current_block.next() {
+        if let Some(x) = current_block.next() {
             x
         } else {
             // load next block
             self.values = &self.values[current_block.consumed_bytes..];
             self.consumed_bytes += current_block.consumed_bytes;
 
-            let mut next_block = Block::new(
+            let next_block = Block::try_new(
                 self.values,
                 self.num_mini_blocks,
                 self.values_per_mini_block,
                 self.values_remaining,
             );
+            match next_block {
+                Ok(mut next_block) => {
+                    let delta = next_block
+                        .next()
+                        .ok_or_else(|| Error::oos("Missing block"))?;
+                    self.current_block = Some(next_block);
+                    delta
+                }
+                Err(e) => Err(e),
+            }
+        }
+    }
+}
 
-            let delta = next_block.next().unwrap();
-            self.current_block = Some(next_block);
+impl<'a> Iterator for Decoder<'a> {
+    type Item = Result<i64, Error>;
 
-            delta
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.values_remaining == 0 {
+            return None;
+        }
+
+        let result = Some(Ok(self.next_value));
+
+        self.values_remaining -= 1;
+        if self.values_remaining == 0 {
+            // do not try to load another block
+            return result;
+        }
+
+        let delta = match self.load_delta() {
+            Ok(delta) => delta,
+            Err(e) => return Some(Err(e)),
         };
 
         self.next_value += delta;
@@ -229,8 +258,8 @@ mod tests {
         // first_value: 2 <=z> 1
         let data = &[128, 1, 4, 1, 2];
 
-        let mut decoder = Decoder::new(data);
-        let r = decoder.by_ref().collect::<Vec<_>>();
+        let mut decoder = Decoder::try_new(data).unwrap();
+        let r = decoder.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(&r[..], &[1]);
         assert_eq!(decoder.consumed_bytes(), 5);
@@ -250,8 +279,8 @@ mod tests {
         // bit_width: 0
         let data = &[128, 1, 4, 5, 2, 2, 0, 0, 0, 0];
 
-        let mut decoder = Decoder::new(data);
-        let r = decoder.by_ref().collect::<Vec<_>>();
+        let mut decoder = Decoder::try_new(data).unwrap();
+        let r = decoder.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(expected, r);
 
@@ -281,8 +310,8 @@ mod tests {
             1, 2, 3,
         ];
 
-        let mut decoder = Decoder::new(data);
-        let r = decoder.by_ref().collect::<Vec<_>>();
+        let mut decoder = Decoder::try_new(data).unwrap();
+        let r = decoder.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(expected, r);
         assert_eq!(decoder.consumed_bytes(), data.len() - 3);
@@ -327,8 +356,8 @@ mod tests {
             -2, 2, 6, 10, 14, 18, 22, 26, 30, 34, 38, 42, 46, 50,
         ];
 
-        let mut decoder = Decoder::new(data);
-        let r = decoder.by_ref().collect::<Vec<_>>();
+        let mut decoder = Decoder::try_new(data).unwrap();
+        let r = decoder.by_ref().collect::<Result<Vec<_>, _>>().unwrap();
 
         assert_eq!(&expected[..], &r[..]);
         assert_eq!(decoder.consumed_bytes(), data.len() - 3);

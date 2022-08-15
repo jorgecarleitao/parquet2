@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use crate::{
     encoding::hybrid_rle::{self, HybridRleDecoder},
-    error::{Error, Result},
+    error::Error,
     indexes::Interval,
     page::{split_buffer, DataPage},
     read::levels::get_bit_width,
@@ -10,7 +10,7 @@ use crate::{
 
 use super::hybrid_rle::{HybridDecoderBitmapIter, HybridRleIter};
 
-pub(super) fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::HybridRleDecoder> {
+pub(super) fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::HybridRleDecoder, Error> {
     let (_, _, indices_buffer) = split_buffer(page)?;
 
     // SPEC: Data page format: the bit width used to encode the entry ids stored as 1 byte (max bit width = 32),
@@ -23,11 +23,7 @@ pub(super) fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::Hybrid
     }
     let indices_buffer = &indices_buffer[1..];
 
-    Ok(hybrid_rle::HybridRleDecoder::new(
-        indices_buffer,
-        bit_width as u32,
-        page.num_values(),
-    ))
+    hybrid_rle::HybridRleDecoder::try_new(indices_buffer, bit_width as u32, page.num_values())
 }
 
 /// Decoder of definition levels.
@@ -42,7 +38,7 @@ pub enum DefLevelsDecoder<'a> {
 }
 
 impl<'a> DefLevelsDecoder<'a> {
-    pub fn try_new(page: &'a DataPage) -> Result<Self> {
+    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
         let (_, def_levels, _) = split_buffer(page)?;
 
         let max_def_level = page.descriptor.max_def_level;
@@ -51,8 +47,11 @@ impl<'a> DefLevelsDecoder<'a> {
             let iter = HybridRleIter::new(iter, page.num_values());
             Self::Bitmap(iter)
         } else {
-            let iter =
-                HybridRleDecoder::new(def_levels, get_bit_width(max_def_level), page.num_values());
+            let iter = HybridRleDecoder::try_new(
+                def_levels,
+                get_bit_width(max_def_level),
+                page.num_values(),
+            )?;
             Self::Levels(iter, max_def_level as u32)
         })
     }
@@ -61,25 +60,27 @@ impl<'a> DefLevelsDecoder<'a> {
 /// Iterator adapter to convert an iterator of non-null values and an iterator over validity
 /// into an iterator of optional values.
 #[derive(Debug, Clone)]
-pub struct OptionalValues<T, V: Iterator<Item = bool>, I: Iterator<Item = T>> {
+pub struct OptionalValues<T, V: Iterator<Item = Result<bool, Error>>, I: Iterator<Item = T>> {
     validity: V,
     values: I,
 }
 
-impl<T, V: Iterator<Item = bool>, I: Iterator<Item = T>> OptionalValues<T, V, I> {
+impl<T, V: Iterator<Item = Result<bool, Error>>, I: Iterator<Item = T>> OptionalValues<T, V, I> {
     pub fn new(validity: V, values: I) -> Self {
         Self { validity, values }
     }
 }
 
-impl<T, V: Iterator<Item = bool>, I: Iterator<Item = T>> Iterator for OptionalValues<T, V, I> {
-    type Item = Option<T>;
+impl<T, V: Iterator<Item = Result<bool, Error>>, I: Iterator<Item = T>> Iterator
+    for OptionalValues<T, V, I>
+{
+    type Item = Result<Option<T>, Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         self.validity
             .next()
-            .map(|x| if x { self.values.next() } else { None })
+            .map(|x| x.map(|x| if x { self.values.next() } else { None }))
     }
 
     #[inline]

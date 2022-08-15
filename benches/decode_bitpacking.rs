@@ -11,7 +11,7 @@ fn add_benchmark(c: &mut Criterion) {
             .collect::<Vec<_>>();
 
         c.bench_function(&format!("bitpacking 2^{}", log2_size), |b| {
-            b.iter(|| Decoder::<u32>::new(&bytes, 1, size).count())
+            b.iter(|| Decoder::<u32>::try_new(&bytes, 1, size).unwrap().count())
         });
     })
 }

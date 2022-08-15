@@ -20,16 +20,12 @@ pub fn page_to_vec(
         }
         FixedLenBinaryPageState::RequiredDictionary(dict) => dict
             .indexes
-            .map(|x| x as usize)
-            .map(|x| dict.dict.value(x).map(|x| x.to_vec()))
-            .map(Some)
-            .map(|x| x.transpose())
+            .map(|x| x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()).map(Some)))
             .collect(),
         FixedLenBinaryPageState::OptionalDictionary(validity, dict) => {
             let values = dict
                 .indexes
-                .map(|x| x as usize)
-                .map(|x| dict.dict.value(x).map(|x| x.to_vec()));
+                .map(|x| x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec())));
             deserialize_optional(validity, values)
         }
     }

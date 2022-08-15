@@ -17,6 +17,7 @@ mod lz4_legacy;
 
 use std::fs::File;
 
+#[cfg(feature = "async")]
 use futures::StreamExt;
 
 use parquet2::error::Error;
@@ -24,7 +25,9 @@ use parquet2::error::Result;
 use parquet2::metadata::ColumnChunkMetaData;
 use parquet2::page::Page;
 use parquet2::page::{CompressedPage, DataPage};
+#[cfg(feature = "async")]
 use parquet2::read::get_page_stream;
+#[cfg(feature = "async")]
 use parquet2::read::read_metadata_async;
 use parquet2::read::BasicDecompressor;
 use parquet2::read::{get_column_iterator, get_field_columns, read_metadata};
@@ -245,6 +248,7 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
     Ok((array, statistics.pop().unwrap()))
 }
 
+#[cfg(feature = "async")]
 pub async fn read_column_async<
     R: futures::AsyncRead + futures::AsyncSeek + Send + std::marker::Unpin,
 >(
