@@ -1,7 +1,9 @@
 //! Subcommand `dump`. This subcommand shows the parquet metadata information
 use parquet2::{
+    deserialize::{native_cast, HybridRleBooleanIter, HybridRleIter},
+    encoding::{hybrid_rle, Encoding},
     error::{Error, Result},
-    page::Page,
+    page::{split_buffer, DataPage, DictPage, Page},
     read::{decompress, get_page_iterator, read_metadata},
     schema::types::PhysicalType,
     types::{decode, NativeType},
@@ -10,31 +12,6 @@ use parquet2::{
 use std::{fs::File, io::Write, path::Path};
 
 use crate::SEPARATOR;
-
-pub struct PrimitivePageDict<T: NativeType> {
-    values: Vec<T>,
-}
-
-impl<T: NativeType> PrimitivePageDict<T> {
-    pub fn new(values: Vec<T>) -> Self {
-        Self { values }
-    }
-
-    pub fn values(&self) -> &[T] {
-        &self.values
-    }
-
-    #[inline]
-    pub fn value(&self, index: usize) -> Result<&T> {
-        let a = self.values.get(index).ok_or_else(|| {
-            Error::OutOfSpec(
-                "The data page has an index larger than the dictionary page values".to_string(),
-            )
-        });
-
-        a
-    }
-}
 
 // Dumps data from the file.
 // The function prints a sample of the data from each of the RowGroups.
@@ -82,6 +59,9 @@ where
                 1024 * 1024,
             )?;
 
+            let descriptor = column_meta.descriptor();
+            let physical_type = descriptor.descriptor.primitive_type.physical_type;
+
             let mut decompress_buffer = vec![];
             for (page_ind, page) in iter.enumerate() {
                 let page = page?;
@@ -90,22 +70,38 @@ where
 
                 let page = decompress(page, &mut decompress_buffer)?;
                 match page {
-                    Page::Dict(_) => {
-                        todo!()
-                    }
+                    Page::Dict(page) => match physical_type {
+                        PhysicalType::Int32 => {
+                            print_dict_page::<i32, W>(page, sample_size, writer)?
+                        }
+                        PhysicalType::Int64 => {
+                            print_dict_page::<i64, W>(page, sample_size, writer)?
+                        }
+                        PhysicalType::Float => {
+                            print_dict_page::<f32, W>(page, sample_size, writer)?
+                        }
+                        PhysicalType::Double => {
+                            print_dict_page::<f64, W>(page, sample_size, writer)?
+                        }
+                        _ => continue,
+                    },
                     Page::Data(page) => {
-                        match page.descriptor.primitive_type.physical_type {
-                            PhysicalType::Int32 => {
-                                print_page::<i32, W>(page.buffer(), sample_size, true, writer)?
+                        match (physical_type, page.encoding()) {
+                            (PhysicalType::Int32, Encoding::Plain) => {
+                                print_page::<i32, W>(page, sample_size, writer)?
                             }
-                            PhysicalType::Int64 => {
-                                print_page::<i64, W>(page.buffer(), sample_size, true, writer)?
+                            (
+                                PhysicalType::Int32,
+                                Encoding::RleDictionary | Encoding::PlainDictionary,
+                            ) => print_rle_page::<i32, W>(page, sample_size, writer)?,
+                            (PhysicalType::Int64, Encoding::Plain) => {
+                                print_page::<i64, W>(page, sample_size, writer)?
                             }
-                            PhysicalType::Float => {
-                                print_page::<f32, W>(page.buffer(), sample_size, true, writer)?
+                            (PhysicalType::Float, Encoding::Plain) => {
+                                print_page::<f32, W>(page, sample_size, writer)?
                             }
-                            PhysicalType::Double => {
-                                print_page::<f64, W>(page.buffer(), sample_size, true, writer)?
+                            (PhysicalType::Double, Encoding::Plain) => {
+                                print_page::<f64, W>(page, sample_size, writer)?
                             }
                             _ => continue,
                         };
@@ -118,34 +114,96 @@ where
     Ok(())
 }
 
-pub fn read<T: NativeType>(
-    buf: &[u8],
+fn print_dict_page<T: NativeType, W: Write>(
+    page: DictPage,
     num_values: usize,
-    _is_sorted: bool,
-) -> Result<PrimitivePageDict<T>> {
+    writer: &mut W,
+) -> Result<()> {
     let size_of = std::mem::size_of::<T>();
 
     let typed_size = num_values.wrapping_mul(size_of);
 
-    let values = buf.get(..typed_size).ok_or_else(|| {
+    let values = page.buffer.get(..typed_size).ok_or_else(|| {
         Error::OutOfSpec(
             "The number of values declared in the dict page does not match the length of the page"
                 .to_string(),
         )
     })?;
 
-    let values = values.chunks_exact(size_of).map(decode::<T>).collect();
+    let iter = values.chunks_exact(size_of).map(decode::<T>);
 
-    Ok(PrimitivePageDict::new(values))
+    print_iterator(iter, num_values, writer)
 }
 
-fn print_page<T, W>(buffer: &[u8], sample_size: usize, sorted: bool, writer: &mut W) -> Result<()>
+fn print_page<T, W>(page: DataPage, sample_size: usize, writer: &mut W) -> Result<()>
 where
     T: NativeType,
     W: Write,
 {
-    let dict = read::<T>(buffer, sample_size, sorted)?;
-    print_iterator(dict.values().iter(), sample_size, writer)
+    let validity = validity(&page)?;
+
+    let mut non_null_values = native_cast::<T>(&page)?;
+
+    let iter = validity.map(|is_valid| {
+        if is_valid {
+            non_null_values.next()
+        } else {
+            None
+        }
+    });
+
+    print_iterator(iter, sample_size, writer)
+}
+
+fn print_rle_page<T, W>(page: DataPage, sample_size: usize, writer: &mut W) -> Result<()>
+where
+    T: NativeType,
+    W: Write,
+{
+    let validity = validity(&page)?;
+
+    let mut non_null_indices = dict_indices_decoder(&page)?;
+
+    let iter = validity.map(|is_valid| {
+        if is_valid {
+            non_null_indices.next()
+        } else {
+            None
+        }
+    });
+
+    print_iterator(iter, sample_size, writer)
+}
+
+fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::HybridRleDecoder> {
+    let (_, _, indices_buffer) = split_buffer(page)?;
+
+    // SPEC: Data page format: the bit width used to encode the entry ids stored as 1 byte (max bit width = 32),
+    // SPEC: followed by the values encoded using RLE/Bit packed described above (with the given bit width).
+    let bit_width = indices_buffer[0];
+    if bit_width > 32 {
+        return Err(Error::OutOfSpec(
+            "Bit width of dictionary pages cannot be larger than 32".to_string(),
+        ));
+    }
+    let indices_buffer = &indices_buffer[1..];
+
+    Ok(hybrid_rle::HybridRleDecoder::new(
+        indices_buffer,
+        bit_width as u32,
+        page.num_values(),
+    ))
+}
+
+fn validity(page: &DataPage) -> Result<HybridRleBooleanIter<HybridRleIter<hybrid_rle::Decoder>>> {
+    let (_, def_levels, _) = split_buffer(page)?;
+
+    // only works for non-nested pages
+    let num_bits = (page.descriptor.max_def_level == 1) as usize;
+
+    let validity = hybrid_rle::Decoder::new(def_levels, num_bits);
+    let validity = HybridRleIter::new(validity, page.num_values());
+    Ok(HybridRleBooleanIter::new(validity))
 }
 
 fn print_iterator<I, T, W>(iter: I, sample_size: usize, writer: &mut W) -> Result<()>
