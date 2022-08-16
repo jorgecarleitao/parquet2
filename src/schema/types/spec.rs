@@ -40,8 +40,16 @@ fn check_decimal_invariants(
             }
         }
         PhysicalType::FixedLenByteArray(length) => {
-            let max_precision =
-                (2f64.powi(8 * (*length as i32) - 1) - 1f64).log10().floor() as usize;
+            let oos_error = || Error::oos(format!("Byte Array length {} out of spec", length));
+            let max_precision = (2f64.powi(
+                (*length as i32)
+                    .checked_mul(8)
+                    .ok_or_else(oos_error)?
+                    .checked_sub(1)
+                    .ok_or_else(oos_error)?,
+            ) - 1f64)
+                .log10()
+                .floor() as usize;
 
             if precision > max_precision {
                 return Err(Error::oos(format!(
