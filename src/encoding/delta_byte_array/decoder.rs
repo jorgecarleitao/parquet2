@@ -74,4 +74,35 @@ mod tests {
         assert_eq!(values, expected_values);
         Ok(())
     }
+
+    #[test]
+    fn test_with_prefix() -> Result<(), Error> {
+        // VALIDATED from spark==3.1.1
+        let data = &[
+            128, 1, 4, 2, 0, 6, 0, 0, 0, 0, 128, 1, 4, 2, 10, 4, 0, 0, 0, 0, 72, 101, 108, 108,
+            111, 105, 99, 111, 112, 116, 101, 114,
+            // extra bytes are not from spark, but they should be ignored by the decoder
+            // because they are beyond the sum of all lengths.
+            1, 2, 3,
+        ];
+        // result of encoding
+        let expected_lengths = vec![5, 7];
+        let expected_prefixes = vec![0, 3];
+        let expected_values = b"Helloicopter";
+
+        let mut decoder = Decoder::try_new(data)?;
+        let prefixes = decoder.by_ref().collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(prefixes, expected_prefixes);
+
+        // move to the lengths
+        let mut decoder = decoder.into_lengths()?;
+
+        let lengths = decoder.by_ref().collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(lengths, expected_lengths);
+
+        // move to the values
+        let values = decoder.values();
+        assert_eq!(values, expected_values);
+        Ok(())
+    }
 }
