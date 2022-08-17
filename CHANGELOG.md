@@ -1,5 +1,36 @@
 # Changelog
 
+## [v0.16.0](https://github.com/jorgecarleitao/parquet2/tree/v0.16.0) (2022-08-17)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.15.1...v0.16.0)
+
+**Breaking changes:**
+
+- Improved `Error` [\#181](https://github.com/jorgecarleitao/parquet2/pull/181) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Made decoding fallible [\#178](https://github.com/jorgecarleitao/parquet2/pull/178) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Improved bitpacking [\#176](https://github.com/jorgecarleitao/parquet2/pull/176) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**New features:**
+
+- Added DELTA\_BYTE\_ARRAY encoder [\#183](https://github.com/jorgecarleitao/parquet2/pull/183) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Fixed bugs:**
+
+- FixedLenByteArray max\_precision integer overflow [\#184](https://github.com/jorgecarleitao/parquet2/pull/184) ([evanrichter](https://github.com/evanrichter))
+
+**Documentation updates:**
+
+- enable `doc_cfg` feature [\#186](https://github.com/jorgecarleitao/parquet2/pull/186) ([ritchie46](https://github.com/ritchie46))
+- Improved decoding documentation [\#180](https://github.com/jorgecarleitao/parquet2/pull/180) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+## [v0.15.1](https://github.com/jorgecarleitao/parquet2/tree/v0.15.1) (2022-08-14)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.15.0...v0.15.1)
+
+**Fixed bugs:**
+
+- Fixed error in encoding large bitpacked deltas [\#179](https://github.com/jorgecarleitao/parquet2/pull/179) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.15.1](https://github.com/jorgecarleitao/parquet2/tree/v0.15.1) (2022-08-14)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.15.0...v0.15.1)
