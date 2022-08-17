@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.16.1](https://github.com/jorgecarleitao/parquet2/tree/v0.16.1) (2022-08-17)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.0...v0.16.1)
+
+**Fixed bugs:**
+
+- Fixed error in `FilteredHybridBitmapIter`'s trait bounds [\#187](https://github.com/jorgecarleitao/parquet2/pull/187) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.16.0](https://github.com/jorgecarleitao/parquet2/tree/v0.16.0) (2022-08-17)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.15.1...v0.16.0)
