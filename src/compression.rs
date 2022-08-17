@@ -162,7 +162,9 @@ pub fn decompress(compression: Compression, input_buf: &[u8], output_buf: &mut [
             use snap::raw::{decompress_len, Decoder};
 
             let len = decompress_len(input_buf)?;
-            assert!(len <= output_buf.len());
+            if len > output_buf.len() {
+                return Err(Error::OutOfSpec(String::from("snappy header out of spec")));
+            }
             Decoder::new()
                 .decompress(input_buf, output_buf)
                 .map_err(|e| e.into())
