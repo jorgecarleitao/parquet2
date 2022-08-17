@@ -1,5 +1,6 @@
 use std::collections::VecDeque;
 
+use crate::error::Error;
 use crate::{encoding::hybrid_rle::BitmapIter, indexes::Interval};
 
 use super::{HybridDecoderBitmapIter, HybridEncoded};
@@ -53,7 +54,7 @@ impl<'a> FilteredHybridEncoded<'a> {
 ///
 /// This iterator adapter is used in combination with
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FilteredHybridBitmapIter<'a, I: Iterator<Item = HybridEncoded<'a>>> {
+pub struct FilteredHybridBitmapIter<'a, I: Iterator<Item = Result<HybridEncoded<'a>, Error>>> {
     iter: I,
     current: Option<(HybridEncoded<'a>, usize)>,
     // a run may end in the middle of an interval, in which case we must
@@ -65,7 +66,7 @@ pub struct FilteredHybridBitmapIter<'a, I: Iterator<Item = HybridEncoded<'a>>> {
     total_items: usize,
 }
 
-impl<'a, I: Iterator<Item = HybridEncoded<'a>>> FilteredHybridBitmapIter<'a, I> {
+impl<'a, I: Iterator<Item = Result<HybridEncoded<'a>, Error>>> FilteredHybridBitmapIter<'a, I> {
     pub fn new(iter: I, selected_rows: VecDeque<Interval>) -> Self {
         let total_items = selected_rows.iter().map(|x| x.length).sum();
         Self {
@@ -98,8 +99,10 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> FilteredHybridBitmapIter<'a, I> 
     }
 }
 
-impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitmapIter<'a, I> {
-    type Item = FilteredHybridEncoded<'a>;
+impl<'a, I: Iterator<Item = Result<HybridEncoded<'a>, Error>>> Iterator
+    for FilteredHybridBitmapIter<'a, I>
+{
+    type Item = Result<FilteredHybridEncoded<'a>, Error>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let interval = if let Some(interval) = self.current_interval {
@@ -115,7 +118,12 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
         } else {
             // a new run
             let run = self.iter.next()?; // no run => something wrong since intervals should only slice items up all runs' length
-            self.current = Some((run, 0));
+            match run {
+                Ok(run) => {
+                    self.current = Some((run, 0));
+                }
+                Err(e) => return Some(Err(e)),
+            }
             return self.next();
         };
 
@@ -149,7 +157,7 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
                         Some((run, offset + to_skip))
                     };
 
-                    return Some(FilteredHybridEncoded::Skipped(set));
+                    return Some(Ok(FilteredHybridEncoded::Skipped(set)));
                 };
 
                 // slice the bitmap according to current interval
@@ -162,7 +170,7 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
                     self.advance_current_interval(run_length);
                     self.current_items_in_runs += run_length;
                     self.current = None;
-                    Some(FilteredHybridEncoded::Skipped(set))
+                    Some(Ok(FilteredHybridEncoded::Skipped(set)))
                 } else {
                     let length = if run_length > interval.length {
                         // interval is fully consumed
@@ -188,7 +196,7 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
                         self.current = None;
                         length
                     };
-                    Some(FilteredHybridEncoded::Repeated { is_set, length })
+                    Some(Ok(FilteredHybridEncoded::Repeated { is_set, length }))
                 }
             }
             HybridEncoded::Bitmap(values, full_run_length) => {
@@ -215,7 +223,7 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
                         Some((run, offset + to_skip))
                     };
 
-                    return Some(FilteredHybridEncoded::Skipped(set));
+                    return Some(Ok(FilteredHybridEncoded::Skipped(set)));
                 };
 
                 // slice the bitmap according to current interval
@@ -228,7 +236,7 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
                     self.advance_current_interval(run_length);
                     self.current_items_in_runs += run_length;
                     self.current = None;
-                    Some(FilteredHybridEncoded::Skipped(set))
+                    Some(Ok(FilteredHybridEncoded::Skipped(set)))
                 } else {
                     let length = if run_length > interval.length {
                         // interval is fully consumed
@@ -254,11 +262,11 @@ impl<'a, I: Iterator<Item = HybridEncoded<'a>>> Iterator for FilteredHybridBitma
                         self.current = None;
                         length
                     };
-                    Some(FilteredHybridEncoded::Bitmap {
+                    Some(Ok(FilteredHybridEncoded::Bitmap {
                         values,
                         offset: new_offset,
                         length,
-                    })
+                    }))
                 }
             }
         }
