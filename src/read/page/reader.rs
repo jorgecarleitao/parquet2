@@ -84,7 +84,8 @@ pub struct PageReader<R: Read> {
     // The currently allocated buffer.
     pub(crate) scratch: Vec<u8>,
 
-    max_header_size: usize,
+    // Maximum page size (compressed or uncompressed) to limit allocations
+    max_page_size: usize,
 }
 
 impl<R: Read> PageReader<R> {
@@ -97,15 +98,9 @@ impl<R: Read> PageReader<R> {
         column: &ColumnChunkMetaData,
         pages_filter: PageFilter,
         scratch: Vec<u8>,
-        max_header_size: usize,
+        max_page_size: usize,
     ) -> Self {
-        Self::new_with_page_meta(
-            reader,
-            column.into(),
-            pages_filter,
-            scratch,
-            max_header_size,
-        )
+        Self::new_with_page_meta(reader, column.into(), pages_filter, scratch, max_page_size)
     }
 
     /// Create a a new [`PageReader`] with [`PageMetaData`].
@@ -116,7 +111,7 @@ impl<R: Read> PageReader<R> {
         reader_meta: PageMetaData,
         pages_filter: PageFilter,
         scratch: Vec<u8>,
-        max_header_size: usize,
+        max_page_size: usize,
     ) -> Self {
         Self {
             reader,
@@ -126,7 +121,7 @@ impl<R: Read> PageReader<R> {
             descriptor: reader_meta.descriptor,
             pages_filter,
             scratch,
-            max_header_size,
+            max_page_size,
         }
     }
 
@@ -191,7 +186,7 @@ pub(super) fn build_page<R: Read>(
     reader: &mut PageReader<R>,
     buffer: &mut Vec<u8>,
 ) -> Result<Option<CompressedPage>> {
-    let page_header = read_page_header(&mut reader.reader, reader.max_header_size)?;
+    let page_header = read_page_header(&mut reader.reader, reader.max_page_size)?;
 
     reader.seen_num_values += get_page_header(&page_header)?
         .map(|x| x.num_values() as i64)
@@ -199,13 +194,23 @@ pub(super) fn build_page<R: Read>(
 
     let read_size: usize = page_header.compressed_page_size.try_into()?;
 
+    if read_size > reader.max_page_size {
+        return Err(Error::WouldOverAllocate);
+    }
+
     buffer.clear();
     buffer.try_reserve(read_size)?;
-    reader
+    let bytes_read = reader
         .reader
         .by_ref()
         .take(read_size as u64)
         .read_to_end(buffer)?;
+
+    if bytes_read != read_size {
+        return Err(Error::oos(
+            "The page header reported the wrong page size".to_string(),
+        ));
+    }
 
     finish_page(
         page_header,

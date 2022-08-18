@@ -29,6 +29,8 @@ pub enum Error {
     FeatureNotSupported(String),
     /// When encoding, the user passed an invalid parameter
     InvalidParameter(String),
+    /// When decoding or decompressing, the page would allocate more memory than allowed
+    WouldOverAllocate,
 }
 
 impl Error {
@@ -57,6 +59,9 @@ impl std::fmt::Display for Error {
             }
             Error::InvalidParameter(message) => {
                 write!(fmt, "Invalid parameter: {}", message)
+            }
+            Error::WouldOverAllocate => {
+                write!(fmt, "Operation would exceed memory use threshold")
             }
         }
     }
