@@ -34,6 +34,11 @@ fn decompress_v2(
 
         compression::decompress(compression, &compressed[offset..], &mut buffer[offset..])?;
     } else {
+        if buffer.len() != compressed.len() {
+            return Err(Error::OutOfSpec(
+                "V2 Page Header reported incorrect decompressed size".to_string(),
+            ));
+        }
         buffer.copy_from_slice(compressed);
     }
     Ok(())
