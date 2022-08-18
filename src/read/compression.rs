@@ -30,6 +30,12 @@ fn decompress_v2(
     let can_decompress = page_header.is_compressed.unwrap_or(true);
 
     if can_decompress {
+        if offset > buffer.len() || offset > compressed.len() {
+            return Err(Error::OutOfSpec(
+                "V2 Page Header reported incorrect offset to compressed data".to_string(),
+            ));
+        }
+
         (&mut buffer[..offset]).copy_from_slice(&compressed[..offset]);
 
         compression::decompress(compression, &compressed[offset..], &mut buffer[offset..])?;
