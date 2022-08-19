@@ -333,10 +333,16 @@ filter operations to row groups.</p>
 <p>The column metadata may contain column and page indexes that can be used to push down filters
 when reading (IO) pages.</p>
 <p>This crate offers the necessary functionality to check whether an item is not in a column chunk:</p>
-<pre><code class="language-rust no_run noplayground">    let row_group = 0;
-    let column = 0;
-    let columns = metadata.row_groups[row_group].columns();
-    let column_metadata = &amp;columns[column];
+<pre><code class="language-rust no_run noplayground">    // read the column indexes of every column
+    use parquet2::read;
+    let index = read::read_columns_indexes(&amp;mut reader, columns)?;
+    // these are the minimum and maximum within each page, which can be used
+    // to skip pages.
+    println!(&quot;{index:?}&quot;);
+
+    // read the offset indexes containing page locations of every column
+    let pages = read::read_pages_locations(&amp;mut reader, columns)?;
+    println!(&quot;{pages:?}&quot;);
 </code></pre>
 <h2 id="sidecar"><a class="header" href="#sidecar">Sidecar</a></h2>
 <p>When writing multiple parquet files, it is common to have a &quot;sidecar&quot; metadata file containing
