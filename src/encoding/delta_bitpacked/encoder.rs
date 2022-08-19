@@ -24,50 +24,56 @@ pub fn encode<I: Iterator<Item = i64>>(mut iterator: I, buffer: &mut Vec<u8>) {
     buffer.extend_from_slice(&container[..encoded_len]);
 
     let mut values = [0i64; 128];
-    let mut deltas = [0u32; 128];
+    let mut deltas = [0u64; 128];
 
-    let first_value = iterator.next().unwrap();
+    let first_value = iterator.next().unwrap_or_default();
     let (container, encoded_len) = zigzag_leb128::encode(first_value);
     buffer.extend_from_slice(&container[..encoded_len]);
 
     let mut prev = first_value;
     let mut length = iterator.size_hint().1.unwrap();
     while length != 0 {
-        for (i, v) in (0..128).zip(&mut iterator) {
-            values[i] = v - prev;
-            prev = v;
+        let mut min_delta = i64::MAX;
+        let mut max_delta = i64::MIN;
+        let mut num_bits = 0;
+        for (i, integer) in (0..128).zip(&mut iterator) {
+            let delta = integer - prev;
+            min_delta = min_delta.min(delta);
+            max_delta = max_delta.max(delta);
+
+            num_bits = 64 - (max_delta - min_delta).leading_zeros();
+            values[i] = delta;
+            prev = integer;
         }
         let consumed = std::cmp::min(length - iterator.size_hint().1.unwrap(), 128);
+        length = iterator.size_hint().1.unwrap();
         let values = &values[..consumed];
 
-        let min_delta = *values.iter().min().unwrap();
-        let max_delta = *values.iter().max().unwrap();
-
-        values.iter().zip(deltas.iter_mut()).for_each(|(v, d)| {
-            *d = (v - min_delta) as u32;
+        values.iter().zip(deltas.iter_mut()).for_each(|(v, delta)| {
+            *delta = (v - min_delta) as u64;
         });
 
         // <min delta> <list of bitwidths of miniblocks> <miniblocks>
         let (container, encoded_len) = zigzag_leb128::encode(min_delta);
         buffer.extend_from_slice(&container[..encoded_len]);
 
-        let num_bits = 64 - (max_delta - min_delta).leading_zeros();
+        // one miniblock => 1 byte
         buffer.push(num_bits as u8);
-        let num_bits = num_bits as usize;
+        write_miniblock(buffer, num_bits as usize, deltas);
+    }
+}
 
-        if num_bits > 0 {
-            let start = buffer.len();
+fn write_miniblock(buffer: &mut Vec<u8>, num_bits: usize, deltas: [u64; 128]) {
+    if num_bits > 0 {
+        let start = buffer.len();
 
-            // bitpack encode all (deltas.len = 128 which is a multiple of 32)
-            let bytes_needed = start + ceil8(deltas.len() * num_bits);
-            buffer.resize(bytes_needed, 0);
-            bitpacked::encode(deltas.as_ref(), num_bits, &mut buffer[start..]);
+        // bitpack encode all (deltas.len = 128 which is a multiple of 32)
+        let bytes_needed = start + ceil8(deltas.len() * num_bits);
+        buffer.resize(bytes_needed, 0);
+        bitpacked::encode(deltas.as_ref(), num_bits, &mut buffer[start..]);
 
-            let bytes_needed = start + ceil8(deltas.len() * num_bits);
-            buffer.truncate(bytes_needed);
-        }
-
-        length = iterator.size_hint().1.unwrap();
+        let bytes_needed = start + ceil8(deltas.len() * num_bits);
+        buffer.truncate(bytes_needed);
     }
 }
 
