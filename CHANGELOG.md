@@ -1,5 +1,17 @@
 # Changelog
 
+## [v0.16.2](https://github.com/jorgecarleitao/parquet2/tree/v0.16.2) (2022-08-19)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.1...v0.16.2)
+
+**Fixed bugs:**
+
+- Fixed edge cases in writing delta encoder [\#189](https://github.com/jorgecarleitao/parquet2/pull/189) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Documentation updates:**
+
+- Improved doc generation to include features [\#190](https://github.com/jorgecarleitao/parquet2/pull/190) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.16.1](https://github.com/jorgecarleitao/parquet2/tree/v0.16.1) (2022-08-17)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.0...v0.16.1)
