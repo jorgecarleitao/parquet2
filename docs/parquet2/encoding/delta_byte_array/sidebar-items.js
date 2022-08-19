@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["encode","Encodes an iterator of according to DELTA_BYTE_ARRAY"]],"struct":[["Decoder","Decodes according to Delta strings, prefixes, lengths and values"]]};
