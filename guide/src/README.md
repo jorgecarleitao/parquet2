@@ -130,7 +130,7 @@ when reading (IO) pages.
 This crate offers the necessary functionality to check whether an item is not in a column chunk:
 
 ```rust,no_run,noplayground
-{{#include ../../examples/read_metadata.rs:column_metadata}}
+{{#include ../../examples/read_metadata.rs:column_index}}
 ```
 
 ## Sidecar

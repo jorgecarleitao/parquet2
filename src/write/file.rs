@@ -64,7 +64,7 @@ pub struct FileWriter<W: Write> {
 /// This is used to write the metadata as a separate Parquet file, usually when data
 /// is partitioned across multiple files.
 ///
-/// Note: Recall that when combining row groups from [`FileMetaData`], the `file_path` on each
+/// Note: Recall that when combining row groups from [`ThriftFileMetaData`], the `file_path` on each
 /// of their column chunks must be updated with their path relative to where they are written to.
 pub fn write_metadata_sidecar<W: Write>(
     writer: &mut W,
