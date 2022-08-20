@@ -1,9 +1,9 @@
+use crate::error::Error;
+
 /// Decodes according to [Plain strings](https://github.com/apache/parquet-format/blob/master/Encodings.md#plain-plain--0),
 /// prefixes, lengths and values
 /// # Implementation
 /// This struct does not allocate on the heap.
-use crate::error::Error;
-
 #[derive(Debug)]
 pub struct BinaryIter<'a> {
     values: &'a [u8],
