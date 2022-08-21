@@ -1,124 +1,25 @@
+use std::collections::VecDeque;
+
 use crate::{
-    encoding::{delta_length_byte_array, hybrid_rle, plain_byte_array::BinaryIter},
+    encoding::{
+        delta_length_byte_array,
+        hybrid_rle::{self, HybridRleDecoder},
+        plain_byte_array::BinaryIter,
+    },
     error::Error,
+    indexes::Interval,
     page::{split_buffer, DataPage},
     parquet_bridge::{Encoding, Repetition},
+    read::levels::get_bit_width,
 };
 
-use super::utils::{self, get_selected_rows, FilteredOptionalPageValidity, OptionalPageValidity};
 use super::SliceFilteredIter;
-
-/// The state of a binary-encoded, non-nested [`DataPage`]
-#[derive(Debug)]
-pub enum BinaryPageState<'a, P> {
-    Optional(OptionalPageValidity<'a>, BinaryIter<'a>),
-    Required(BinaryIter<'a>),
-    RequiredDictionary(Dictionary<'a, P>),
-    OptionalDictionary(OptionalPageValidity<'a>, Dictionary<'a, P>),
-    Delta(Delta<'a>),
-    OptionalDelta(OptionalPageValidity<'a>, Delta<'a>),
-    FilteredRequired(FilteredRequired<'a>),
-    FilteredDelta(FilteredDelta<'a>),
-    FilteredOptionalDelta(FilteredOptionalPageValidity<'a>, Delta<'a>),
-    FilteredOptional(FilteredOptionalPageValidity<'a>, BinaryIter<'a>),
-    FilteredRequiredDictionary(FilteredRequiredDictionary<'a, P>),
-    FilteredOptionalDictionary(FilteredOptionalPageValidity<'a>, Dictionary<'a, P>),
-}
-
-impl<'a, P> BinaryPageState<'a, P> {
-    pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
-        let is_optional =
-            page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
-        let is_filtered = page.selected_rows().is_some();
-
-        match (page.encoding(), dict, is_optional, is_filtered) {
-            (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), false, false) => {
-                Ok(Self::RequiredDictionary(Dictionary::try_new(page, dict)?))
-            }
-            (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), true, false) => {
-                Ok(Self::OptionalDictionary(
-                    OptionalPageValidity::try_new(page)?,
-                    Dictionary::try_new(page, dict)?,
-                ))
-            }
-            (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), false, true) => {
-                FilteredRequiredDictionary::try_new(page, dict)
-                    .map(Self::FilteredRequiredDictionary)
-            }
-            (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict), true, true) => {
-                Ok(Self::FilteredOptionalDictionary(
-                    FilteredOptionalPageValidity::try_new(page)?,
-                    Dictionary::try_new(page, dict)?,
-                ))
-            }
-            (Encoding::Plain, _, true, false) => {
-                let (_, _, values) = split_buffer(page)?;
-
-                let values = BinaryIter::new(values, None);
-
-                Ok(Self::Optional(OptionalPageValidity::try_new(page)?, values))
-            }
-            (Encoding::Plain, _, false, false) => {
-                let (_, _, values) = split_buffer(page)?;
-
-                Ok(Self::Required(BinaryIter::new(
-                    values,
-                    Some(page.num_values()),
-                )))
-            }
-            (Encoding::Plain, _, false, true) => {
-                Ok(Self::FilteredRequired(FilteredRequired::new(page)))
-            }
-            (Encoding::Plain, _, true, true) => {
-                let (_, _, values) = split_buffer(page)?;
-
-                Ok(Self::FilteredOptional(
-                    FilteredOptionalPageValidity::try_new(page)?,
-                    BinaryIter::new(values, None),
-                ))
-            }
-            (Encoding::DeltaLengthByteArray, _, false, false) => {
-                Delta::try_new(page).map(Self::Delta)
-            }
-            (Encoding::DeltaLengthByteArray, _, true, false) => Ok(Self::OptionalDelta(
-                OptionalPageValidity::try_new(page)?,
-                Delta::try_new(page)?,
-            )),
-            (Encoding::DeltaLengthByteArray, _, false, true) => {
-                FilteredDelta::try_new(page).map(Self::FilteredDelta)
-            }
-            (Encoding::DeltaLengthByteArray, _, true, true) => Ok(Self::FilteredOptionalDelta(
-                FilteredOptionalPageValidity::try_new(page)?,
-                Delta::try_new(page)?,
-            )),
-            (other, _, _, _) => Err(Error::OutOfSpec(format!(
-                "Binary-encoded non-nested pages cannot be encoded as {other:?}"
-            ))),
-        }
-    }
-
-    pub fn len(&self) -> usize {
-        match self {
-            Self::Optional(validity, _) => validity.len(),
-            Self::Required(state) => state.size_hint().0,
-            Self::Delta(state) => state.len(),
-            Self::OptionalDelta(state, _) => state.len(),
-            Self::RequiredDictionary(values) => values.len(),
-            Self::OptionalDictionary(optional, _) => optional.len(),
-            Self::FilteredRequired(state) => state.len(),
-            Self::FilteredOptional(validity, _) => validity.len(),
-            Self::FilteredDelta(state) => state.len(),
-            Self::FilteredOptionalDelta(state, _) => state.len(),
-            Self::FilteredRequiredDictionary(values) => values.len(),
-            Self::FilteredOptionalDictionary(optional, _) => optional.len(),
-        }
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
+use super::{
+    utils::{
+        dict_indices_decoder, get_selected_rows, FilteredOptionalPageValidity, OptionalPageValidity,
+    },
+    FilteredHybridRleDecoderIter,
+};
 
 #[derive(Debug)]
 pub struct Dictionary<'a, P> {
@@ -128,7 +29,7 @@ pub struct Dictionary<'a, P> {
 
 impl<'a, P> Dictionary<'a, P> {
     pub fn try_new(page: &'a DataPage, dict: &'a P) -> Result<Self, Error> {
-        let indexes = utils::dict_indices_decoder(page)?;
+        let indexes = dict_indices_decoder(page)?;
 
         Ok(Self { indexes, dict })
     }
@@ -243,28 +144,166 @@ impl<'a> FilteredDelta<'a> {
 }
 
 #[derive(Debug)]
-pub struct FilteredRequiredDictionary<'a, P> {
-    pub values: SliceFilteredIter<hybrid_rle::HybridRleDecoder<'a>>,
+pub struct FilteredDictionary<'a, P> {
+    pub indexes: SliceFilteredIter<hybrid_rle::HybridRleDecoder<'a>>,
     pub dict: &'a P,
 }
 
-impl<'a, P> FilteredRequiredDictionary<'a, P> {
+impl<'a, P> FilteredDictionary<'a, P> {
     pub fn try_new(page: &'a DataPage, dict: &'a P) -> Result<Self, Error> {
-        let values = utils::dict_indices_decoder(page)?;
+        let indexes = dict_indices_decoder(page)?;
 
         let rows = get_selected_rows(page);
-        let values = SliceFilteredIter::new(values, rows);
+        let indexes = SliceFilteredIter::new(indexes, rows);
 
-        Ok(Self { values, dict })
+        Ok(Self { indexes, dict })
     }
 
     #[inline]
     pub fn len(&self) -> usize {
-        self.values.size_hint().0
+        self.indexes.size_hint().0
     }
 
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+}
+
+pub enum BinaryPageValues<'a, P> {
+    Plain(BinaryIter<'a>),
+    Dictionary(Dictionary<'a, P>),
+    Delta(Delta<'a>),
+}
+
+impl<'a, P> BinaryPageValues<'a, P> {
+    pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
+        let is_optional =
+            page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
+        let length = (!is_optional).then(|| page.num_values());
+
+        match (page.encoding(), dict) {
+            (Encoding::PlainDictionary | Encoding::RleDictionary, Some(dict)) => {
+                Dictionary::try_new(page, dict).map(Self::Dictionary)
+            }
+            (Encoding::Plain, _) => {
+                let (_, _, values) = split_buffer(page)?;
+                Ok(Self::Plain(BinaryIter::new(values, length)))
+            }
+            (Encoding::DeltaLengthByteArray, _) => Delta::try_new(page).map(Self::Delta),
+            (other, _) => Err(Error::OutOfSpec(format!(
+                "Binary-encoded non-nested pages cannot be encoded as {other:?}"
+            ))),
+        }
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Plain(validity) => validity.size_hint().0,
+            Self::Dictionary(state) => state.len(),
+            Self::Delta(state) => state.len(),
+        }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+pub enum BinaryPage<'a, P> {
+    Optional(OptionalPageValidity<'a>, BinaryPageValues<'a, P>),
+    Required(BinaryPageValues<'a, P>),
+    Levels(HybridRleDecoder<'a>, u32, BinaryPageValues<'a, P>),
+}
+
+impl<'a, P> BinaryPage<'a, P> {
+    pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
+        let values = BinaryPageValues::try_new(page, dict)?;
+
+        if page.descriptor.max_def_level > 1 {
+            let (_, def_levels, _) = split_buffer(page)?;
+            let max = page.descriptor.max_def_level as u32;
+            let validity = HybridRleDecoder::try_new(
+                def_levels,
+                get_bit_width(max as i16),
+                page.num_values(),
+            )?;
+            return Ok(Self::Levels(
+                validity,
+                page.descriptor.max_def_level as u32,
+                values,
+            ));
+        }
+
+        let is_optional =
+            page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
+        Ok(if is_optional {
+            Self::Optional(OptionalPageValidity::try_new(page)?, values)
+        } else {
+            Self::Required(values)
+        })
+    }
+
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Optional(validity, _) => validity.len(),
+            Self::Required(state) => state.len(),
+            Self::Levels(state, _, _) => state.len(),
+        }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+pub enum FilteredBinaryPageValues<'a, P> {
+    Plain(SliceFilteredIter<BinaryIter<'a>>),
+    Dictionary(FilteredDictionary<'a, P>),
+    Delta(SliceFilteredIter<Delta<'a>>),
+}
+
+impl<'a, P> FilteredBinaryPageValues<'a, P> {
+    pub fn new(page: BinaryPageValues<'a, P>, intervals: VecDeque<Interval>) -> Self {
+        match page {
+            BinaryPageValues::Plain(values) => {
+                Self::Plain(SliceFilteredIter::new(values, intervals))
+            }
+            BinaryPageValues::Dictionary(values) => Self::Dictionary(FilteredDictionary {
+                indexes: SliceFilteredIter::new(values.indexes, intervals),
+                dict: values.dict,
+            }),
+            BinaryPageValues::Delta(values) => {
+                Self::Delta(SliceFilteredIter::new(values, intervals))
+            }
+        }
+    }
+}
+
+pub enum FilteredBinaryPage<'a, P> {
+    Optional(FilteredOptionalPageValidity<'a>, BinaryPageValues<'a, P>),
+    Required(FilteredBinaryPageValues<'a, P>),
+    // todo: levels
+}
+
+impl<'a, P> FilteredBinaryPage<'a, P> {
+    pub fn try_new(page: BinaryPage<'a, P>, intervals: VecDeque<Interval>) -> Result<Self, Error> {
+        Ok(match page {
+            BinaryPage::Optional(iter, values) => Self::Optional(
+                FilteredOptionalPageValidity::new(FilteredHybridRleDecoderIter::new(
+                    iter.iter, intervals,
+                )),
+                values,
+            ),
+            BinaryPage::Required(values) => {
+                Self::Required(FilteredBinaryPageValues::new(values, intervals))
+            }
+            BinaryPage::Levels(_, _, _) => {
+                return Err(Error::FeatureNotSupported("Filtered levels".to_string()))
+            }
+        })
     }
 }

@@ -160,7 +160,7 @@ pub fn get_selected_rows(page: &DataPage) -> VecDeque<Interval> {
 
 #[derive(Debug, Clone)]
 pub struct OptionalPageValidity<'a> {
-    iter: HybridDecoderBitmapIter<'a>,
+    pub(super) iter: HybridDecoderBitmapIter<'a>,
     current: Option<(HybridEncoded<'a>, usize)>,
 }
 
@@ -243,6 +243,13 @@ pub struct FilteredOptionalPageValidity<'a> {
 }
 
 impl<'a> FilteredOptionalPageValidity<'a> {
+    pub fn new(iter: FilteredHybridRleDecoderIter<'a>) -> Self {
+        Self {
+            iter,
+            current: None,
+        }
+    }
+
     pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
         let (_, validity, _) = split_buffer(page)?;
 

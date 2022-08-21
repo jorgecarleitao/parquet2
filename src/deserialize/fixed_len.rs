@@ -54,14 +54,14 @@ impl<'a, P> Dictionary<'a, P> {
 }
 
 #[allow(clippy::large_enum_variant)]
-pub enum FixedLenBinaryPageState<'a, P> {
+pub enum FixedLenBinaryPage<'a, P> {
     Optional(utils::DefLevelsDecoder<'a>, FixexBinaryIter<'a>),
     Required(FixexBinaryIter<'a>),
     RequiredDictionary(Dictionary<'a, P>),
     OptionalDictionary(utils::DefLevelsDecoder<'a>, Dictionary<'a, P>),
 }
 
-impl<'a, P> FixedLenBinaryPageState<'a, P> {
+impl<'a, P> FixedLenBinaryPage<'a, P> {
     pub fn try_new(page: &'a DataPage, dict: Option<P>) -> Result<Self, Error> {
         let is_optional =
             page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
@@ -72,8 +72,7 @@ impl<'a, P> FixedLenBinaryPageState<'a, P> {
             size
         } else {
             return Err(Error::InvalidParameter(
-                "FixedLenBinaryPageState must be initialized by pages of FixedLenByteArray"
-                    .to_string(),
+                "FixedLenBinaryPage must be initialized by pages of FixedLenByteArray".to_string(),
             ));
         };
 
