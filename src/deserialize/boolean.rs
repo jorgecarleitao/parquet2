@@ -79,11 +79,7 @@ impl<'a> BooleanPageState<'a> {
                 get_bit_width(max as i16),
                 page.num_values(),
             )?;
-            return Ok(Self::Levels(
-                validity,
-                page.descriptor.max_def_level as u32,
-                values,
-            ));
+            return Ok(Self::Levels(validity, max, values));
         }
 
         let is_optional =

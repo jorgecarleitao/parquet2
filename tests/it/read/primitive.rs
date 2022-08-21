@@ -1,7 +1,7 @@
 use parquet2::{
     deserialize::{
-        native_cast, Casted, HybridRleDecoderIter, HybridRleIter, NativePageState, OptionalValues,
-        SliceFilteredIter,
+        native_cast, Casted, HybridRleDecoderIter, HybridRleIter, NativePage, NativePageValues,
+        OptionalValues, SliceFilteredIter,
     },
     encoding::{hybrid_rle::Decoder, Encoding},
     error::Error,
@@ -10,7 +10,7 @@ use parquet2::{
     types::NativeType,
 };
 
-use super::{dictionary::PrimitivePageDict, utils::deserialize_optional};
+use super::utils::deserialize_optional1;
 
 /// The deserialization state of a `DataPage` of `Primitive` parquet primitive type
 #[derive(Debug)]
@@ -31,18 +31,15 @@ pub enum PageState<'a, T>
 where
     T: NativeType,
 {
-    Nominal(NativePageState<'a, T, &'a PrimitivePageDict<T>>),
+    Nominal(NativePage<'a, T, Vec<T>>),
     Filtered(FilteredPageState<'a, T>),
 }
 
 impl<'a, T: NativeType> PageState<'a, T> {
-    /// Tries to create [`NativePageState`]
+    /// Tries to create [`NativePage`]
     /// # Error
-    /// Errors iff the page is not a `NativePageState`
-    pub fn try_new(
-        page: &'a DataPage,
-        dict: Option<&'a PrimitivePageDict<T>>,
-    ) -> Result<Self, Error> {
+    /// Errors iff the page is not a `NativePage`
+    pub fn try_new(page: &'a DataPage, dict: Option<&'a Vec<T>>) -> Result<Self, Error> {
         if let Some(selected_rows) = page.selected_rows() {
             let is_optional =
                 page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
@@ -79,33 +76,38 @@ impl<'a, T: NativeType> PageState<'a, T> {
                 ))),
             }
         } else {
-            NativePageState::try_new(page, dict).map(Self::Nominal)
+            NativePage::try_new(page, dict).map(Self::Nominal)
         }
     }
 }
 
 pub fn page_to_vec<T: NativeType>(
     page: &DataPage,
-    dict: Option<&PrimitivePageDict<T>>,
+    dict: Option<&Vec<T>>,
 ) -> Result<Vec<Option<T>>, Error> {
     assert_eq!(page.descriptor.max_rep_level, 0);
     let state = PageState::<T>::try_new(page, dict)?;
 
     match state {
         PageState::Nominal(state) => match state {
-            NativePageState::Optional(validity, mut values) => {
-                deserialize_optional(validity, values.by_ref().map(Ok))
-            }
-            NativePageState::Required(values) => Ok(values.map(Some).collect()),
-            NativePageState::RequiredDictionary(dict) => dict
-                .indexes
-                .map(|x| x.and_then(|x| dict.dict.value(x as usize).copied().map(Some)))
-                .collect(),
-            NativePageState::OptionalDictionary(validity, dict) => {
-                let values = dict
+            NativePage::Optional(validity, values) => match values {
+                NativePageValues::Plain(mut values) => {
+                    deserialize_optional1(validity, values.by_ref().map(Ok))
+                }
+                parquet2::deserialize::NativePageValues::Dictionary(dict) => {
+                    let values = dict.indexes.map(|x| x.map(|x| dict.dict[x as usize]));
+                    deserialize_optional1(validity, values)
+                }
+            },
+            NativePage::Required(values) => match values {
+                NativePageValues::Plain(values) => Ok(values.map(Some).collect()),
+                NativePageValues::Dictionary(dict) => dict
                     .indexes
-                    .map(|x| x.and_then(|x| dict.dict.value(x as usize).copied()));
-                deserialize_optional(validity, values)
+                    .map(|x| x.map(|x| Some(dict.dict[x as usize])))
+                    .collect(),
+            },
+            NativePage::Levels(..) => {
+                unreachable!()
             }
         },
         PageState::Filtered(state) => match state {

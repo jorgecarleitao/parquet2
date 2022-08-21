@@ -4,18 +4,17 @@ mod primitive;
 
 pub use binary::BinaryPageDict;
 pub use fixed_len_binary::FixedLenByteArrayPageDict;
-pub use primitive::PrimitivePageDict;
 
 use parquet2::error::{Error, Result};
 use parquet2::page::DictPage;
 use parquet2::schema::types::PhysicalType;
 
 pub enum DecodedDictPage {
-    Int32(PrimitivePageDict<i32>),
-    Int64(PrimitivePageDict<i64>),
-    Int96(PrimitivePageDict<[u32; 3]>),
-    Float(PrimitivePageDict<f32>),
-    Double(PrimitivePageDict<f64>),
+    Int32(Vec<i32>),
+    Int64(Vec<i64>),
+    Int96(Vec<[u32; 3]>),
+    Float(Vec<f32>),
+    Double(Vec<f64>),
     ByteArray(BinaryPageDict),
     FixedLenByteArray(FixedLenByteArrayPageDict),
 }

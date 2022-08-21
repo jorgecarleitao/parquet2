@@ -76,14 +76,19 @@ impl<'a> Delta<'a> {
 }
 
 impl<'a> Iterator for Delta<'a> {
-    type Item = &'a [u8];
+    type Item = Result<&'a [u8], Error>;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let length = self.lengths.next()?;
+        if length > self.values.len() {
+            return Some(Err(Error::oos(
+                "Delta contains a length larger than the values",
+            )));
+        }
         let (item, remaining) = self.values.split_at(length);
         self.values = remaining;
-        Some(item)
+        Some(Ok(item))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -230,11 +235,7 @@ impl<'a, P> BinaryPage<'a, P> {
                 get_bit_width(max as i16),
                 page.num_values(),
             )?;
-            return Ok(Self::Levels(
-                validity,
-                page.descriptor.max_def_level as u32,
-                values,
-            ));
+            return Ok(Self::Levels(validity, max, values));
         }
 
         let is_optional =
