@@ -175,6 +175,7 @@ impl<'a, P> FilteredDictionary<'a, P> {
     }
 }
 
+#[derive(Debug)]
 pub enum BinaryPageValues<'a, P> {
     Plain(BinaryIter<'a>),
     Dictionary(Dictionary<'a, P>),
@@ -217,13 +218,14 @@ impl<'a, P> BinaryPageValues<'a, P> {
     }
 }
 
-pub enum BinaryPage<'a, P> {
+#[derive(Debug)]
+pub enum NominalBinaryPage<'a, P> {
     Optional(OptionalPageValidity<'a>, BinaryPageValues<'a, P>),
     Required(BinaryPageValues<'a, P>),
     Levels(HybridRleDecoder<'a>, u32, BinaryPageValues<'a, P>),
 }
 
-impl<'a, P> BinaryPage<'a, P> {
+impl<'a, P> NominalBinaryPage<'a, P> {
     pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
         let values = BinaryPageValues::try_new(page, dict)?;
 
@@ -261,6 +263,7 @@ impl<'a, P> BinaryPage<'a, P> {
     }
 }
 
+#[derive(Debug)]
 pub enum FilteredBinaryPageValues<'a, P> {
     Plain(SliceFilteredIter<BinaryIter<'a>>),
     Dictionary(FilteredDictionary<'a, P>),
@@ -284,6 +287,7 @@ impl<'a, P> FilteredBinaryPageValues<'a, P> {
     }
 }
 
+#[derive(Debug)]
 pub enum FilteredBinaryPage<'a, P> {
     Optional(FilteredOptionalPageValidity<'a>, BinaryPageValues<'a, P>),
     Required(FilteredBinaryPageValues<'a, P>),
@@ -291,20 +295,47 @@ pub enum FilteredBinaryPage<'a, P> {
 }
 
 impl<'a, P> FilteredBinaryPage<'a, P> {
-    pub fn try_new(page: BinaryPage<'a, P>, intervals: VecDeque<Interval>) -> Result<Self, Error> {
+    pub fn try_new(
+        page: NominalBinaryPage<'a, P>,
+        intervals: VecDeque<Interval>,
+    ) -> Result<Self, Error> {
         Ok(match page {
-            BinaryPage::Optional(iter, values) => Self::Optional(
+            NominalBinaryPage::Optional(iter, values) => Self::Optional(
                 FilteredOptionalPageValidity::new(FilteredHybridRleDecoderIter::new(
                     iter.iter, intervals,
                 )),
                 values,
             ),
-            BinaryPage::Required(values) => {
+            NominalBinaryPage::Required(values) => {
                 Self::Required(FilteredBinaryPageValues::new(values, intervals))
             }
-            BinaryPage::Levels(_, _, _) => {
+            NominalBinaryPage::Levels(_, _, _) => {
                 return Err(Error::FeatureNotSupported("Filtered levels".to_string()))
             }
         })
+    }
+}
+
+/// The deserialization state of a [`DataPage`] of a parquet binary type
+#[derive(Debug)]
+#[allow(clippy::large_enum_variant)]
+pub enum BinaryPage<'a, P> {
+    Nominal(NominalBinaryPage<'a, P>),
+    Filtered(FilteredBinaryPage<'a, P>),
+}
+
+impl<'a, P> BinaryPage<'a, P> {
+    /// Tries to create [`BinaryPage`]
+    /// # Error
+    /// Errors iff the page is not a `BinaryPage`
+    pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
+        let native_page = NominalBinaryPage::try_new(page, dict)?;
+
+        if let Some(selected_rows) = page.selected_rows() {
+            FilteredBinaryPage::try_new(native_page, selected_rows.iter().copied().collect())
+                .map(Self::Filtered)
+        } else {
+            Ok(Self::Nominal(native_page))
+        }
     }
 }

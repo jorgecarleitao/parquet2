@@ -12,4 +12,7 @@ pub use filtered_rle::*;
 pub use fixed_len::*;
 pub use hybrid_rle::*;
 pub use native::*;
-pub use utils::{DefLevelsDecoder, OptionalPageValidity, OptionalValues, SliceFilteredIter};
+pub use utils::{
+    DefLevelsDecoder, FilteredOptionalPageValidity, OptionalPageValidity, OptionalValues,
+    SliceFilteredIter,
+};

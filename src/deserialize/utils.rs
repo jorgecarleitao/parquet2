@@ -264,8 +264,74 @@ impl<'a> FilteredOptionalPageValidity<'a> {
         })
     }
 
+    /// Returns the number of items (not runs)
     pub fn len(&self) -> usize {
         self.iter.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn next_limited(
+        &mut self,
+        limit: usize,
+    ) -> Option<Result<FilteredHybridEncoded<'a>, Error>> {
+        let (run, own_offset) = if let Some((run, offset)) = self.current {
+            (run, offset)
+        } else {
+            // a new run
+            let run = self.iter.next()?; // no run -> None
+            match run {
+                Ok(run) => {
+                    self.current = Some((run, 0));
+                    return self.next_limited(limit);
+                }
+                Err(e) => return Some(Err(e)),
+            }
+        };
+
+        match run {
+            FilteredHybridEncoded::Bitmap {
+                values,
+                offset,
+                length,
+            } => {
+                let run_length = length - own_offset;
+
+                let length = limit.min(run_length);
+
+                if length == run_length {
+                    self.current = None;
+                } else {
+                    self.current = Some((run, own_offset + length));
+                }
+
+                Some(Ok(FilteredHybridEncoded::Bitmap {
+                    values,
+                    offset,
+                    length,
+                }))
+            }
+            FilteredHybridEncoded::Repeated { is_set, length } => {
+                let run_length = length - own_offset;
+
+                let length = limit.min(run_length);
+
+                if length == run_length {
+                    self.current = None;
+                } else {
+                    self.current = Some((run, own_offset + length));
+                }
+
+                Some(Ok(FilteredHybridEncoded::Repeated { is_set, length }))
+            }
+            FilteredHybridEncoded::Skipped(set) => {
+                self.current = None;
+                Some(Ok(FilteredHybridEncoded::Skipped(set)))
+            }
+        }
     }
 }
 
