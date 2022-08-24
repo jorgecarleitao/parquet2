@@ -97,32 +97,6 @@ impl<'a> Iterator for Delta<'a> {
 }
 
 #[derive(Debug)]
-pub struct FilteredRequired<'a> {
-    pub values: SliceFilteredIter<BinaryIter<'a>>,
-}
-
-impl<'a> FilteredRequired<'a> {
-    pub fn new(page: &'a DataPage) -> Self {
-        let values = BinaryIter::new(page.buffer(), Some(page.num_values()));
-
-        let rows = get_selected_rows(page);
-        let values = SliceFilteredIter::new(values, rows);
-
-        Self { values }
-    }
-
-    /// Returns the length of this [`FilteredRequired`].
-    pub fn len(&self) -> usize {
-        self.values.size_hint().0
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-}
-
-#[derive(Debug)]
 pub struct FilteredDelta<'a> {
     pub values: SliceFilteredIter<Delta<'a>>,
 }

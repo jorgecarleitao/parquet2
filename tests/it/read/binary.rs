@@ -5,7 +5,7 @@ use parquet2::{
 };
 
 use super::dictionary::BinaryPageDict;
-use super::utils::{deserialize_levels, deserialize_optional1};
+use super::utils::{deserialize_levels, deserialize_optional};
 
 pub fn page_to_vec(page: &DataPage, dict: Option<&BinaryPageDict>) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(page.descriptor.max_rep_level, 0);
@@ -15,9 +15,9 @@ pub fn page_to_vec(page: &DataPage, dict: Option<&BinaryPageDict>) -> Result<Vec
         BinaryPage::Nominal(state) => match state {
             NominalBinaryPage::Optional(validity, values) => match values {
                 BinaryPageValues::Plain(values) => {
-                    deserialize_optional1(validity, values.map(|x| x.map(|x| x.to_vec())))
+                    deserialize_optional(validity, values.map(|x| x.map(|x| x.to_vec())))
                 }
-                BinaryPageValues::Dictionary(dict) => deserialize_optional1(
+                BinaryPageValues::Dictionary(dict) => deserialize_optional(
                     validity,
                     dict.indexes
                         .map(|x| x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()))),

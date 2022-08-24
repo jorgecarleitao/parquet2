@@ -1,13 +1,10 @@
 use parquet2::{
-    deserialize::{
-        DefLevelsDecoder, FilteredHybridEncoded, HybridDecoderBitmapIter, HybridEncoded,
-        OptionalPageValidity,
-    },
+    deserialize::{FilteredHybridEncoded, OptionalPageValidity},
     encoding::hybrid_rle::BitmapIter,
     error::Error,
 };
 
-pub fn deserialize_optional1<C: Clone, I: Iterator<Item = Result<C, Error>>>(
+pub fn deserialize_optional<C: Clone, I: Iterator<Item = Result<C, Error>>>(
     mut validity: OptionalPageValidity,
     mut values_iter: I,
 ) -> Result<Vec<Option<C>>, Error> {
@@ -42,51 +39,6 @@ pub fn deserialize_optional1<C: Clone, I: Iterator<Item = Result<C, Error>>>(
             FilteredHybridEncoded::Skipped(_) => continue,
         }
     }
-    Ok(deserialized)
-}
-
-pub fn deserialize_optional<C: Clone, I: Iterator<Item = Result<C, Error>>>(
-    validity: DefLevelsDecoder,
-    values: I,
-) -> Result<Vec<Option<C>>, Error> {
-    match validity {
-        DefLevelsDecoder::Bitmap(bitmap) => deserialize_bitmap(bitmap, values),
-        DefLevelsDecoder::Levels(levels, max_level) => {
-            let levels = levels.map(|def| Ok(def? == max_level));
-            deserialize_levels(levels, values)
-        }
-    }
-}
-
-fn deserialize_bitmap<C: Clone, I: Iterator<Item = Result<C, Error>>>(
-    mut validity: HybridDecoderBitmapIter,
-    mut values: I,
-) -> Result<Vec<Option<C>>, Error> {
-    let mut deserialized = Vec::with_capacity(validity.len());
-
-    validity.try_for_each(|run| match run? {
-        HybridEncoded::Bitmap(bitmap, length) => BitmapIter::new(bitmap, 0, length)
-            .into_iter()
-            .try_for_each(|x| {
-                if x {
-                    deserialized.push(values.next().transpose()?);
-                } else {
-                    deserialized.push(None);
-                }
-                Result::<_, Error>::Ok(())
-            }),
-        HybridEncoded::Repeated(is_set, length) => {
-            if is_set {
-                deserialized.reserve(length);
-                for x in values.by_ref().take(length) {
-                    deserialized.push(Some(x?))
-                }
-            } else {
-                deserialized.extend(std::iter::repeat(None).take(length))
-            }
-            Ok(())
-        }
-    })?;
     Ok(deserialized)
 }
 

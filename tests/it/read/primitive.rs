@@ -9,7 +9,7 @@ use parquet2::{
     types::NativeType,
 };
 
-use super::utils::deserialize_optional1;
+use super::utils::deserialize_optional;
 
 pub fn page_to_vec<T: NativeType>(
     page: &DataPage,
@@ -22,11 +22,11 @@ pub fn page_to_vec<T: NativeType>(
         NativePage::Nominal(state) => match state {
             NominalNativePage::Optional(validity, values) => match values {
                 NativePageValues::Plain(mut values) => {
-                    deserialize_optional1(validity, values.by_ref().map(Ok))
+                    deserialize_optional(validity, values.by_ref().map(Ok))
                 }
                 parquet2::deserialize::NativePageValues::Dictionary(dict) => {
                     let values = dict.indexes.map(|x| x.map(|x| dict.dict[x as usize]));
-                    deserialize_optional1(validity, values)
+                    deserialize_optional(validity, values)
                 }
             },
             NominalNativePage::Required(values) => match values {

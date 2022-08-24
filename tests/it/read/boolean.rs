@@ -3,7 +3,7 @@ use parquet2::encoding::hybrid_rle::BitmapIter;
 use parquet2::error::Result;
 use parquet2::page::DataPage;
 
-use crate::read::utils::{deserialize_levels, deserialize_optional1};
+use crate::read::utils::{deserialize_levels, deserialize_optional};
 
 pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<bool>>> {
     assert_eq!(page.descriptor.max_rep_level, 0);
@@ -13,7 +13,7 @@ pub fn page_to_vec(page: &DataPage) -> Result<Vec<Option<bool>>> {
         BooleanPageState::Optional(validity, values) => match values {
             BooleanValuesPageState::Plain(values) => {
                 let values = BitmapIter::new(values.values, values.offset, values.length);
-                deserialize_optional1(validity, values.map(Ok))
+                deserialize_optional(validity, values.map(Ok))
             }
         },
         BooleanPageState::Required(values) => match values {
