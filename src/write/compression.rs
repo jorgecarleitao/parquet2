@@ -4,7 +4,7 @@ use crate::page::{CompressedDictPage, CompressedPage, DataPageHeader, DictPage};
 use crate::FallibleStreamingIterator;
 use crate::{
     compression,
-    page::{CompressedDataPage, DataPage, EncodedPage},
+    page::{CompressedDataPage, DataPage, Page},
 };
 
 /// Compresses a [`DataPage`] into a [`CompressedDataPage`].
@@ -83,30 +83,30 @@ fn compress_dict(
 /// # Errors
 /// Errors if the compressor fails
 pub fn compress(
-    page: EncodedPage,
+    page: Page,
     compressed_buffer: Vec<u8>,
     compression: CompressionOptions,
 ) -> Result<CompressedPage> {
     match page {
-        EncodedPage::Data(page) => {
+        Page::Data(page) => {
             compress_data(page, compressed_buffer, compression).map(CompressedPage::Data)
         }
-        EncodedPage::Dict(page) => {
+        Page::Dict(page) => {
             compress_dict(page, compressed_buffer, compression).map(CompressedPage::Dict)
         }
     }
 }
 
-/// A [`FallibleStreamingIterator`] that consumes [`EncodedPage`] and yields [`CompressedPage`]
+/// A [`FallibleStreamingIterator`] that consumes [`Page`] and yields [`CompressedPage`]
 /// holding a reusable buffer ([`Vec<u8>`]) for compression.
-pub struct Compressor<I: Iterator<Item = Result<EncodedPage>>> {
+pub struct Compressor<I: Iterator<Item = Result<Page>>> {
     iter: I,
     compression: CompressionOptions,
     buffer: Vec<u8>,
     current: Option<CompressedPage>,
 }
 
-impl<I: Iterator<Item = Result<EncodedPage>>> Compressor<I> {
+impl<I: Iterator<Item = Result<Page>>> Compressor<I> {
     /// Creates a new [`Compressor`]
     pub fn new(iter: I, compression: CompressionOptions, buffer: Vec<u8>) -> Self {
         Self {
@@ -134,7 +134,7 @@ impl<I: Iterator<Item = Result<EncodedPage>>> Compressor<I> {
     }
 }
 
-impl<I: Iterator<Item = Result<EncodedPage>>> FallibleStreamingIterator for Compressor<I> {
+impl<I: Iterator<Item = Result<Page>>> FallibleStreamingIterator for Compressor<I> {
     type Item = CompressedPage;
     type Error = Error;
 

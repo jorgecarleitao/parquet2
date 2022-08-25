@@ -1,7 +1,7 @@
 use parquet2::{
     encoding::Encoding,
     metadata::Descriptor,
-    page::{DataPage, DataPageHeader, DataPageHeaderV1, EncodedPage},
+    page::{DataPage, DataPageHeader, DataPageHeaderV1, Page},
     statistics::{serialize_statistics, BinaryStatistics, Statistics},
     types::ord_binary,
     write::WriteOptions,
@@ -45,7 +45,7 @@ pub fn array_to_page_v1(
     array: &[Option<Vec<u8>>],
     options: &WriteOptions,
     descriptor: &Descriptor,
-) -> Result<EncodedPage> {
+) -> Result<Page> {
     let (values, mut buffer) = unzip_option(array)?;
 
     buffer.extend_from_slice(&values);
@@ -79,7 +79,7 @@ pub fn array_to_page_v1(
         statistics,
     };
 
-    Ok(EncodedPage::Data(DataPage::new(
+    Ok(Page::Data(DataPage::new(
         DataPageHeader::V1(header),
         buffer,
         descriptor.clone(),

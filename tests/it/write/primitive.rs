@@ -1,7 +1,7 @@
 use parquet2::{
     encoding::Encoding,
     metadata::Descriptor,
-    page::{DataPage, DataPageHeader, DataPageHeaderV1, EncodedPage},
+    page::{DataPage, DataPageHeader, DataPageHeaderV1, Page},
     statistics::{serialize_statistics, PrimitiveStatistics, Statistics},
     types::NativeType,
     write::WriteOptions,
@@ -44,7 +44,7 @@ pub fn array_to_page_v1<T: NativeType>(
     array: &[Option<T>],
     options: &WriteOptions,
     descriptor: &Descriptor,
-) -> Result<EncodedPage> {
+) -> Result<Page> {
     let (values, mut buffer) = unzip_option(array)?;
 
     buffer.extend_from_slice(&values);
@@ -70,7 +70,7 @@ pub fn array_to_page_v1<T: NativeType>(
         statistics,
     };
 
-    Ok(EncodedPage::Data(DataPage::new(
+    Ok(Page::Data(DataPage::new(
         DataPageHeader::V1(header),
         buffer,
         descriptor.clone(),

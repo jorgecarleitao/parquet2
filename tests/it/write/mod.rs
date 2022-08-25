@@ -15,7 +15,7 @@ use parquet2::statistics::Statistics;
 #[cfg(feature = "async")]
 use parquet2::write::FileStreamer;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
-use parquet2::{metadata::Descriptor, page::EncodedPage, write::WriteOptions};
+use parquet2::{metadata::Descriptor, page::Page, write::WriteOptions};
 
 use super::Array;
 use super::{alltypes_plain, alltypes_statistics};
@@ -25,7 +25,7 @@ pub fn array_to_page(
     array: &Array,
     options: &WriteOptions,
     descriptor: &Descriptor,
-) -> Result<EncodedPage> {
+) -> Result<Page> {
     // using plain encoding format
     match array {
         Array::Int32(array) => primitive::array_to_page_v1(array, options, descriptor),
