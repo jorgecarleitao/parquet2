@@ -1,22 +1,48 @@
 use std::collections::VecDeque;
 
 use crate::{
-    encoding::hybrid_rle::HybridRleDecoder,
     error::Error,
     indexes::Interval,
     page::{split_buffer, DataPage},
     parquet_bridge::{Encoding, Repetition},
-    read::levels::get_bit_width,
 };
 
-use super::{
-    utils::FilteredOptionalPageValidity, FilteredHybridRleDecoderIter, OptionalPageValidity,
-};
+use super::values::{Decoder, ValuesDecoder};
 
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
-pub enum BooleanPageValues<'a> {
+pub enum BooleanValuesDecoder<'a> {
     Plain(Bitmap<'a>),
+}
+
+impl<'a> BooleanValuesDecoder<'a> {
+    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
+        match page.encoding() {
+            Encoding::Plain => Bitmap::try_new(page).map(Self::Plain),
+            _ => Err(Error::InvalidParameter(format!(
+                "Viewing page for encoding {:?} for boolean type not supported",
+                page.encoding(),
+            ))),
+        }
+    }
+
+    #[must_use]
+    pub fn len(&self) -> usize {
+        match self {
+            Self::Plain(validity) => validity.length,
+        }
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+}
+
+impl<'a> ValuesDecoder for BooleanValuesDecoder<'a> {
+    fn len(&self) -> usize {
+        self.len()
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -103,119 +129,20 @@ impl<'a> Bitmap<'a> {
     }
 }
 
-impl<'a> BooleanPageValues<'a> {
-    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
-        match page.encoding() {
-            Encoding::Plain => Bitmap::try_new(page).map(Self::Plain),
-            _ => Err(Error::InvalidParameter(format!(
-                "Viewing page for encoding {:?} for boolean type not supported",
-                page.encoding(),
-            ))),
-        }
-    }
-}
-
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub enum NominalBooleanPage<'a> {
-    Optional(OptionalPageValidity<'a>, BooleanPageValues<'a>),
-    Required(BooleanPageValues<'a>),
-    Levels(HybridRleDecoder<'a>, u32, BooleanPageValues<'a>),
-}
-
-impl<'a> NominalBooleanPage<'a> {
-    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
-        let values = BooleanPageValues::try_new(page)?;
-
-        if page.descriptor.max_def_level > 1 {
-            let (_, def_levels, _) = split_buffer(page)?;
-            let max = page.descriptor.max_def_level as u32;
-            let validity = HybridRleDecoder::try_new(
-                def_levels,
-                get_bit_width(max as i16),
-                page.num_values(),
-            )?;
-            return Ok(Self::Levels(validity, max, values));
-        }
-
-        let is_optional =
-            page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
-
-        match (page.encoding(), is_optional) {
-            (Encoding::Plain, true) => Ok(Self::Optional(
-                OptionalPageValidity::try_new(page)?,
-                BooleanPageValues::try_new(page)?,
-            )),
-            (Encoding::Plain, false) => BooleanPageValues::try_new(page).map(Self::Required),
-            (other, _) => Err(Error::OutOfSpec(format!(
-                "boolean-encoded non-nested pages cannot be encoded as {other:?}"
-            ))),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum FilteredBooleanPageValues<'a> {
+pub enum BooleanFilteredValuesDecoder<'a> {
     Plain(FilteredBitmap<'a>),
 }
 
-impl<'a> FilteredBooleanPageValues<'a> {
-    pub fn new(page: BooleanPageValues<'a>, intervals: VecDeque<Interval>) -> Self {
-        match page {
-            BooleanPageValues::Plain(bitmap) => Self::Plain(FilteredBitmap::new(bitmap, intervals)),
+impl<'a> From<(BooleanValuesDecoder<'a>, VecDeque<Interval>)> for BooleanFilteredValuesDecoder<'a> {
+    fn from((decoder, intervals): (BooleanValuesDecoder<'a>, VecDeque<Interval>)) -> Self {
+        match decoder {
+            BooleanValuesDecoder::Plain(bitmap) => {
+                Self::Plain(FilteredBitmap::new(bitmap, intervals))
+            }
         }
     }
 }
 
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub enum FilteredBooleanPage<'a> {
-    Optional(FilteredOptionalPageValidity<'a>, BooleanPageValues<'a>),
-    Required(FilteredBooleanPageValues<'a>),
-}
-
-impl<'a> FilteredBooleanPage<'a> {
-    pub fn try_new(
-        page: NominalBooleanPage<'a>,
-        intervals: VecDeque<Interval>,
-    ) -> Result<Self, Error> {
-        Ok(match page {
-            NominalBooleanPage::Optional(iter, values) => Self::Optional(
-                FilteredOptionalPageValidity::new(FilteredHybridRleDecoderIter::new(
-                    iter.iter, intervals,
-                )),
-                values,
-            ),
-            NominalBooleanPage::Required(values) => {
-                Self::Required(FilteredBooleanPageValues::new(values, intervals))
-            }
-            NominalBooleanPage::Levels(_, _, _) => {
-                return Err(Error::FeatureNotSupported("Filtered levels".to_string()))
-            }
-        })
-    }
-}
-
-/// The deserialization state of a [`DataPage`] of a parquet binary type
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub enum BooleanPage<'a> {
-    Nominal(NominalBooleanPage<'a>),
-    Filtered(FilteredBooleanPage<'a>),
-}
-
-impl<'a> BooleanPage<'a> {
-    /// Tries to create [`BooleanPage`]
-    /// # Error
-    /// Errors iff the page is not a `BooleanPage`
-    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
-        let native_page = NominalBooleanPage::try_new(page)?;
-
-        if let Some(selected_rows) = page.selected_rows() {
-            FilteredBooleanPage::try_new(native_page, selected_rows.iter().copied().collect())
-                .map(Self::Filtered)
-        } else {
-            Ok(Self::Nominal(native_page))
-        }
-    }
-}
+pub type BooleanDecoder<'a> =
+    Decoder<'a, BooleanValuesDecoder<'a>, BooleanFilteredValuesDecoder<'a>>;

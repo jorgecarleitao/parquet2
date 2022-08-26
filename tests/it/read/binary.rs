@@ -1,5 +1,5 @@
 use parquet2::{
-    deserialize::{BinaryPage, BinaryPageValues, NominalBinaryPage},
+    deserialize::{BinaryDecoder, BinaryValuesDecoder, FullDecoder},
     error::Result,
     page::DataPage,
 };
@@ -10,50 +10,53 @@ use super::utils::{deserialize_levels, deserialize_optional};
 pub fn page_to_vec(page: &DataPage, dict: Option<&BinaryPageDict>) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(page.descriptor.max_rep_level, 0);
 
-    let state = BinaryPage::try_new(page, dict)?;
-    match state {
-        BinaryPage::Nominal(state) => match state {
-            NominalBinaryPage::Optional(validity, values) => match values {
-                BinaryPageValues::Plain(values) => {
+    let values = BinaryValuesDecoder::try_new(page, dict)?;
+    let decoder = FullDecoder::try_new(page, values)?;
+    let decoder = BinaryDecoder::try_new(page, decoder)?;
+
+    match decoder {
+        BinaryDecoder::Full(state) => match state {
+            FullDecoder::Optional(validity, values) => match values {
+                BinaryValuesDecoder::Plain(values) => {
                     deserialize_optional(validity, values.map(|x| x.map(|x| x.to_vec())))
                 }
-                BinaryPageValues::Dictionary(dict) => deserialize_optional(
+                BinaryValuesDecoder::Dictionary(dict) => deserialize_optional(
                     validity,
                     dict.indexes
                         .map(|x| x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()))),
                 ),
-                BinaryPageValues::Delta(_) => todo!(),
+                BinaryValuesDecoder::Delta(_) => todo!(),
             },
-            NominalBinaryPage::Required(values) => match values {
-                BinaryPageValues::Plain(values) => values
+            FullDecoder::Required(values) => match values {
+                BinaryValuesDecoder::Plain(values) => values
                     .map(|x| x.map(|x| x.to_vec()))
                     .map(Some)
                     .map(|x| x.transpose())
                     .collect(),
-                BinaryPageValues::Dictionary(dict) => dict
+                BinaryValuesDecoder::Dictionary(dict) => dict
                     .indexes
                     .map(|x| {
                         x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()).map(Some))
                     })
                     .collect(),
-                BinaryPageValues::Delta(_) => todo!(),
+                BinaryValuesDecoder::Delta(_) => todo!(),
             },
-            NominalBinaryPage::Levels(validity, max, values) => {
+            FullDecoder::Levels(validity, max, values) => {
                 let validity = validity.map(|def| Ok(def? == max));
                 match values {
-                    BinaryPageValues::Plain(values) => {
+                    BinaryValuesDecoder::Plain(values) => {
                         deserialize_levels(validity, values.map(|x| x.map(|x| x.to_vec())))
                     }
-                    BinaryPageValues::Dictionary(dict) => {
+                    BinaryValuesDecoder::Dictionary(dict) => {
                         let values = dict.indexes.map(|x| {
                             x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()))
                         });
                         deserialize_levels(validity, values)
                     }
-                    _ => todo!(),
+                    BinaryValuesDecoder::Delta(_) => todo!(),
                 }
             }
         },
-        BinaryPage::Filtered(..) => todo!(),
+        BinaryDecoder::Filtered(..) => todo!(),
     }
 }

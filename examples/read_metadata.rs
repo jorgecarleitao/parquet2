@@ -2,7 +2,7 @@ use parquet2::bloom_filter;
 use parquet2::error::Error;
 
 // ANCHOR: deserialize
-use parquet2::deserialize::{NativePage, NativePageValues, NominalNativePage};
+use parquet2::deserialize::{FullDecoder, NativeDecoder, NativeValuesDecoder};
 use parquet2::page::{DataPage, DictPage, Page};
 use parquet2::schema::types::PhysicalType;
 use parquet2::types::decode;
@@ -38,21 +38,23 @@ fn deserialize(page: &DataPage, dict: Option<&Dict>) -> Result<Vec<Option<i32>>,
                     unreachable!()
                 }
             });
-            let page = NativePage::<i32, Vec<i32>>::try_new(page, dict)?;
+            let values = NativeValuesDecoder::<i32, Vec<i32>>::try_new(page, dict)?;
+            let decoder = FullDecoder::try_new(page, values)?;
+            let decoder = NativeDecoder::try_new(page, decoder)?;
             // page is an enum comprising of the different possible encodings:
-            match page {
-                NativePage::Nominal(values) => match values {
-                    NominalNativePage::Optional(_, _) => todo!("optional pages"),
-                    NominalNativePage::Required(values) => match values {
-                        NativePageValues::Plain(values) => Ok(values.map(Some).collect()),
-                        NativePageValues::Dictionary(dict) => dict
+            match decoder {
+                NativeDecoder::Full(values) => match values {
+                    FullDecoder::Optional(_, _) => todo!("optional pages"),
+                    FullDecoder::Required(values) => match values {
+                        NativeValuesDecoder::Plain(values) => Ok(values.map(Some).collect()),
+                        NativeValuesDecoder::Dictionary(dict) => dict
                             .indexes
                             .map(|x| x.map(|x| Some(dict.dict[x as usize])))
                             .collect(),
                     },
-                    NominalNativePage::Levels(_, _, _) => todo!("nested pages"),
+                    FullDecoder::Levels(_, _, _) => todo!("nested pages"),
                 },
-                NativePage::Filtered(_) => todo!("Filtered page"),
+                NativeDecoder::Filtered(_) => todo!("Filtered page"),
             }
         }
         PhysicalType::Int64 => todo!("int64"),

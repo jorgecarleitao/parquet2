@@ -5,6 +5,7 @@ mod fixed_binary;
 mod hybrid_rle;
 mod native;
 mod utils;
+mod values;
 
 pub use binary::*;
 pub use boolean::*;
@@ -16,3 +17,4 @@ pub use utils::{
     DefLevelsDecoder, FilteredOptionalPageValidity, OptionalPageValidity, OptionalValues,
     SliceFilteredIter,
 };
+pub use values::{FilteredDecoder, FullDecoder};

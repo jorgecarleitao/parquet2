@@ -1,25 +1,18 @@
 use std::collections::VecDeque;
 
 use crate::{
-    encoding::{
-        delta_length_byte_array,
-        hybrid_rle::{self, HybridRleDecoder},
-        plain_byte_array::BinaryIter,
-    },
+    encoding::{delta_length_byte_array, hybrid_rle, plain_byte_array::BinaryIter},
     error::Error,
     indexes::Interval,
     page::{split_buffer, DataPage},
     parquet_bridge::{Encoding, Repetition},
-    read::levels::get_bit_width,
 };
 
-use super::SliceFilteredIter;
 use super::{
-    utils::{
-        dict_indices_decoder, get_selected_rows, FilteredOptionalPageValidity, OptionalPageValidity,
-    },
-    FilteredHybridRleDecoderIter,
+    utils::{dict_indices_decoder, get_selected_rows},
+    values::Decoder,
 };
+use super::{values::ValuesDecoder, SliceFilteredIter};
 
 #[derive(Debug)]
 pub struct Dictionary<'a, P> {
@@ -150,13 +143,13 @@ impl<'a, P> FilteredDictionary<'a, P> {
 }
 
 #[derive(Debug)]
-pub enum BinaryPageValues<'a, P> {
+pub enum BinaryValuesDecoder<'a, P> {
     Plain(BinaryIter<'a>),
     Dictionary(Dictionary<'a, P>),
     Delta(Delta<'a>),
 }
 
-impl<'a, P> BinaryPageValues<'a, P> {
+impl<'a, P> BinaryValuesDecoder<'a, P> {
     pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
         let is_optional =
             page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
@@ -192,124 +185,37 @@ impl<'a, P> BinaryPageValues<'a, P> {
     }
 }
 
-#[derive(Debug)]
-pub enum NominalBinaryPage<'a, P> {
-    Optional(OptionalPageValidity<'a>, BinaryPageValues<'a, P>),
-    Required(BinaryPageValues<'a, P>),
-    Levels(HybridRleDecoder<'a>, u32, BinaryPageValues<'a, P>),
-}
-
-impl<'a, P> NominalBinaryPage<'a, P> {
-    pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
-        let values = BinaryPageValues::try_new(page, dict)?;
-
-        if page.descriptor.max_def_level > 1 {
-            let (_, def_levels, _) = split_buffer(page)?;
-            let max = page.descriptor.max_def_level as u32;
-            let validity = HybridRleDecoder::try_new(
-                def_levels,
-                get_bit_width(max as i16),
-                page.num_values(),
-            )?;
-            return Ok(Self::Levels(validity, max, values));
-        }
-
-        let is_optional =
-            page.descriptor.primitive_type.field_info.repetition == Repetition::Optional;
-        Ok(if is_optional {
-            Self::Optional(OptionalPageValidity::try_new(page)?, values)
-        } else {
-            Self::Required(values)
-        })
-    }
-
-    pub fn len(&self) -> usize {
-        match self {
-            Self::Optional(validity, _) => validity.len(),
-            Self::Required(state) => state.len(),
-            Self::Levels(state, _, _) => state.len(),
-        }
-    }
-
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
+impl<'a, P> ValuesDecoder for BinaryValuesDecoder<'a, P> {
+    fn len(&self) -> usize {
+        self.len()
     }
 }
 
 #[derive(Debug)]
-pub enum FilteredBinaryPageValues<'a, P> {
+pub enum BinaryFilteredValuesDecoder<'a, P> {
     Plain(SliceFilteredIter<BinaryIter<'a>>),
     Dictionary(FilteredDictionary<'a, P>),
     Delta(SliceFilteredIter<Delta<'a>>),
 }
 
-impl<'a, P> FilteredBinaryPageValues<'a, P> {
-    pub fn new(page: BinaryPageValues<'a, P>, intervals: VecDeque<Interval>) -> Self {
-        match page {
-            BinaryPageValues::Plain(values) => {
+impl<'a, P> From<(BinaryValuesDecoder<'a, P>, VecDeque<Interval>)>
+    for BinaryFilteredValuesDecoder<'a, P>
+{
+    fn from((decoder, intervals): (BinaryValuesDecoder<'a, P>, VecDeque<Interval>)) -> Self {
+        match decoder {
+            BinaryValuesDecoder::Plain(values) => {
                 Self::Plain(SliceFilteredIter::new(values, intervals))
             }
-            BinaryPageValues::Dictionary(values) => Self::Dictionary(FilteredDictionary {
+            BinaryValuesDecoder::Dictionary(values) => Self::Dictionary(FilteredDictionary {
                 indexes: SliceFilteredIter::new(values.indexes, intervals),
                 dict: values.dict,
             }),
-            BinaryPageValues::Delta(values) => {
+            BinaryValuesDecoder::Delta(values) => {
                 Self::Delta(SliceFilteredIter::new(values, intervals))
             }
         }
     }
 }
 
-#[derive(Debug)]
-pub enum FilteredBinaryPage<'a, P> {
-    Optional(FilteredOptionalPageValidity<'a>, BinaryPageValues<'a, P>),
-    Required(FilteredBinaryPageValues<'a, P>),
-    // todo: levels
-}
-
-impl<'a, P> FilteredBinaryPage<'a, P> {
-    pub fn try_new(
-        page: NominalBinaryPage<'a, P>,
-        intervals: VecDeque<Interval>,
-    ) -> Result<Self, Error> {
-        Ok(match page {
-            NominalBinaryPage::Optional(iter, values) => Self::Optional(
-                FilteredOptionalPageValidity::new(FilteredHybridRleDecoderIter::new(
-                    iter.iter, intervals,
-                )),
-                values,
-            ),
-            NominalBinaryPage::Required(values) => {
-                Self::Required(FilteredBinaryPageValues::new(values, intervals))
-            }
-            NominalBinaryPage::Levels(_, _, _) => {
-                return Err(Error::FeatureNotSupported("Filtered levels".to_string()))
-            }
-        })
-    }
-}
-
-/// The deserialization state of a [`DataPage`] of a parquet binary type
-#[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
-pub enum BinaryPage<'a, P> {
-    Nominal(NominalBinaryPage<'a, P>),
-    Filtered(FilteredBinaryPage<'a, P>),
-}
-
-impl<'a, P> BinaryPage<'a, P> {
-    /// Tries to create [`BinaryPage`]
-    /// # Error
-    /// Errors iff the page is not a `BinaryPage`
-    pub fn try_new(page: &'a DataPage, dict: Option<&'a P>) -> Result<Self, Error> {
-        let native_page = NominalBinaryPage::try_new(page, dict)?;
-
-        if let Some(selected_rows) = page.selected_rows() {
-            FilteredBinaryPage::try_new(native_page, selected_rows.iter().copied().collect())
-                .map(Self::Filtered)
-        } else {
-            Ok(Self::Nominal(native_page))
-        }
-    }
-}
+pub type BinaryDecoder<'a, P> =
+    Decoder<'a, BinaryValuesDecoder<'a, P>, BinaryFilteredValuesDecoder<'a, P>>;

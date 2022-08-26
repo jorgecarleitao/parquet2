@@ -1,5 +1,8 @@
-use parquet2::deserialize::{FixedBinaryPage, FixedBinaryPageValues, NominalFixedBinaryPage};
-use parquet2::{error::Result, page::DataPage};
+use parquet2::{
+    deserialize::{FixedBinaryDecoder, FixedBinaryValuesDecoder, FullDecoder},
+    error::Result,
+    page::DataPage,
+};
 
 use super::dictionary::FixedLenByteArrayPageDict;
 use super::utils::deserialize_optional;
@@ -10,35 +13,37 @@ pub fn page_to_vec(
 ) -> Result<Vec<Option<Vec<u8>>>> {
     assert_eq!(page.descriptor.max_rep_level, 0);
 
-    let state = FixedBinaryPage::try_new(page, dict)?;
+    let values = FixedBinaryValuesDecoder::try_new(page, dict)?;
+    let decoder = FullDecoder::try_new(page, values)?;
+    let decoder = FixedBinaryDecoder::try_new(page, decoder)?;
 
-    match state {
-        FixedBinaryPage::Nominal(state) => match state {
-            NominalFixedBinaryPage::Optional(validity, values) => match values {
-                FixedBinaryPageValues::Plain(values) => {
+    match decoder {
+        FixedBinaryDecoder::Full(state) => match state {
+            FullDecoder::Optional(validity, values) => match values {
+                FixedBinaryValuesDecoder::Plain(values) => {
                     deserialize_optional(validity, values.map(|x| Ok(x.to_vec())))
                 }
-                FixedBinaryPageValues::Dictionary(dict) => deserialize_optional(
+                FixedBinaryValuesDecoder::Dictionary(dict) => deserialize_optional(
                     validity,
                     dict.indexes
                         .map(|x| x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()))),
                 ),
             },
-            NominalFixedBinaryPage::Required(values) => match values {
-                FixedBinaryPageValues::Plain(values) => {
+            FullDecoder::Required(values) => match values {
+                FixedBinaryValuesDecoder::Plain(values) => {
                     Ok(values.map(|x| x.to_vec()).map(Some).collect())
                 }
-                FixedBinaryPageValues::Dictionary(dict) => dict
+                FixedBinaryValuesDecoder::Dictionary(dict) => dict
                     .indexes
                     .map(|x| {
                         x.and_then(|x| dict.dict.value(x as usize).map(|x| x.to_vec()).map(Some))
                     })
                     .collect(),
             },
-            NominalFixedBinaryPage::Levels(..) => {
+            FullDecoder::Levels(..) => {
                 unreachable!()
             }
         },
-        FixedBinaryPage::Filtered(_) => todo!(),
+        FixedBinaryDecoder::Filtered(_) => todo!(),
     }
 }

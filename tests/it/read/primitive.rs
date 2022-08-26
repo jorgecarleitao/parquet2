@@ -1,7 +1,7 @@
 use parquet2::{
     deserialize::{
-        FilteredHybridEncoded, FilteredNativePage, FilteredNativePageValues,
-        FilteredOptionalPageValidity, NativePage, NativePageValues, NominalNativePage,
+        FilteredDecoder, FilteredHybridEncoded, FilteredOptionalPageValidity, FullDecoder,
+        NativeDecoder, NativeFilteredValuesDecoder, NativeValuesDecoder,
     },
     encoding::hybrid_rle::BitmapIter,
     error::Error,
@@ -16,43 +16,48 @@ pub fn page_to_vec<T: NativeType>(
     dict: Option<&Vec<T>>,
 ) -> Result<Vec<Option<T>>, Error> {
     assert_eq!(page.descriptor.max_rep_level, 0);
-    let state = NativePage::<T, _>::try_new(page, dict)?;
+
+    let values = NativeValuesDecoder::<T, _>::try_new(page, dict)?;
+    let decoder = FullDecoder::try_new(page, values)?;
+    let state = NativeDecoder::try_new(page, decoder)?;
 
     match state {
-        NativePage::Nominal(state) => match state {
-            NominalNativePage::Optional(validity, values) => match values {
-                NativePageValues::Plain(mut values) => {
+        NativeDecoder::Full(state) => match state {
+            FullDecoder::Optional(validity, values) => match values {
+                NativeValuesDecoder::Plain(mut values) => {
                     deserialize_optional(validity, values.by_ref().map(Ok))
                 }
-                parquet2::deserialize::NativePageValues::Dictionary(dict) => {
+                NativeValuesDecoder::Dictionary(dict) => {
                     let values = dict.indexes.map(|x| x.map(|x| dict.dict[x as usize]));
                     deserialize_optional(validity, values)
                 }
             },
-            NominalNativePage::Required(values) => match values {
-                NativePageValues::Plain(values) => Ok(values.map(Some).collect()),
-                NativePageValues::Dictionary(dict) => dict
+            FullDecoder::Required(values) => match values {
+                NativeValuesDecoder::Plain(values) => Ok(values.map(Some).collect()),
+                NativeValuesDecoder::Dictionary(dict) => dict
                     .indexes
                     .map(|x| x.map(|x| Some(dict.dict[x as usize])))
                     .collect(),
             },
-            NominalNativePage::Levels(..) => {
+            FullDecoder::Levels(..) => {
                 unreachable!()
             }
         },
-        NativePage::Filtered(state) => match state {
-            FilteredNativePage::Optional(mut validity, values) => match values {
-                NativePageValues::Plain(mut values) => extend_filtered(&mut validity, &mut values),
-                NativePageValues::Dictionary(dict) => {
+        NativeDecoder::Filtered(state) => match state {
+            FilteredDecoder::Optional(mut validity, values) => match values {
+                NativeValuesDecoder::Plain(mut values) => {
+                    extend_filtered(&mut validity, &mut values)
+                }
+                NativeValuesDecoder::Dictionary(dict) => {
                     let mut values = dict
                         .indexes
                         .map(|x| x.map(|x| dict.dict[x as usize]).unwrap());
                     extend_filtered(&mut validity, &mut values)
                 }
             },
-            FilteredNativePage::Required(values) => match values {
-                FilteredNativePageValues::Plain(values) => Ok(values.map(Some).collect()),
-                FilteredNativePageValues::Dictionary(dict) => dict
+            FilteredDecoder::Required(values) => match values {
+                NativeFilteredValuesDecoder::Plain(values) => Ok(values.map(Some).collect()),
+                NativeFilteredValuesDecoder::Dictionary(dict) => dict
                     .indexes
                     .map(|x| x.map(|x| Some(dict.dict[x as usize])))
                     .collect(),
