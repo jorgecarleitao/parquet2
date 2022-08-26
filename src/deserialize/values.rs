@@ -86,7 +86,6 @@ impl<'a, V: ValuesDecoder, F: From<(V, VecDeque<Interval>)>> FilteredDecoder<'a,
 
 /// The deserialization state of a [`DataPage`] of a parquet primitive type
 #[derive(Debug)]
-#[allow(clippy::large_enum_variant)]
 pub enum Decoder<'a, V: ValuesDecoder, F: From<(V, VecDeque<Interval>)>> {
     Full(FullDecoder<'a, V>),
     Filtered(FilteredDecoder<'a, V, F>),

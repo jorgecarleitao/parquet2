@@ -41,7 +41,7 @@ fn deserialize(page: &DataPage, dict: Option<&Dict>) -> Result<Vec<Option<i32>>,
             let values = NativeValuesDecoder::<i32, Vec<i32>>::try_new(page, dict)?;
             let decoder = FullDecoder::try_new(page, values)?;
             let decoder = NativeDecoder::try_new(page, decoder)?;
-            // page is an enum comprising of the different possible encodings:
+            // decoder is an enum comprising the different cases:
             match decoder {
                 NativeDecoder::Full(values) => match values {
                     FullDecoder::Optional(_, _) => todo!("optional pages"),
