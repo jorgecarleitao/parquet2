@@ -52,7 +52,7 @@ pub fn get_page_iterator<R: Read + Seek>(
     mut reader: R,
     pages_filter: Option<PageFilter>,
     scratch: Vec<u8>,
-    max_header_size: usize,
+    max_page_size: usize,
 ) -> Result<PageReader<R>> {
     let pages_filter = pages_filter.unwrap_or_else(|| Arc::new(|_, _| true));
 
@@ -63,7 +63,7 @@ pub fn get_page_iterator<R: Read + Seek>(
         column_chunk,
         pages_filter,
         scratch,
-        max_header_size,
+        max_page_size,
     ))
 }
 
