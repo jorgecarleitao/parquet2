@@ -19,7 +19,7 @@ mod stream;
 /// returns multiple iterators, one per physical column of the `field`.
 /// For primitive fields (e.g. `i64`), [`ColumnIterator`] yields exactly one column.
 /// For complex fields, it yields multiple columns.
-/// `max_header_size` is the maximum number of bytes thrift is allowed to allocate
+/// `max_page_size` is the maximum number of bytes thrift is allowed to allocate
 /// to read a page header.
 pub fn get_column_iterator<R: Read + Seek>(
     reader: R,
@@ -28,21 +28,14 @@ pub fn get_column_iterator<R: Read + Seek>(
     field: usize,
     page_filter: Option<PageFilter>,
     scratch: Vec<u8>,
-    max_header_size: usize,
+    max_page_size: usize,
 ) -> ColumnIterator<R> {
     let field = metadata.schema().fields()[field].clone();
     let columns = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
         .cloned()
         .collect::<Vec<_>>();
 
-    ColumnIterator::new(
-        reader,
-        field,
-        columns,
-        page_filter,
-        scratch,
-        max_header_size,
-    )
+    ColumnIterator::new(reader, field, columns, page_filter, scratch, max_page_size)
 }
 
 /// State of [`MutStreamingIterator`].
@@ -80,20 +73,19 @@ pub struct ColumnIterator<R: Read + Seek> {
     page_filter: Option<PageFilter>,
     current: Option<(PageReader<R>, ColumnChunkMetaData)>,
     scratch: Vec<u8>,
-    max_header_size: usize,
+    max_page_size: usize,
 }
 
 impl<R: Read + Seek> ColumnIterator<R> {
     /// Returns a new [`ColumnIterator`]
-    /// `max_header_size` is the maximum number of bytes thrift is allowed to allocate
-    /// to read a page header.
+    /// `max_page_size` is the maximum allowed page size
     pub fn new(
         reader: R,
         field: ParquetType,
         mut columns: Vec<ColumnChunkMetaData>,
         page_filter: Option<PageFilter>,
         scratch: Vec<u8>,
-        max_header_size: usize,
+        max_page_size: usize,
     ) -> Self {
         columns.reverse();
         Self {
@@ -103,7 +95,7 @@ impl<R: Read + Seek> ColumnIterator<R> {
             columns,
             page_filter,
             current: None,
-            max_header_size,
+            max_page_size,
         }
     }
 }
@@ -128,7 +120,7 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
             reader,
             self.page_filter.clone(),
             scratch,
-            self.max_header_size,
+            self.max_page_size,
         )?;
         let current = Some((iter, column));
         Ok(State::Some(Self {
@@ -138,7 +130,7 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
             page_filter: self.page_filter,
             current,
             scratch: vec![],
-            max_header_size: self.max_header_size,
+            max_page_size: self.max_page_size,
         }))
     }
 
