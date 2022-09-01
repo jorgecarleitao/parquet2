@@ -239,7 +239,7 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
     );
     let field = &metadata.schema().fields()[field];
 
-    let mut statistics = get_field_columns(&metadata, row_group, field)
+    let mut statistics = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
         .map(|column_meta| column_meta.statistics().transpose())
         .collect::<Result<Vec<_>>>()?;
 
@@ -273,7 +273,7 @@ pub async fn read_column_async<
 
     let field = &metadata.schema().fields()[field];
 
-    let mut statistics = get_field_columns(&metadata, row_group, field)
+    let mut statistics = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
         .map(|column_meta| column_meta.statistics().transpose())
         .collect::<Result<Vec<_>>>()?;
 
