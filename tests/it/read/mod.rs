@@ -215,7 +215,7 @@ where
 pub fn read_column<R: std::io::Read + std::io::Seek>(
     reader: &mut R,
     row_group: usize,
-    field: &str,
+    field_name: &str,
 ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
     let metadata = read_metadata(reader)?;
 
@@ -223,21 +223,17 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .schema()
         .fields()
         .iter()
-        .enumerate()
-        .filter_map(|(i, x)| if x.name() == field { Some(i) } else { None })
-        .next()
+        .find_map(|field| (field.name() == field_name).then(|| field))
         .ok_or_else(|| Error::OutOfSpec("column does not exist".to_string()))?;
 
     let columns = get_column_iterator(
         reader,
-        &metadata,
-        row_group,
-        field,
+        &metadata.row_groups[row_group],
+        field.name(),
         None,
         vec![],
         usize::MAX,
     );
-    let field = &metadata.schema().fields()[field];
 
     let mut statistics = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
         .map(|column_meta| column_meta.statistics().transpose())
@@ -254,7 +250,7 @@ pub async fn read_column_async<
 >(
     reader: &mut R,
     row_group: usize,
-    field: &str,
+    field_name: &str,
 ) -> Result<(Array, Option<std::sync::Arc<dyn Statistics>>)> {
     let metadata = read_metadata_async(reader).await?;
 
@@ -262,16 +258,14 @@ pub async fn read_column_async<
         .schema()
         .fields()
         .iter()
-        .enumerate()
-        .filter_map(|(i, x)| if x.name() == field { Some(i) } else { None })
+        .find_map(|field| (field.name() == field_name).then(|| field))
+        .ok_or_else(|| Error::OutOfSpec("column does not exist".to_string()))?;
+
+    let column = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
         .next()
         .unwrap();
 
-    let column = &metadata.row_groups[0].columns()[0];
-
     let pages = get_page_stream(column, reader, vec![], Arc::new(|_, _| true), usize::MAX).await?;
-
-    let field = &metadata.schema().fields()[field];
 
     let mut statistics = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
         .map(|column_meta| column_meta.statistics().transpose())

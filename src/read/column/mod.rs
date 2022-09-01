@@ -2,10 +2,9 @@ use std::io::{Read, Seek};
 use std::vec::IntoIter;
 
 use crate::error::Error;
-use crate::metadata::ColumnChunkMetaData;
+use crate::metadata::{ColumnChunkMetaData, RowGroupMetaData};
 use crate::page::CompressedPage;
 use crate::schema::types::ParquetType;
-use crate::{error::Result, metadata::FileMetaData};
 
 use super::{get_field_columns, get_page_iterator, PageFilter, PageReader};
 
@@ -16,26 +15,23 @@ mod stream;
 /// Returns a [`ColumnIterator`] of column chunks corresponding to `field`.
 ///
 /// Contrarily to [`get_page_iterator`] that returns a single iterator of pages, this iterator
-/// returns multiple iterators, one per physical column of the `field`.
+/// iterates over columns, one by one, and returns a [`PageReader`] per column.
 /// For primitive fields (e.g. `i64`), [`ColumnIterator`] yields exactly one column.
 /// For complex fields, it yields multiple columns.
-/// `max_page_size` is the maximum number of bytes thrift is allowed to allocate
-/// to read a page header.
+/// `max_page_size` is the maximum number of bytes allowed.
 pub fn get_column_iterator<R: Read + Seek>(
     reader: R,
-    metadata: &FileMetaData,
-    row_group: usize,
-    field: usize,
+    row_group: &RowGroupMetaData,
+    field_name: &str,
     page_filter: Option<PageFilter>,
     scratch: Vec<u8>,
     max_page_size: usize,
 ) -> ColumnIterator<R> {
-    let field = metadata.schema().fields()[field].clone();
-    let columns = get_field_columns(metadata.row_groups[row_group].columns(), field.name())
+    let columns = get_field_columns(row_group.columns(), field_name)
         .cloned()
         .collect::<Vec<_>>();
 
-    ColumnIterator::new(reader, field, columns, page_filter, scratch, max_page_size)
+    ColumnIterator::new(reader, columns, page_filter, scratch, max_page_size)
 }
 
 /// State of [`MutStreamingIterator`].
@@ -56,19 +52,10 @@ pub trait MutStreamingIterator: Sized {
     fn get(&mut self) -> Option<&mut Self::Item>;
 }
 
-/// Trait describing a [`MutStreamingIterator`] of column chunks.
-pub trait ColumnChunkIter<I>:
-    MutStreamingIterator<Item = (I, ColumnChunkMetaData), Error = Error>
-{
-    /// The field associated to the set of column chunks this iterator iterates over.
-    fn field(&self) -> &ParquetType;
-}
-
 /// A [`MutStreamingIterator`] that reads column chunks one by one,
 /// returning a [`PageReader`] per column.
 pub struct ColumnIterator<R: Read + Seek> {
     reader: Option<R>,
-    field: ParquetType,
     columns: Vec<ColumnChunkMetaData>,
     page_filter: Option<PageFilter>,
     current: Option<(PageReader<R>, ColumnChunkMetaData)>,
@@ -81,7 +68,6 @@ impl<R: Read + Seek> ColumnIterator<R> {
     /// `max_page_size` is the maximum allowed page size
     pub fn new(
         reader: R,
-        field: ParquetType,
         mut columns: Vec<ColumnChunkMetaData>,
         page_filter: Option<PageFilter>,
         scratch: Vec<u8>,
@@ -90,7 +76,6 @@ impl<R: Read + Seek> ColumnIterator<R> {
         columns.reverse();
         Self {
             reader: Some(reader),
-            field,
             scratch,
             columns,
             page_filter,
@@ -104,7 +89,7 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
     type Item = (PageReader<R>, ColumnChunkMetaData);
     type Error = Error;
 
-    fn advance(mut self) -> Result<State<Self>> {
+    fn advance(mut self) -> Result<State<Self>, Error> {
         let (reader, scratch) = if let Some((iter, _)) = self.current {
             iter.into_inner()
         } else {
@@ -125,7 +110,6 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
         let current = Some((iter, column));
         Ok(State::Some(Self {
             reader: None,
-            field: self.field,
             columns: self.columns,
             page_filter: self.page_filter,
             current,
@@ -139,25 +123,19 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
     }
 }
 
-impl<R: Read + Seek> ColumnChunkIter<PageReader<R>> for ColumnIterator<R> {
-    fn field(&self) -> &ParquetType {
-        &self.field
-    }
-}
-
 /// A [`MutStreamingIterator`] of pre-read column chunks
 #[derive(Debug)]
 pub struct ReadColumnIterator {
     field: ParquetType,
-    chunks: Vec<(Vec<Result<CompressedPage>>, ColumnChunkMetaData)>,
-    current: Option<(IntoIter<Result<CompressedPage>>, ColumnChunkMetaData)>,
+    chunks: Vec<(Vec<Result<CompressedPage, Error>>, ColumnChunkMetaData)>,
+    current: Option<(IntoIter<Result<CompressedPage, Error>>, ColumnChunkMetaData)>,
 }
 
 impl ReadColumnIterator {
     /// Returns a new [`ReadColumnIterator`]
     pub fn new(
         field: ParquetType,
-        chunks: Vec<(Vec<Result<CompressedPage>>, ColumnChunkMetaData)>,
+        chunks: Vec<(Vec<Result<CompressedPage, Error>>, ColumnChunkMetaData)>,
     ) -> Self {
         Self {
             field,
@@ -168,10 +146,10 @@ impl ReadColumnIterator {
 }
 
 impl MutStreamingIterator for ReadColumnIterator {
-    type Item = (IntoIter<Result<CompressedPage>>, ColumnChunkMetaData);
+    type Item = (IntoIter<Result<CompressedPage, Error>>, ColumnChunkMetaData);
     type Error = Error;
 
-    fn advance(mut self) -> Result<State<Self>> {
+    fn advance(mut self) -> Result<State<Self>, Error> {
         if self.chunks.is_empty() {
             return Ok(State::Finished(vec![]));
         }
@@ -191,12 +169,6 @@ impl MutStreamingIterator for ReadColumnIterator {
     }
 }
 
-impl ColumnChunkIter<IntoIter<Result<CompressedPage>>> for ReadColumnIterator {
-    fn field(&self) -> &ParquetType {
-        &self.field
-    }
-}
-
 /// Reads all columns that are part of the parquet field `field_name`
 /// # Implementation
 /// This operation is IO-bounded `O(C)` where C is the number of columns associated to
@@ -207,7 +179,7 @@ pub fn read_columns<'a, R: Read + Seek>(
     reader: &mut R,
     columns: &'a [ColumnChunkMetaData],
     field_name: &'a str,
-) -> Result<Vec<(&'a ColumnChunkMetaData, Vec<u8>)>> {
+) -> Result<Vec<(&'a ColumnChunkMetaData, Vec<u8>)>, Error> {
     get_field_columns(columns, field_name)
         .map(|column| read_column(reader, column).map(|c| (column, c)))
         .collect()
@@ -215,7 +187,7 @@ pub fn read_columns<'a, R: Read + Seek>(
 
 /// Reads a column chunk into memory
 /// This operation is IO-bounded and allocates the column's `compressed_size`.
-pub fn read_column<R>(reader: &mut R, column: &ColumnChunkMetaData) -> Result<Vec<u8>>
+pub fn read_column<R>(reader: &mut R, column: &ColumnChunkMetaData) -> Result<Vec<u8>, Error>
 where
     R: Read + Seek,
 {

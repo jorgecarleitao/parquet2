@@ -214,7 +214,6 @@ mod tests {
 
         let mut iter = ColumnIterator::new(
             file,
-            metadata.schema().fields()[0].clone(),
             metadata.row_groups[0].columns().to_vec(),
             None,
             vec![],
