@@ -25,25 +25,21 @@ pub fn serialize_column_index(pages: &[PageWriteSpec]) -> Result<ColumnIndex> {
                 let null_count = stats
                     .null_count
                     .ok_or_else(|| Error::oos("null count of a page is required"))?;
-
                 null_counts.push(null_count);
-                if null_count as usize == spec.num_values {
-                    min_values.push(vec![0]);
-                    max_values.push(vec![0]);
-                    null_pages.push(true)
-                } else {
-                    min_values.push(
-                        stats
-                            .min_value
-                            .ok_or_else(|| Error::oos("min value of a page is required"))?,
-                    );
+
+                if let Some(min_value) = stats.min_value {
+                    min_values.push(min_value);
                     max_values.push(
                         stats
                             .max_value
                             .ok_or_else(|| Error::oos("max value of a page is required"))?,
                     );
                     null_pages.push(false)
-                };
+                } else {
+                    min_values.push(vec![0]);
+                    max_values.push(vec![0]);
+                    null_pages.push(true)
+                }
 
                 Result::Ok(())
             } else {
