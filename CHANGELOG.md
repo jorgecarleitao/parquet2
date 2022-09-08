@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.16.3](https://github.com/jorgecarleitao/parquet2/tree/v0.16.3) (2022-09-08)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.2...v0.16.3)
+
+**Fixed bugs:**
+
+- Removed un-necessary conversion [\#197](https://github.com/jorgecarleitao/parquet2/pull/197) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
 ## [v0.16.2](https://github.com/jorgecarleitao/parquet2/tree/v0.16.2) (2022-08-19)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.1...v0.16.2)
