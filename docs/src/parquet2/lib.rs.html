@@ -1,0 +1,88 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/lib.rs`."><meta name="keywords" content="rust, rustlang, rust-lang"><title>lib.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Regular.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../FiraSans-Medium.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Regular.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceSerif4-Bold.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../SourceCodePro-Semibold.ttf.woff2"><link rel="stylesheet" href="../../normalize.css"><link rel="stylesheet" href="../../rustdoc.css" id="mainThemeStyle"><link rel="stylesheet" href="../../ayu.css" disabled><link rel="stylesheet" href="../../dark.css" disabled><link rel="stylesheet" href="../../light.css" id="themeStyle"><script id="default-settings" ></script><script src="../../storage.js"></script><script defer src="../../source-script.js"></script><script defer src="../../source-files.js"></script><script defer src="../../main.js"></script><noscript><link rel="stylesheet" href="../../noscript.css"></noscript><link rel="alternate icon" type="image/png" href="../../favicon-16x16.png"><link rel="alternate icon" type="image/png" href="../../favicon-32x32.png"><link rel="icon" type="image/svg+xml" href="../../favicon.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle">&#9776;</button><a class="sidebar-logo" href="../../parquet2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a><h2 class="location"></h2></nav><nav class="sidebar"><a class="sidebar-logo" href="../../parquet2/index.html"><div class="logo-container"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></div></a></nav><main><div class="width-limiter"><div class="sub-container"><a class="sub-logo-container" href="../../parquet2/index.html"><img class="rust-logo" src="../../rust-logo.svg" alt="logo"></a><nav class="sub"><form class="search-form"><div class="search-container"><span></span><input class="search-input" name="search" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><button type="button">?</button></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../wheel.svg"></a></div></div></form></nav></div><section id="main-content" class="content"><div class="example-wrap"><pre class="line-numbers"><span id="1">1</span>
+<span id="2">2</span>
+<span id="3">3</span>
+<span id="4">4</span>
+<span id="5">5</span>
+<span id="6">6</span>
+<span id="7">7</span>
+<span id="8">8</span>
+<span id="9">9</span>
+<span id="10">10</span>
+<span id="11">11</span>
+<span id="12">12</span>
+<span id="13">13</span>
+<span id="14">14</span>
+<span id="15">15</span>
+<span id="16">16</span>
+<span id="17">17</span>
+<span id="18">18</span>
+<span id="19">19</span>
+<span id="20">20</span>
+<span id="21">21</span>
+<span id="22">22</span>
+<span id="23">23</span>
+<span id="24">24</span>
+<span id="25">25</span>
+<span id="26">26</span>
+<span id="27">27</span>
+<span id="28">28</span>
+<span id="29">29</span>
+<span id="30">30</span>
+<span id="31">31</span>
+<span id="32">32</span>
+<span id="33">33</span>
+<span id="34">34</span>
+<span id="35">35</span>
+<span id="36">36</span>
+<span id="37">37</span>
+<span id="38">38</span>
+<span id="39">39</span>
+<span id="40">40</span>
+<span id="41">41</span>
+<span id="42">42</span>
+<span id="43">43</span>
+</pre><pre class="rust"><code><span class="attribute">#![forbid(unsafe_code)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+</span><span class="doccomment">/// Unofficial implementation of parquet IO in Rust.
+
+</span><span class="attribute">#[macro_use]
+</span><span class="kw">pub mod </span>error;
+<span class="attribute">#[cfg(feature = <span class="string">&quot;bloom_filter&quot;</span>)]
+</span><span class="kw">pub mod </span>bloom_filter;
+<span class="kw">pub mod </span>compression;
+<span class="kw">pub mod </span>deserialize;
+<span class="kw">pub mod </span>encoding;
+<span class="kw">pub mod </span>indexes;
+<span class="kw">pub mod </span>metadata;
+<span class="kw">pub mod </span>page;
+<span class="kw">mod </span>parquet_bridge;
+<span class="kw">pub mod </span>read;
+<span class="kw">pub mod </span>schema;
+<span class="kw">pub mod </span>statistics;
+<span class="kw">pub mod </span>types;
+<span class="kw">pub mod </span>write;
+
+<span class="kw">use </span>parquet_format_safe <span class="kw">as </span>thrift_format;
+
+<span class="kw">pub use </span>streaming_decompression::fallible_streaming_iterator;
+<span class="kw">pub use </span>streaming_decompression::FallibleStreamingIterator;
+
+<span class="kw">const </span>HEADER_SIZE: u64 = PARQUET_MAGIC.len() <span class="kw">as </span>u64;
+<span class="kw">const </span>FOOTER_SIZE: u64 = <span class="number">8</span>;
+<span class="kw">const </span>PARQUET_MAGIC: [u8; <span class="number">4</span>] = [<span class="string">b&#39;P&#39;</span>, <span class="string">b&#39;A&#39;</span>, <span class="string">b&#39;R&#39;</span>, <span class="string">b&#39;1&#39;</span>];
+
+<span class="doccomment">/// The number of bytes read at the end of the parquet file on first read
+</span><span class="kw">const </span>DEFAULT_FOOTER_READ_SIZE: u64 = <span class="number">64 </span>* <span class="number">1024</span>;
+
+<span class="attribute">#[cfg(test)]
+</span><span class="kw">mod </span>tests {
+    <span class="kw">use </span>std::path::PathBuf;
+
+    <span class="kw">pub fn </span>get_path() -&gt; PathBuf {
+        <span class="kw">let </span>dir = <span class="macro">env!</span>(<span class="string">&quot;CARGO_MANIFEST_DIR&quot;</span>);
+
+        PathBuf::from(dir).join(<span class="string">&quot;testing/parquet-testing/data&quot;</span>)
+    }
+}
+</code></pre></div>
+</section></div></main><div id="rustdoc-vars" data-root-path="../../" data-current-crate="parquet2" data-themes="ayu,dark,light" data-resource-suffix="" data-rustdoc-version="1.65.0-nightly (c2804e6ec 2022-09-07)" ></div></body></html>
