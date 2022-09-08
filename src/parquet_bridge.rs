@@ -183,13 +183,6 @@ impl BrotliLevel {
     }
 }
 
-#[cfg(feature = "brotli")]
-impl From<BrotliLevel> for flate2::Compression {
-    fn from(level: BrotliLevel) -> Self {
-        Self::new(level.compression_level() as u32)
-    }
-}
-
 /// Represents a valid gzip compression level.
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub struct GzipLevel(u8);
