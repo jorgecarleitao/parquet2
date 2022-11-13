@@ -15,10 +15,7 @@ pub fn encode<'a, I: Iterator<Item = &'a [u8]> + Clone>(iterator: I, buffer: &mu
                 .zip(previous.iter())
                 .enumerate()
                 // find first difference
-                .find_map(|(length, (lhs, rhs))| {
-                    println!("{lhs} {rhs}");
-                    (lhs != rhs).then(|| length)
-                })
+                .find_map(|(length, (lhs, rhs))| (lhs != rhs).then(|| length))
                 .unwrap_or(previous.len());
             previous = item;
 
