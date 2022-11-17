@@ -46,9 +46,9 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> Result<S
         }
         Some(HybridEncoded::Rle(pack, additional)) => {
             let mut bytes = [0u8; std::mem::size_of::<u32>()];
-            pack.iter()
-                .enumerate()
-                .for_each(|(i, byte)| bytes[i] = *byte);
+            pack.iter().zip(bytes.iter_mut()).for_each(|(src, dst)| {
+                *dst = *src;
+            });
             let value = u32::from_le_bytes(bytes);
             State::Rle(std::iter::repeat(value).take(additional))
         }
