@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":[["encode","Encodes a clonable iterator of `&[u8]` into `buffer`. This does not allocated on the heap."]],"struct":[["Decoder","Decodes Delta-length byte array lengths and values."]]};
