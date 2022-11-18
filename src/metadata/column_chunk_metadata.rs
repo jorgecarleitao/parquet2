@@ -1,5 +1,3 @@
-#[cfg(feature = "serde_types")]
-use std::io::Cursor;
 use std::sync::Arc;
 
 use parquet_format_safe::{ColumnChunk, ColumnMetaData, Encoding};
@@ -9,16 +7,20 @@ use crate::compression::Compression;
 use crate::error::{Error, Result};
 use crate::schema::types::PhysicalType;
 use crate::statistics::{deserialize_statistics, Statistics};
+
 #[cfg(feature = "serde_types")]
-use parquet_format_safe::thrift::protocol::{TCompactInputProtocol, TCompactOutputProtocol};
+mod serde_types {
+    pub use parquet_format_safe::thrift::protocol::{
+        TCompactInputProtocol, TCompactOutputProtocol,
+    };
+    pub use serde::de::Error as DeserializeError;
+    pub use serde::ser::Error as SerializeError;
+    pub use serde::{Deserialize, Deserializer, Serializer};
+    pub use serde_derive::{Deserialize, Serialize};
+    pub use std::io::Cursor;
+}
 #[cfg(feature = "serde_types")]
-use serde::de::Error as DeserializeError;
-#[cfg(feature = "serde_types")]
-use serde::ser::Error as SerializeError;
-#[cfg(feature = "serde_types")]
-use serde::{Deserialize, Deserializer, Serializer};
-#[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde_types::*;
 
 /// Metadata for a column chunk.
 // This contains the `ColumnDescriptor` associated with the chunk so that deserializers have
