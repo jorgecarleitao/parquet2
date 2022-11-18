@@ -1,3 +1,5 @@
+#[cfg(feature = "serde_types")]
+use std::io::Cursor;
 use std::sync::Arc;
 
 use parquet_format_safe::{ColumnChunk, ColumnMetaData, Encoding};
@@ -7,14 +9,61 @@ use crate::compression::Compression;
 use crate::error::{Error, Result};
 use crate::schema::types::PhysicalType;
 use crate::statistics::{deserialize_statistics, Statistics};
+#[cfg(feature = "serde_types")]
+use parquet_format_safe::thrift::protocol::{TCompactInputProtocol, TCompactOutputProtocol};
+#[cfg(feature = "serde_types")]
+use serde::de::Error as DeserializeError;
+#[cfg(feature = "serde_types")]
+use serde::ser::Error as SerializeError;
+#[cfg(feature = "serde_types")]
+use serde::{Deserialize, Deserializer, Serializer};
+#[cfg(feature = "serde_types")]
+use serde_derive::{Deserialize, Serialize};
 
 /// Metadata for a column chunk.
 // This contains the `ColumnDescriptor` associated with the chunk so that deserializers have
 // access to the descriptor (e.g. physical, converted, logical).
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub struct ColumnChunkMetaData {
+    #[cfg_attr(
+        feature = "serde_types",
+        serde(serialize_with = "serialize_column_chunk")
+    )]
+    #[cfg_attr(
+        feature = "serde_types",
+        serde(deserialize_with = "deserialize_column_chunk")
+    )]
     column_chunk: ColumnChunk,
     column_descr: ColumnDescriptor,
+}
+
+#[cfg(feature = "serde_types")]
+fn serialize_column_chunk<S>(
+    column_chunk: &ColumnChunk,
+    serializer: S,
+) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut buf = vec![];
+    let cursor = Cursor::new(&mut buf[..]);
+    let mut protocol = TCompactOutputProtocol::new(cursor);
+    column_chunk
+        .write_to_out_protocol(&mut protocol)
+        .map_err(S::Error::custom)?;
+    serializer.serialize_bytes(&buf)
+}
+
+#[cfg(feature = "serde_types")]
+fn deserialize_column_chunk<'de, D>(deserializer: D) -> std::result::Result<ColumnChunk, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let buf = Vec::<u8>::deserialize(deserializer)?;
+    let mut cursor = Cursor::new(&buf[..]);
+    let mut protocol = TCompactInputProtocol::new(&mut cursor, usize::MAX);
+    ColumnChunk::read_from_in_protocol(&mut protocol).map_err(D::Error::custom)
 }
 
 // Represents common operations for a column chunk.

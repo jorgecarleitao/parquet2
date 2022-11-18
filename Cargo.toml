@@ -32,6 +32,8 @@ flate2 = { version = "^1.0", optional = true, default-features = false }
 lz4 = { version = "1.23.3", optional = true }
 zstd = { version = "^0.11", optional = true, default-features = false }
 lz4_flex = { version = "^0.9.2", optional = true }
+serde = { version = "^1.0", optional = true }
+serde_derive = { version = "^1.0", optional = true }
 
 xxhash-rust = { version="0.8.3", optional = true, features = ["xxh64"] }
 
@@ -48,6 +50,7 @@ snappy = ["snap"]
 gzip = ["flate2/rust_backend"]
 gzip_zlib_ng = ["flate2/zlib-ng"]
 bloom_filter = ["xxhash-rust"]
+serde_types = ["serde", "serde_derive"]
 
 [[bench]]
 name = "decode_bitpacking"

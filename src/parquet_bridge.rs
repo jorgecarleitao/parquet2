@@ -9,9 +9,12 @@ use super::thrift_format::{
 };
 
 use crate::error::Error;
+#[cfg(feature = "serde_types")]
+use serde_derive::{Deserialize, Serialize};
 
 /// The repetition of a parquet field
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum Repetition {
     /// When the field has no null values
     Required,
@@ -433,6 +436,7 @@ impl DataPageHeaderExt for DataPageHeaderV2 {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum TimeUnit {
     Milliseconds,
     Microseconds,
@@ -461,6 +465,7 @@ impl From<TimeUnit> for ParquetTimeUnit {
 
 /// Enum of all valid logical integer types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum IntegerType {
     Int8,
     Int16,
@@ -473,6 +478,7 @@ pub enum IntegerType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum PrimitiveLogicalType {
     String,
     Enum,
@@ -494,6 +500,7 @@ pub enum PrimitiveLogicalType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum GroupLogicalType {
     Map,
     List,
