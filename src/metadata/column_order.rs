@@ -1,4 +1,6 @@
 use super::sort::SortOrder;
+#[cfg(feature = "serde_types")]
+use serde_derive::{Deserialize, Serialize};
 
 /// Column order that specifies what method was used to aggregate min/max values for
 /// statistics.
@@ -6,6 +8,7 @@ use super::sort::SortOrder;
 /// If column order is undefined, then it is the legacy behaviour and all values should
 /// be compared as signed values/bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum ColumnOrder {
     /// Column uses the order defined by its logical or physical type
     /// (if there is no logical type), parquet-format 2.4.0+.

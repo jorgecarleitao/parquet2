@@ -1,8 +1,11 @@
 use crate::schema::types::{ParquetType, PrimitiveType};
+#[cfg(feature = "serde_types")]
+use serde_derive::{Deserialize, Serialize};
 
 /// A descriptor of a parquet column. It contains the necessary information to deserialize
 /// a parquet column.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub struct Descriptor {
     /// The [`PrimitiveType`] of this column
     pub primitive_type: PrimitiveType,
@@ -18,6 +21,7 @@ pub struct Descriptor {
 /// This encapsulates information such as definition and repetition levels and is used to
 /// re-assemble nested data.
 #[derive(Debug, PartialEq, Clone)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub struct ColumnDescriptor {
     /// The descriptor this columns' leaf.
     pub descriptor: Descriptor,

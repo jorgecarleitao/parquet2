@@ -7,9 +7,12 @@ use super::{
     spec, FieldInfo, GroupConvertedType, GroupLogicalType, PhysicalType, PrimitiveConvertedType,
     PrimitiveLogicalType,
 };
+#[cfg(feature = "serde_types")]
+use serde_derive::{Deserialize, Serialize};
 
 /// The complete description of a parquet column
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub struct PrimitiveType {
     /// The fields' generic information
     pub field_info: FieldInfo,
@@ -41,6 +44,7 @@ impl PrimitiveType {
 /// Representation of a Parquet type describing primitive and nested fields,
 /// including the top-level schema of the parquet file.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum ParquetType {
     PrimitiveType(PrimitiveType),
     GroupType {
