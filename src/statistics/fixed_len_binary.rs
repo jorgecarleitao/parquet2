@@ -56,11 +56,11 @@ pub fn read(
         null_count: v.null_count,
         distinct_count: v.distinct_count,
         max_value: v.max_value.clone().map(|mut x| {
-            x.truncate(size as usize);
+            x.truncate(size);
             x
         }),
         min_value: v.min_value.clone().map(|mut x| {
-            x.truncate(size as usize);
+            x.truncate(size);
             x
         }),
     }))
