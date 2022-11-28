@@ -60,11 +60,15 @@ impl From<&ColumnChunkMetaData> for PageMetaData {
 /// Type declaration for a page filter
 pub type PageFilter = Arc<dyn Fn(&Descriptor, &DataPageHeader) -> bool + Send + Sync>;
 
+/// Type declaration for a page inspector
+pub type PageInspector = Arc<dyn Fn(&mut CompressedDataPage)>;
+
 /// A fallible [`Iterator`] of [`CompressedDataPage`]. This iterator reads pages back
 /// to back until all pages have been consumed.
 /// The pages from this iterator always have [`None`] [`crate::page::CompressedDataPage::selected_rows()`] since
 /// filter pushdown is not supported without a
 /// pre-computed [page index](https://github.com/apache/parquet-format/blob/master/PageIndex.md).
+/// Howerver, it's able to inspect the page and modify the `selected_rows` by passing a [`PageInspector`] during iteration in the runtime.
 pub struct PageReader<R: Read> {
     // The source
     reader: R,
@@ -78,6 +82,8 @@ pub struct PageReader<R: Read> {
     total_num_values: i64,
 
     pages_filter: PageFilter,
+
+    page_inspector: PageInspector,
 
     descriptor: Descriptor,
 
@@ -97,10 +103,18 @@ impl<R: Read> PageReader<R> {
         reader: R,
         column: &ColumnChunkMetaData,
         pages_filter: PageFilter,
+        page_inspector: PageInspector,
         scratch: Vec<u8>,
         max_page_size: usize,
     ) -> Self {
-        Self::new_with_page_meta(reader, column.into(), pages_filter, scratch, max_page_size)
+        Self::new_with_page_meta(
+            reader,
+            column.into(),
+            pages_filter,
+            page_inspector,
+            scratch,
+            max_page_size,
+        )
     }
 
     /// Create a a new [`PageReader`] with [`PageMetaData`].
@@ -110,6 +124,7 @@ impl<R: Read> PageReader<R> {
         reader: R,
         reader_meta: PageMetaData,
         pages_filter: PageFilter,
+        page_inspector: PageInspector,
         scratch: Vec<u8>,
         max_page_size: usize,
     ) -> Self {
@@ -120,6 +135,7 @@ impl<R: Read> PageReader<R> {
             seen_num_values: 0,
             descriptor: reader_meta.descriptor,
             pages_filter,
+            page_inspector,
             scratch,
             max_page_size,
         }
@@ -142,8 +158,8 @@ impl<R: Read> Iterator for PageReader<R> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let mut buffer = std::mem::take(&mut self.scratch);
-        let maybe_maybe_page = next_page(self, &mut buffer).transpose();
-        if let Some(ref maybe_page) = maybe_maybe_page {
+        let mut maybe_maybe_page = next_page(self, &mut buffer).transpose();
+        if let Some(ref mut maybe_page) = maybe_maybe_page {
             if let Ok(CompressedPage::Data(page)) = maybe_page {
                 // check if we should filter it (only valid for data pages)
                 let to_consume = (self.pages_filter)(&self.descriptor, page.header());
@@ -151,6 +167,7 @@ impl<R: Read> Iterator for PageReader<R> {
                     self.scratch = std::mem::take(&mut buffer);
                     return self.next();
                 }
+                (self.page_inspector)(page);
             }
         } else {
             // no page => we take back the buffer

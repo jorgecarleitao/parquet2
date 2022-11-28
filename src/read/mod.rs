@@ -29,6 +29,8 @@ use crate::{error::Result, metadata::FileMetaData};
 
 pub use indexes::{read_columns_indexes, read_pages_locations};
 
+use self::page::PageInspector;
+
 /// Filters row group metadata to only those row groups,
 /// for which the predicate function returns true
 pub fn filter_row_groups(
@@ -51,10 +53,12 @@ pub fn get_page_iterator<R: Read + Seek>(
     column_chunk: &ColumnChunkMetaData,
     mut reader: R,
     pages_filter: Option<PageFilter>,
+    page_inspector: Option<PageInspector>,
     scratch: Vec<u8>,
     max_page_size: usize,
 ) -> Result<PageReader<R>> {
     let pages_filter = pages_filter.unwrap_or_else(|| Arc::new(|_, _| true));
+    let page_inspector = page_inspector.unwrap_or_else(|| Arc::new(|_| {}));
 
     let (col_start, _) = column_chunk.byte_range();
     reader.seek(SeekFrom::Start(col_start))?;
@@ -62,6 +66,7 @@ pub fn get_page_iterator<R: Read + Seek>(
         reader,
         column_chunk,
         pages_filter,
+        page_inspector,
         scratch,
         max_page_size,
     ))
@@ -92,12 +97,14 @@ pub fn get_field_columns<'a>(
 /// For complex fields, it yields multiple columns.
 /// `max_header_size` is the maximum number of bytes thrift is allowed to allocate
 /// to read a page header.
+#[allow(clippy::too_many_arguments)]
 pub fn get_column_iterator<R: Read + Seek>(
     reader: R,
     metadata: &FileMetaData,
     row_group: usize,
     field: usize,
     page_filter: Option<PageFilter>,
+    page_inspector: Option<PageInspector>,
     scratch: Vec<u8>,
     max_header_size: usize,
 ) -> ColumnIterator<R> {
@@ -111,6 +118,7 @@ pub fn get_column_iterator<R: Read + Seek>(
         field,
         columns,
         page_filter,
+        page_inspector,
         scratch,
         max_header_size,
     )
@@ -149,6 +157,7 @@ pub struct ColumnIterator<R: Read + Seek> {
     field: ParquetType,
     columns: Vec<ColumnChunkMetaData>,
     page_filter: Option<PageFilter>,
+    page_inspector: Option<PageInspector>,
     current: Option<(PageReader<R>, ColumnChunkMetaData)>,
     scratch: Vec<u8>,
     max_header_size: usize,
@@ -163,6 +172,7 @@ impl<R: Read + Seek> ColumnIterator<R> {
         field: ParquetType,
         mut columns: Vec<ColumnChunkMetaData>,
         page_filter: Option<PageFilter>,
+        page_inspector: Option<PageInspector>,
         scratch: Vec<u8>,
         max_header_size: usize,
     ) -> Self {
@@ -173,6 +183,7 @@ impl<R: Read + Seek> ColumnIterator<R> {
             scratch,
             columns,
             page_filter,
+            page_inspector,
             current: None,
             max_header_size,
         }
@@ -198,6 +209,7 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
             &column,
             reader,
             self.page_filter.clone(),
+            self.page_inspector.clone(),
             scratch,
             self.max_header_size,
         )?;
@@ -207,6 +219,7 @@ impl<R: Read + Seek> MutStreamingIterator for ColumnIterator<R> {
             field: self.field,
             columns: self.columns,
             page_filter: self.page_filter,
+            page_inspector: self.page_inspector,
             current,
             scratch: vec![],
             max_header_size: self.max_header_size,

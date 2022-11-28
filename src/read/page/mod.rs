@@ -6,7 +6,7 @@ mod stream;
 use crate::{error::Error, page::CompressedPage};
 
 pub use indexed_reader::IndexedPageReader;
-pub use reader::{PageFilter, PageMetaData, PageReader};
+pub use reader::{PageFilter, PageInspector, PageMetaData, PageReader};
 
 pub trait PageIterator: Iterator<Item = Result<CompressedPage, Error>> {
     fn swap_buffer(&mut self, buffer: &mut Vec<u8>);

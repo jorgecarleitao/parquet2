@@ -1,4 +1,7 @@
-use std::io::Cursor;
+use std::cell::RefCell;
+use std::io::{Cursor, Seek, SeekFrom};
+use std::rc::Rc;
+use std::sync::Arc;
 
 use parquet2::compression::CompressionOptions;
 use parquet2::error::Result;
@@ -6,14 +9,17 @@ use parquet2::indexes::{
     select_pages, BoundaryOrder, Index, Interval, NativeIndex, PageIndex, PageLocation,
 };
 use parquet2::metadata::SchemaDescriptor;
+use parquet2::page::Page;
 use parquet2::read::{
-    read_columns_indexes, read_metadata, read_pages_locations, BasicDecompressor, IndexedPageReader,
+    read_columns_indexes, read_metadata, read_pages_locations, BasicDecompressor,
+    IndexedPageReader, PageReader,
 };
 use parquet2::schema::types::{ParquetType, PhysicalType, PrimitiveType};
 use parquet2::write::WriteOptions;
 use parquet2::write::{Compressor, DynIter, DynStreamingIterator, FileWriter, Version};
+use parquet2::FallibleStreamingIterator;
 
-use crate::read::collect;
+use crate::read::{collect, page_to_array};
 use crate::Array;
 
 use super::primitive::array_to_page_v1;
@@ -128,6 +134,64 @@ fn read_indexes_and_locations() -> Result<()> {
 
     let pages = read_pages_locations(&mut reader, columns)?;
     assert_eq!(pages, expected_page_locations);
+
+    Ok(())
+}
+
+#[test]
+fn select_rows_in_runtime() -> Result<()> {
+    let data = write_file()?;
+    let mut reader = Cursor::new(data);
+
+    let metadata = read_metadata(&mut reader)?;
+
+    let columns = &metadata.row_groups[0].columns();
+    let column = &columns[0];
+
+    let intervals = Rc::new(RefCell::new(vec![Interval::new(2, 2)]));
+    let pass_in = intervals.clone();
+
+    reader.seek(SeekFrom::Start(column.metadata().data_page_offset as u64))?;
+
+    let pages = PageReader::new(
+        reader,
+        &column,
+        Arc::new(|_, _| true),
+        Arc::new(move |page| {
+            let interval = pass_in.borrow();
+            page.set_selected_rows(interval.clone());
+        }),
+        vec![],
+        usize::MAX,
+    );
+
+    let mut pages = BasicDecompressor::new(pages, vec![]);
+
+    let mut arrays = vec![];
+    let dict = None;
+    if let Some(page) = pages.next()? {
+        match page {
+            Page::Data(page) => arrays.push(page_to_array(page, dict.as_ref())?),
+            _ => unreachable!(),
+        }
+    }
+
+    // change intervals
+    intervals.replace(vec![Interval::new(1, 1)]);
+
+    if let Some(page) = pages.next()? {
+        match page {
+            Page::Data(page) => arrays.push(page_to_array(page, dict.as_ref())?),
+            _ => unreachable!(),
+        }
+    }
+    assert_eq!(
+        arrays,
+        vec![
+            Array::Int32(vec![None, Some(3)]),
+            Array::Int32(vec![Some(11)])
+        ]
+    );
 
     Ok(())
 }

@@ -234,6 +234,7 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         row_group,
         field,
         None,
+        None,
         vec![],
         usize::MAX,
     );
