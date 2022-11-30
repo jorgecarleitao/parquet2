@@ -1,5 +1,30 @@
 # Changelog
 
+## [v0.17.0](https://github.com/jorgecarleitao/parquet2/tree/v0.17.0) (2022-11-30)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.2...v0.17.0)
+
+**Breaking changes:**
+
+- Improved hybrid rle decoding performance ~-40% [\#203](https://github.com/jorgecarleitao/parquet2/pull/203) ([ritchie46](https://github.com/ritchie46))
+- Improved API to read column chunks [\#195](https://github.com/jorgecarleitao/parquet2/pull/195) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Removed `EncodedPage`  [\#191](https://github.com/jorgecarleitao/parquet2/pull/191) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**New features:**
+
+- Added `serde` support for `RowGroupMetaData`. [\#202](https://github.com/jorgecarleitao/parquet2/pull/202) ([youngsofun](https://github.com/youngsofun))
+
+**Fixed bugs:**
+
+- Removed un-necessary conversion [\#197](https://github.com/jorgecarleitao/parquet2/pull/197) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Avoid OOM on page streams [\#194](https://github.com/jorgecarleitao/parquet2/pull/194) ([jorgecarleitao](https://github.com/jorgecarleitao))
+- Fixed error requiring stats [\#193](https://github.com/jorgecarleitao/parquet2/pull/193) ([jorgecarleitao](https://github.com/jorgecarleitao))
+
+**Enhancements:**
+
+- elide bound check in RLE decoder [\#201](https://github.com/jorgecarleitao/parquet2/pull/201) ([ritchie46](https://github.com/ritchie46))
+- Replaced panics by errors on invalid pages [\#188](https://github.com/jorgecarleitao/parquet2/pull/188) ([evanrichter](https://github.com/evanrichter))
+
 ## [v0.16.2](https://github.com/jorgecarleitao/parquet2/tree/v0.16.2) (2022-08-19)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.1...v0.16.2)
