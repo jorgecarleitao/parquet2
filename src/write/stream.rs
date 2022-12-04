@@ -30,7 +30,6 @@ async fn end_file<W: AsyncWrite + Unpin + Send>(
     // Write file metadata
     let mut protocol = TCompactOutputStreamProtocol::new(&mut writer);
     let metadata_len = metadata.write_to_out_stream_protocol(&mut protocol).await? as i32;
-    protocol.flush().await?;
 
     // Write footer
     let metadata_bytes = metadata_len.to_le_bytes();

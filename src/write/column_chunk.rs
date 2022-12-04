@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::io::Write;
 
-use parquet_format_safe::thrift::protocol::{TCompactOutputProtocol, TOutputProtocol};
+use parquet_format_safe::thrift::protocol::TCompactOutputProtocol;
 use parquet_format_safe::{ColumnChunk, ColumnMetaData, Type};
 
 #[cfg(feature = "async")]
@@ -58,7 +58,6 @@ where
         .as_ref()
         .unwrap()
         .write_to_out_protocol(&mut protocol)? as u64;
-    protocol.flush()?;
 
     Ok((column_chunk, specs, bytes_written))
 }
@@ -96,7 +95,6 @@ where
         .unwrap()
         .write_to_out_stream_protocol(&mut protocol)
         .await? as u64;
-    protocol.flush().await?;
 
     Ok((column_chunk, specs, bytes_written))
 }
