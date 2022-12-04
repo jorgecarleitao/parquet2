@@ -1,7 +1,6 @@
 use std::io::Write;
 
 use parquet_format_safe::thrift::protocol::TCompactOutputProtocol;
-use parquet_format_safe::thrift::protocol::TOutputProtocol;
 use parquet_format_safe::RowGroup;
 
 use crate::metadata::ThriftFileMetaData;
@@ -27,7 +26,6 @@ pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: &ThriftFileMetaDa
     // Write metadata
     let mut protocol = TCompactOutputProtocol::new(&mut writer);
     let metadata_len = metadata.write_to_out_protocol(&mut protocol)? as i32;
-    protocol.flush()?;
 
     // Write footer
     let metadata_bytes = metadata_len.to_le_bytes();
@@ -38,6 +36,7 @@ pub(super) fn end_file<W: Write>(mut writer: &mut W, metadata: &ThriftFileMetaDa
 
     (&mut footer_buffer[4..]).write_all(&PARQUET_MAGIC)?;
     writer.write_all(&footer_buffer)?;
+    writer.flush()?;
     Ok(metadata_len as u64 + FOOTER_SIZE)
 }
 
