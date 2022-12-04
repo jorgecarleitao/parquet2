@@ -109,6 +109,11 @@ impl CompressedDataPage {
                 .map(|x| deserialize_statistics(x, self.descriptor.primitive_type.clone())),
         }
     }
+
+    #[inline]
+    pub fn select_rows(&mut self, selected_rows: Vec<Interval>) {
+        self.selected_rows = Some(selected_rows);
+    }
 }
 
 #[derive(Debug, Clone)]
