@@ -1,5 +1,13 @@
 # Changelog
 
+## [v0.17.1](https://github.com/jorgecarleitao/parquet2/tree/v0.17.1) (2022-12-12)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.17.0...v0.17.1)
+
+**Fixed bugs:**
+
+- Fixed error in rle decoding [\#207](https://github.com/jorgecarleitao/parquet2/pull/207) ([ritchie46](https://github.com/ritchie46))
+
 ## [v0.17.0](https://github.com/jorgecarleitao/parquet2/tree/v0.17.0) (2022-11-30)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.2...v0.17.0)
