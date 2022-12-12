@@ -27,7 +27,7 @@ enum State<'a> {
     Rle(std::iter::Take<std::iter::Repeat<u32>>),
     // Add a special branch for a single value to
     // adhere to the strong law of small numbers.
-    Single(u32),
+    Single(Option<u32>),
 }
 
 /// [`Iterator`] of [`u32`] from a byte slice of Hybrid-RLE encoded values
@@ -54,7 +54,7 @@ fn read_next<'a, 'b>(decoder: &'b mut Decoder<'a>, remaining: usize) -> Result<S
             });
             let value = u32::from_le_bytes(bytes);
             if additional == 1 {
-                State::Single(value)
+                State::Single(Some(value))
             } else {
                 State::Rle(std::iter::repeat(value).take(additional))
             }
@@ -85,7 +85,11 @@ impl<'a> Iterator for HybridRleDecoder<'a> {
             return None;
         };
         let result = match &mut self.state {
-            State::Single(i) => Some(*i),
+            State::Single(opt_val) => {
+                // make sure to take so that next calls will return 'None'
+                // indicating that the iterator is finished.
+                opt_val.take()
+            }
             State::Bitpacked(decoder) => decoder.next(),
             State::Rle(iter) => iter.next(),
             State::None => Some(0),
