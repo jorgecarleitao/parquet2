@@ -48,6 +48,7 @@ impl From<Repetition> for FieldRepetitionType {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
+#[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
 pub enum Compression {
     Uncompressed,
     Snappy,
