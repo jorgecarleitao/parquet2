@@ -2,10 +2,7 @@ use std::io::Write;
 
 use futures::{AsyncWrite, AsyncWriteExt};
 
-use parquet_format_safe::{
-    thrift::protocol::{TCompactOutputStreamProtocol, TOutputStreamProtocol},
-    FileMetaData, RowGroup,
-};
+use parquet_format_safe::{thrift::protocol::TCompactOutputStreamProtocol, FileMetaData, RowGroup};
 
 use crate::write::indexes::{write_column_index_async, write_offset_index_async};
 use crate::write::page::PageWriteSpec;

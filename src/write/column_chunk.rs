@@ -7,7 +7,7 @@ use parquet_format_safe::{ColumnChunk, ColumnMetaData, Type};
 #[cfg(feature = "async")]
 use futures::AsyncWrite;
 #[cfg(feature = "async")]
-use parquet_format_safe::thrift::protocol::{TCompactOutputStreamProtocol, TOutputStreamProtocol};
+use parquet_format_safe::thrift::protocol::TCompactOutputStreamProtocol;
 
 use crate::statistics::serialize_statistics;
 use crate::FallibleStreamingIterator;
