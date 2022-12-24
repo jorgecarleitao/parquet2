@@ -1,6 +1,6 @@
 use super::sort::SortOrder;
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Column order that specifies what method was used to aggregate min/max values for
 /// statistics.

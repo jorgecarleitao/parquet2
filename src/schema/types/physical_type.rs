@@ -2,7 +2,7 @@ use parquet_format_safe::Type;
 
 use crate::error::Error;
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// The set of all physical types representable in Parquet
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
