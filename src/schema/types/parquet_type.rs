@@ -8,7 +8,7 @@ use super::{
     PrimitiveLogicalType,
 };
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// The complete description of a parquet column
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

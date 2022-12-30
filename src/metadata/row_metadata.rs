@@ -6,7 +6,7 @@ use crate::{
     write::ColumnOffsetsMetadata,
 };
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Metadata for a row group.
 #[derive(Debug, Clone)]

@@ -3,7 +3,7 @@ use crate::schema::types::{
 };
 
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// Sort order for page and column statistics.
 ///

@@ -3,7 +3,7 @@ use parquet_format_safe::PageLocation;
 use crate::error::Error;
 
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// An interval
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

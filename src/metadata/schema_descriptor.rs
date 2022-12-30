@@ -9,7 +9,7 @@ use crate::{error::Result, schema::types::FieldInfo};
 use super::column_descriptor::{ColumnDescriptor, Descriptor};
 
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 /// A schema descriptor. This encapsulates the top-level schemas for all the columns,
 /// as well as all descriptors for all the primitive columns.

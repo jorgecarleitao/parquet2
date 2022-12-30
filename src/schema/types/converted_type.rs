@@ -1,7 +1,7 @@
 use crate::error::Error;
 use parquet_format_safe::ConvertedType;
 #[cfg(feature = "serde_types")]
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde_types", derive(Deserialize, Serialize))]
