@@ -36,7 +36,7 @@ fn decompress_v2(
             ));
         }
 
-        (&mut buffer[..offset]).copy_from_slice(&compressed[..offset]);
+        (buffer[..offset]).copy_from_slice(&compressed[..offset]);
 
         compression::decompress(compression, &compressed[offset..], &mut buffer[offset..])?;
     } else {

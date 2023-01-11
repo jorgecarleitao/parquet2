@@ -15,8 +15,7 @@ mod serde_types {
     };
     pub use serde::de::Error as DeserializeError;
     pub use serde::ser::Error as SerializeError;
-    pub use serde::{Deserialize, Deserializer, Serializer};
-    pub use serde::{Deserialize, Serialize};
+    pub use serde::{Deserialize, Deserializer, Serialize, Serializer};
     pub use std::io::Cursor;
 }
 #[cfg(feature = "serde_types")]
