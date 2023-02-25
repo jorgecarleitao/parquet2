@@ -21,8 +21,6 @@ pub use file::{write_metadata_sidecar, FileWriter};
 
 pub use row_group::ColumnOffsetsMetadata;
 
-use crate::page::CompressedPage;
-
 pub type RowGroupIter<'a, E> = DynIter<'a, std::result::Result<row_group::PageIter<'a, E>, E>>;
 
 /// Write options of different interfaces on this crate

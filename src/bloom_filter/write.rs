@@ -7,7 +7,7 @@ use parquet_format_safe::{
 
 use crate::error::Error;
 
-pub fn write_to_protocol<W: Write>(
+pub(crate) fn write_to_protocol<W: Write>(
     protocol: &mut TCompactOutputProtocol<W>,
     num_bytes: i32,
 ) -> Result<usize, Error> {

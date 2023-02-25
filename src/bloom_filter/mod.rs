@@ -7,7 +7,7 @@ mod write;
 pub use hash::{hash_byte, hash_native};
 pub use read::read;
 pub use split_block::{insert, is_in_set};
-pub use write::write_to_protocol;
+pub(crate) use write::write_to_protocol;
 
 #[cfg(test)]
 mod tests {

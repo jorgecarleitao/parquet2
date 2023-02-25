@@ -26,11 +26,11 @@ use super::page::{write_page, PageWriteSpec};
 use super::statistics::reduce;
 use super::DynStreamingIterator;
 
-pub fn write_column_chunk<'a, W, E>(
+pub fn write_column_chunk<W, E>(
     writer: &mut W,
     mut offset: u64,
     descriptor: &ColumnDescriptor,
-    mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
+    mut compressed_pages: DynStreamingIterator<CompressedPage, E>,
     #[cfg(feature = "bloom_filter")] bloom_filter_bitset: Option<&[u8]>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
