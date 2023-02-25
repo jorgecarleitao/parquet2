@@ -31,6 +31,7 @@ pub fn write_column_chunk<'a, W, E>(
     mut offset: u64,
     descriptor: &ColumnDescriptor,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
+    #[cfg(feature = "bloom_filter")] bloom_filter_bitset: Option<&[u8]>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: Write,
@@ -42,16 +43,8 @@ where
     let initial = offset;
 
     let mut specs = vec![];
-    #[cfg(feature = "bloom_filter")]
-    let mut bloom_filter_bitset = Vec::new();
     while let Some(compressed_page) = compressed_pages.next()? {
-        let spec = write_page(
-            writer,
-            offset,
-            compressed_page,
-            #[cfg(feature = "bloom_filter")]
-            &mut bloom_filter_bitset,
-        )?;
+        let spec = write_page(writer, offset, compressed_page)?;
         offset += spec.bytes_written;
         specs.push(spec);
     }
@@ -63,7 +56,7 @@ where
     let mut protocol = TCompactOutputProtocol::new(&mut *writer);
 
     #[cfg(feature = "bloom_filter")]
-    {
+    if let Some(bloom_filter_bitset) = bloom_filter_bitset {
         column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
             Some(offset.try_into().unwrap());
         let written = crate::bloom_filter::write_to_protocol(
@@ -83,7 +76,7 @@ where
     std::mem::drop(protocol);
 
     #[cfg(feature = "bloom_filter")]
-    {
+    if let Some(bloom_filter_bitset) = bloom_filter_bitset {
         writer.write_all(&bloom_filter_bitset)?;
         bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
     }

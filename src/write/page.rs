@@ -55,7 +55,6 @@ pub fn write_page<W: Write>(
     writer: &mut W,
     offset: u64,
     compressed_page: &CompressedPage,
-    #[cfg(feature = "bloom_filter")] bloom_filter_bitset: &mut [u8],
 ) -> Result<PageWriteSpec> {
     let num_values = compressed_page.num_values();
     let selected_rows = compressed_page.selected_rows();

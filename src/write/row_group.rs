@@ -75,6 +75,14 @@ fn compute_num_rows(columns: &[(ColumnChunk, Vec<PageWriteSpec>)]) -> Result<i64
         .unwrap_or(Ok(0))
 }
 
+#[cfg(not(feature = "bloom_filter"))]
+pub type PageIter<'a, E> = DynStreamingIterator<'a, CompressedPage, E>;
+#[cfg(feature = "bloom_filter")]
+pub type PageIter<'a, E> = (
+    DynStreamingIterator<'a, CompressedPage, E>,
+    Option<&'a [u8]>,
+);
+
 pub fn write_row_group<
     'a,
     W,
@@ -83,7 +91,7 @@ pub fn write_row_group<
     writer: &mut W,
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
-    columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
+    columns: DynIter<'a, std::result::Result<PageIter<'a, E>, E>>,
     ordinal: usize,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
@@ -96,8 +104,14 @@ where
     let initial = offset;
     let columns = column_iter
         .map(|(descriptor, page_iter)| {
+            #[cfg(not(feature = "bloom_filter"))]
             let (column, page_specs, size) =
                 write_column_chunk(writer, offset, descriptor, page_iter?)?;
+            #[cfg(feature = "bloom_filter")]
+            let (column, page_specs, size) = {
+                let (page_iter, bloom_filter_bitset) = page_iter?;
+                write_column_chunk(writer, offset, descriptor, page_iter, bloom_filter_bitset)?
+            };
             offset += size;
             Ok((column, page_specs))
         })
