@@ -31,8 +31,6 @@ pub fn write_column_chunk<'a, W, E>(
     mut offset: u64,
     descriptor: &ColumnDescriptor,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
-    #[cfg(feature = "bloom_filter")]
-    bloom_filter_bitset: &[u8],
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: Write,
@@ -44,8 +42,16 @@ where
     let initial = offset;
 
     let mut specs = vec![];
+    #[cfg(feature = "bloom_filter")]
+    let mut bloom_filter_bitset = Vec::new();
     while let Some(compressed_page) = compressed_pages.next()? {
-        let spec = write_page(writer, offset, compressed_page)?;
+        let spec = write_page(
+            writer,
+            offset,
+            compressed_page,
+            #[cfg(feature = "bloom_filter")]
+            &mut bloom_filter_bitset,
+        )?;
         offset += spec.bytes_written;
         specs.push(spec);
     }
@@ -53,23 +59,34 @@ where
 
     let mut column_chunk = build_column_chunk(&specs, descriptor)?;
 
+    // write metadata
+    let mut protocol = TCompactOutputProtocol::new(&mut *writer);
+
     #[cfg(feature = "bloom_filter")]
     {
-        column_chunk.meta_data.bloom_filter_offset = offset;
-        writer.write_all(&bloom_filter_bitset)?;
+        column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
+            Some(offset.try_into().unwrap());
+        let written = crate::bloom_filter::write_to_protocol(
+            &mut protocol,
+            bloom_filter_bitset.len().try_into().unwrap(),
+        )?;
+
+        bytes_written += u64::try_from(written).unwrap();
     }
-
-    // write metadata
-    let mut protocol = TCompactOutputProtocol::new(writer);
-
-    #[cfg(feature = "bloom_filter")]
-    bloom_filter::write::write_to_protocol(&mut protocol)?;
 
     bytes_written += column_chunk
         .meta_data
         .as_ref()
         .unwrap()
         .write_to_out_protocol(&mut protocol)? as u64;
+
+    std::mem::drop(protocol);
+
+    #[cfg(feature = "bloom_filter")]
+    {
+        writer.write_all(&bloom_filter_bitset)?;
+        bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
+    }
 
     Ok((column_chunk, specs, bytes_written))
 }
@@ -101,6 +118,7 @@ where
 
     // write metadata
     let mut protocol = TCompactOutputStreamProtocol::new(writer);
+
     bytes_written += column_chunk
         .meta_data
         .as_ref()

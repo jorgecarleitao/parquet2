@@ -10,7 +10,7 @@ use crate::error::Error;
 pub fn write_to_protocol<W: Write>(
     protocol: &mut TCompactOutputProtocol<W>,
     num_bytes: i32,
-) -> Result<(), Error> {
+) -> Result<usize, Error> {
     let header = BloomFilterHeader {
         num_bytes,
         algorithm: BloomFilterAlgorithm::BLOCK(SplitBlockAlgorithm {}),
@@ -18,7 +18,7 @@ pub fn write_to_protocol<W: Write>(
         compression: BloomFilterCompression::UNCOMPRESSED(Uncompressed {}),
     };
 
-    header.write_to_out_protocol(protocol)?;
+    let written = header.write_to_out_protocol(protocol)?;
 
-    Ok(())
+    Ok(written)
 }
