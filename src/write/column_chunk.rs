@@ -31,6 +31,8 @@ pub fn write_column_chunk<'a, W, E>(
     mut offset: u64,
     descriptor: &ColumnDescriptor,
     mut compressed_pages: DynStreamingIterator<'a, CompressedPage, E>,
+    #[cfg(feature = "bloom_filter")]
+    bloom_filter_bitset: &[u8],
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: Write,
@@ -49,10 +51,20 @@ where
     }
     let mut bytes_written = offset - initial;
 
-    let column_chunk = build_column_chunk(&specs, descriptor)?;
+    let mut column_chunk = build_column_chunk(&specs, descriptor)?;
+
+    #[cfg(feature = "bloom_filter")]
+    {
+        column_chunk.meta_data.bloom_filter_offset = offset;
+        writer.write_all(&bloom_filter_bitset)?;
+    }
 
     // write metadata
     let mut protocol = TCompactOutputProtocol::new(writer);
+
+    #[cfg(feature = "bloom_filter")]
+    bloom_filter::write::write_to_protocol(&mut protocol)?;
+
     bytes_written += column_chunk
         .meta_data
         .as_ref()
