@@ -75,9 +75,6 @@ fn compute_num_rows(columns: &[(ColumnChunk, Vec<PageWriteSpec>)]) -> Result<i64
         .unwrap_or(Ok(0))
 }
 
-#[cfg(not(feature = "bloom_filter"))]
-pub type PageIter<'a, E> = DynStreamingIterator<'a, CompressedPage, E>;
-#[cfg(feature = "bloom_filter")]
 pub type PageIter<'a, E> = (
     DynStreamingIterator<'a, CompressedPage, E>,
     Option<&'a [u8]>,
@@ -104,10 +101,6 @@ where
     let initial = offset;
     let columns = column_iter
         .map(|(descriptor, page_iter)| {
-            #[cfg(not(feature = "bloom_filter"))]
-            let (column, page_specs, size) =
-                write_column_chunk(writer, offset, descriptor, page_iter?)?;
-            #[cfg(feature = "bloom_filter")]
             let (column, page_specs, size) = {
                 let (page_iter, bloom_filter_bitset) = page_iter?;
                 write_column_chunk(writer, offset, descriptor, page_iter, bloom_filter_bitset)?

@@ -45,7 +45,7 @@ fn write_file() -> Result<Vec<u8>> {
         CompressionOptions::Uncompressed,
         vec![],
     ));
-    let columns = std::iter::once(Ok(pages));
+    let columns = std::iter::once(Ok((pages, None)));
 
     let writer = Cursor::new(vec![]);
     let mut writer = FileWriter::new(writer, schema, options, None);

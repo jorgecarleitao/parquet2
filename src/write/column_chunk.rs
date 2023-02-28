@@ -31,7 +31,7 @@ pub fn write_column_chunk<W, E>(
     mut offset: u64,
     descriptor: &ColumnDescriptor,
     mut compressed_pages: DynStreamingIterator<CompressedPage, E>,
-    #[cfg(feature = "bloom_filter")] bloom_filter_bitset: Option<&[u8]>,
+    bloom_filter_bitset: Option<&[u8]>,
 ) -> Result<(ColumnChunk, Vec<PageWriteSpec>, u64)>
 where
     W: Write,
@@ -55,16 +55,24 @@ where
     // write metadata
     let mut protocol = TCompactOutputProtocol::new(&mut *writer);
 
-    #[cfg(feature = "bloom_filter")]
     if let Some(bloom_filter_bitset) = bloom_filter_bitset {
-        column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
-            Some(offset.try_into().unwrap());
-        let written = crate::bloom_filter::write_to_protocol(
-            &mut protocol,
-            bloom_filter_bitset.len().try_into().unwrap(),
-        )?;
+        #[cfg(not(feature = "bloom_filter"))]
+        return Err(Error::FeatureNotActive(
+            crate::error::Feature::BloomFilter,
+            "write bloom filters".to_string(),
+        ));
 
-        bytes_written += u64::try_from(written).unwrap();
+        #[cfg(feature = "bloom_filter")]
+        {
+            column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
+                Some(offset.try_into().unwrap());
+            let written = crate::bloom_filter::write_to_protocol(
+                &mut protocol,
+                bloom_filter_bitset.len().try_into().unwrap(),
+            )?;
+
+            bytes_written += u64::try_from(written).unwrap();
+        }
     }
 
     bytes_written += column_chunk
@@ -75,10 +83,18 @@ where
 
     std::mem::drop(protocol);
 
-    #[cfg(feature = "bloom_filter")]
     if let Some(bloom_filter_bitset) = bloom_filter_bitset {
-        writer.write_all(&bloom_filter_bitset)?;
-        bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
+        #[cfg(not(feature = "bloom_filter"))]
+        return Err(Error::FeatureNotActive(
+            crate::error::Feature::BloomFilter,
+            "write bloom filters".to_string(),
+        ));
+
+        #[cfg(feature = "bloom_filter")]
+        {
+            writer.write_all(&bloom_filter_bitset)?;
+            bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
+        }
     }
 
     Ok((column_chunk, specs, bytes_written))
