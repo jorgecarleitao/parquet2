@@ -163,7 +163,7 @@ fn reduce_primitive<
         acc.max_value = reduce_single(
             acc.max_value,
             new.max_value,
-            |x, y| if x < y { x } else { y },
+            |x, y| if x > y { x } else { y },
         );
         acc.null_count = reduce_single(acc.null_count, new.null_count, |x, y| x + y);
         acc.distinct_count = None;
@@ -291,6 +291,37 @@ mod tests {
             },
         );
 
+        Ok(())
+    }
+    
+    #[test]
+    fn primitive() -> Result<()> {
+        let iter = vec![
+            PrimitiveStatistics {
+                null_count: Some(1),
+                distinct_count: None,
+                min_value: Some(10),
+                max_value: Some(50),
+            },
+            PrimitiveStatistics {
+                null_count: Some(2),
+                distinct_count: None,
+                min_value: Some(30),
+                max_value: Some(70),
+            },
+        ];
+        let a = reduce_primitive(iter.iter());
+        
+        assert_eq!(
+            a,
+            PrimitiveStatistics {
+                null_count: Some(3),
+                distinct_count: None,
+                min_value: Some(10),
+                max_value: Some(70),
+            },
+        );
+        
         Ok(())
     }
 }
