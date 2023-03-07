@@ -270,7 +270,7 @@ async fn test_column_async(column: &str, compression: CompressionOptions) -> Res
         compression,
         vec![],
     ));
-    let columns = std::iter::once(Ok(pages));
+    let columns = std::iter::once(Ok((pages, None)));
 
     let writer = futures::io::Cursor::new(vec![]);
     let mut writer = FileStreamer::new(writer, schema, options, None);

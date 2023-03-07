@@ -124,13 +124,8 @@ pub async fn write_page_async<W: AsyncWrite + Unpin + Send>(
         }
     };
 
-    let (statistics) = match &compressed_page {
-        CompressedPage::Data(compressed_page) => compressed_page
-            .statistics(
-                #[cfg(feature = "bloom_filter")]
-                bloom_filter_bitset,
-            )
-            .transpose()?,
+    let statistics = match &compressed_page {
+        CompressedPage::Data(compressed_page) => compressed_page.statistics().transpose()?,
         CompressedPage::Dict(_) => None,
     };
 

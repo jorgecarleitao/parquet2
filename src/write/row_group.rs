@@ -157,7 +157,7 @@ pub async fn write_row_group_async<
     writer: &mut W,
     mut offset: u64,
     descriptors: &[ColumnDescriptor],
-    columns: DynIter<'a, std::result::Result<DynStreamingIterator<'a, CompressedPage, E>, E>>,
+    columns: DynIter<'a, std::result::Result<PageIter<'a, E>, E>>,
     ordinal: usize,
 ) -> Result<(RowGroup, Vec<Vec<PageWriteSpec>>, u64)>
 where
@@ -170,8 +170,11 @@ where
     let initial = offset;
     let mut columns = vec![];
     for (descriptor, page_iter) in column_iter {
-        let (column, page_specs, size) =
-            write_column_chunk_async(writer, offset, descriptor, page_iter?).await?;
+        let (column, page_specs, size) = {
+            let (page_iter, bloom_filter_bitset) = page_iter?;
+            write_column_chunk_async(writer, offset, descriptor, page_iter, bloom_filter_bitset)
+                .await?
+        };
         offset += size;
         columns.push((column, page_specs));
     }

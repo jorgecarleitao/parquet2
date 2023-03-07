@@ -8,6 +8,8 @@ pub use hash::{hash_byte, hash_native};
 pub use read::read;
 pub use split_block::{insert, is_in_set};
 pub(crate) use write::write_to_protocol;
+#[cfg(feature = "async")]
+pub(crate) use write::write_to_stream_protocol;
 
 #[cfg(test)]
 mod tests {
