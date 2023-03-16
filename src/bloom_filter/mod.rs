@@ -6,6 +6,8 @@ mod write;
 
 pub use hash::{hash_byte, hash_native};
 pub use read::read;
+#[cfg(feature = "async")]
+pub use read::read_async;
 pub use split_block::{insert, is_in_set};
 pub(crate) use write::write_to_protocol;
 #[cfg(feature = "async")]

@@ -44,7 +44,7 @@ pub async fn read_columns_async<
     let fields = get_field_columns(columns, field_name).collect::<Vec<_>>();
     let futures = fields
         .iter()
-        .map(|meta| async { read_column_async(factory.clone(), meta).await });
+        .map(|meta| read_column_async(factory.clone(), meta));
 
     let columns = try_join_all(futures).await?;
     Ok(fields.into_iter().zip(columns).collect())

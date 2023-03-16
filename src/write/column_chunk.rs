@@ -52,9 +52,6 @@ where
 
     let mut column_chunk = build_column_chunk(&specs, descriptor)?;
 
-    // write metadata
-    let mut protocol = TCompactOutputProtocol::new(&mut *writer);
-
     if let Some(bloom_filter_bitset) = bloom_filter_bitset {
         #[cfg(not(feature = "bloom_filter"))]
         return Err(Error::FeatureNotActive(
@@ -64,38 +61,31 @@ where
 
         #[cfg(feature = "bloom_filter")]
         {
-            column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
-                Some(offset.try_into().unwrap());
-            let written = crate::bloom_filter::write_to_protocol(
-                &mut protocol,
-                bloom_filter_bitset.len().try_into().unwrap(),
-            )?;
+            {
+                let mut protocol = TCompactOutputProtocol::new(&mut *writer);
+                column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
+                    Some(offset.try_into().unwrap());
+                let written = crate::bloom_filter::write_to_protocol(
+                    &mut protocol,
+                    bloom_filter_bitset.len().try_into().unwrap(),
+                )?;
 
-            bytes_written += u64::try_from(written).unwrap();
+                bytes_written += u64::try_from(written).unwrap();
+            }
+
+            writer.write_all(&bloom_filter_bitset)?;
+            bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
         }
     }
+
+    // write metadata
+    let mut protocol = TCompactOutputProtocol::new(writer);
 
     bytes_written += column_chunk
         .meta_data
         .as_ref()
         .unwrap()
         .write_to_out_protocol(&mut protocol)? as u64;
-
-    std::mem::drop(protocol);
-
-    if let Some(bloom_filter_bitset) = bloom_filter_bitset {
-        #[cfg(not(feature = "bloom_filter"))]
-        return Err(Error::FeatureNotActive(
-            crate::error::Feature::BloomFilter,
-            "write bloom filters".to_string(),
-        ));
-
-        #[cfg(feature = "bloom_filter")]
-        {
-            writer.write_all(&bloom_filter_bitset)?;
-            bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
-        }
-    }
 
     Ok((column_chunk, specs, bytes_written))
 }
@@ -126,9 +116,6 @@ where
 
     let mut column_chunk = build_column_chunk(&specs, descriptor)?;
 
-    // write metadata
-    let mut protocol = TCompactOutputStreamProtocol::new(&mut *writer);
-
     if let Some(bloom_filter_bitset) = bloom_filter_bitset {
         #[cfg(not(feature = "bloom_filter"))]
         return Err(Error::FeatureNotActive(
@@ -138,17 +125,30 @@ where
 
         #[cfg(feature = "bloom_filter")]
         {
-            column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
-                Some(offset.try_into().unwrap());
-            let written = crate::bloom_filter::write_to_stream_protocol(
-                &mut protocol,
-                bloom_filter_bitset.len().try_into().unwrap(),
-            )
-            .await?;
+            {
+                let mut protocol = TCompactOutputStreamProtocol::new(&mut *writer);
 
-            bytes_written += u64::try_from(written).unwrap();
+                column_chunk.meta_data.as_mut().unwrap().bloom_filter_offset =
+                    Some(offset.try_into().unwrap());
+                let written = crate::bloom_filter::write_to_stream_protocol(
+                    &mut protocol,
+                    bloom_filter_bitset.len().try_into().unwrap(),
+                )
+                .await?;
+
+                bytes_written += u64::try_from(written).unwrap();
+            }
+
+            #[cfg(feature = "bloom_filter")]
+            {
+                writer.write_all(&bloom_filter_bitset).await?;
+                bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
+            }
         }
     }
+
+    // write metadata
+    let mut protocol = TCompactOutputStreamProtocol::new(writer);
 
     bytes_written += column_chunk
         .meta_data
@@ -156,22 +156,6 @@ where
         .unwrap()
         .write_to_out_stream_protocol(&mut protocol)
         .await? as u64;
-
-    std::mem::drop(protocol);
-
-    if let Some(bloom_filter_bitset) = bloom_filter_bitset {
-        #[cfg(not(feature = "bloom_filter"))]
-        return Err(Error::FeatureNotActive(
-            crate::error::Feature::BloomFilter,
-            "write bloom filters".to_string(),
-        ));
-
-        #[cfg(feature = "bloom_filter")]
-        {
-            writer.write_all(&bloom_filter_bitset).await?;
-            bytes_written += u64::try_from(bloom_filter_bitset.len()).unwrap();
-        }
-    }
 
     Ok((column_chunk, specs, bytes_written))
 }
