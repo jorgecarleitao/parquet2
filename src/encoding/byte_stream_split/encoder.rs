@@ -5,7 +5,7 @@ pub fn encode<T: NativeType>(data: &[T], buffer: &mut Vec<u8>) {
     let element_size = std::mem::size_of::<T>();
     let num_elements = data.len();
     let total_length = element_size * num_elements;
-    buffer.reserve(total_length);
+    buffer.resize(total_length, 0);
 
     for (i, v) in data.iter().enumerate() {
         let value_bytes = v.to_le_bytes();

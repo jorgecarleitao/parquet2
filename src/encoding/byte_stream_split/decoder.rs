@@ -15,16 +15,20 @@ pub struct Decoder<'a, T: NativeType> {
 }
 
 impl<'a, T: NativeType> Decoder<'a, T> {
-    pub fn new(values: &'a [u8]) -> Self {
+    pub fn try_new(values: &'a [u8]) -> Result<Self, Error> {
         let element_size = std::mem::size_of::<T>();
+        let values_size = values.len();
+        if values_size % element_size != 0 {
+            return Err(Error::oos("Value array is not a multiple of element size"));
+        }
         let num_elements = values.len() / element_size;
-        Self {
+        Ok(Self {
             values,
             num_elements,
             current: 0,
             element_size,
             element_type: PhantomData
-        }
+        })
     }
 }
 
