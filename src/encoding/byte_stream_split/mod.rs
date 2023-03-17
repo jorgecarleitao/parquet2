@@ -15,7 +15,7 @@ mod tests {
         let mut buffer = vec![];
         encode(&data, &mut buffer);
 
-        let mut decoder = Decoder::<f32>::try_new(&buffer).unwrap();
+        let mut decoder = Decoder::<f32>::try_new(&buffer)?;
         let values = decoder.by_ref().collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(data, values);
@@ -24,10 +24,12 @@ mod tests {
     }
 
     #[test]
-    fn from_pyarrow_page() -> Result<(), Error> {
-        let buffer = vec![0, 205, 0, 205, 0, 0, 204, 0, 204, 0, 128, 140, 0, 140, 128, 255, 191, 0, 63, 127];
+    fn pyarrow_integration() -> Result<(), Error> {
+        let buffer = vec![
+            0, 205, 0, 205, 0, 0, 204, 0, 204, 0, 128, 140, 0, 140, 128, 255, 191, 0, 63, 127
+        ];
 
-        let mut decoder = Decoder::<f32>::try_new(&buffer).unwrap();
+        let mut decoder = Decoder::<f32>::try_new(&buffer)?;
         let values = decoder.by_ref().collect::<Result<Vec<_>, _>>()?;
 
         assert_eq!(values, vec![-f32::INFINITY, -1.1, 0.0, 1.1, f32::INFINITY]);
