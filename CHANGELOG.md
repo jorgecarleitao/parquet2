@@ -1,5 +1,31 @@
 # Changelog
 
+## [v0.17.2](https://github.com/jorgecarleitao/parquet2/tree/v0.17.2) (2023-04-13)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.17.1...v0.17.2)
+
+**Fixed bugs:**
+
+- Fixed aggregation of max statistics for primitive fields [\#217](https://github.com/jorgecarleitao/parquet2/pull/217) ([tjwilson90](https://github.com/tjwilson90))
+- Fix reimport problem and clippy. [\#216](https://github.com/jorgecarleitao/parquet2/pull/216) ([RinChanNOWWW](https://github.com/RinChanNOWWW))
+- Bump minimum async-stream version to 0.3.3 [\#212](https://github.com/jorgecarleitao/parquet2/pull/212) ([garrisonhess](https://github.com/garrisonhess))
+- Fixed error in rle decoding [\#207](https://github.com/jorgecarleitao/parquet2/pull/207) ([ritchie46](https://github.com/ritchie46))
+
+**Enhancements:**
+
+- Update dependencies + a little cleanup [\#211](https://github.com/jorgecarleitao/parquet2/pull/211) ([aldanor](https://github.com/aldanor))
+- Make some struct de/serializable. [\#209](https://github.com/jorgecarleitao/parquet2/pull/209) ([RinChanNOWWW](https://github.com/RinChanNOWWW))
+- Removed unnecessary flushes while writing [\#206](https://github.com/jorgecarleitao/parquet2/pull/206) ([cyr](https://github.com/cyr))
+- Enbaled setting `selected_rows` in the runtime. [\#205](https://github.com/jorgecarleitao/parquet2/pull/205) ([RinChanNOWWW](https://github.com/RinChanNOWWW))
+
+## [v0.17.1](https://github.com/jorgecarleitao/parquet2/tree/v0.17.1) (2022-12-12)
+
+[Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.17.0...v0.17.1)
+
+**Fixed bugs:**
+
+- Fixed error in rle decoding [\#207](https://github.com/jorgecarleitao/parquet2/pull/207) ([ritchie46](https://github.com/ritchie46))
+
 ## [v0.17.0](https://github.com/jorgecarleitao/parquet2/tree/v0.17.0) (2022-11-30)
 
 [Full Changelog](https://github.com/jorgecarleitao/parquet2/compare/v0.16.2...v0.17.0)
