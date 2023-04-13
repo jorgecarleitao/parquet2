@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Version"],"fn":["compress","write_metadata_sidecar"],"struct":["ColumnOffsetsMetadata","Compressor","DynIter","DynStreamingIterator","FileStreamer","FileWriter","WriteOptions"],"type":["RowGroupIter"]};
