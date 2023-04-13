@@ -223,7 +223,7 @@ pub fn read_column<R: std::io::Read + std::io::Seek>(
         .schema()
         .fields()
         .iter()
-        .find_map(|field| (field.name() == field_name).then(|| field))
+        .find_map(|field| (field.name() == field_name).then_some(field))
         .ok_or_else(|| Error::OutOfSpec("column does not exist".to_string()))?;
 
     let columns = get_column_iterator(

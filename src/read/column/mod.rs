@@ -196,10 +196,7 @@ where
 
     let mut chunk = vec![];
     chunk.try_reserve(length as usize)?;
-    reader
-        .by_ref()
-        .take(length as u64)
-        .read_to_end(&mut chunk)?;
+    reader.by_ref().take(length).read_to_end(&mut chunk)?;
     Ok(chunk)
 }
 

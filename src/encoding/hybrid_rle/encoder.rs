@@ -16,7 +16,7 @@ pub fn encode_u32<W: Write, I: Iterator<Item = u32>>(
     let length = iterator.size_hint().1.unwrap();
 
     // write the length + indicator
-    let mut header = ceil8(length as usize) as u64;
+    let mut header = ceil8(length) as u64;
     header <<= 1;
     header |= 1; // it is bitpacked => first bit is set
     let mut container = [0; 10];
@@ -57,7 +57,7 @@ fn bitpacked_encode_u32<W: Write, I: Iterator<Item = u32>>(
     }
 
     if remainder != 0 {
-        let compressed_remainder_size = ceil8(remainder * num_bits as usize);
+        let compressed_remainder_size = ceil8(remainder * num_bits);
         iterator
             .by_ref()
             .take(remainder)

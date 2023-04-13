@@ -77,7 +77,7 @@ pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
 
         buffer.clear();
         buffer.try_reserve(footer_len as usize)?;
-        reader.take(footer_len as u64).read_to_end(&mut buffer)?;
+        reader.take(footer_len).read_to_end(&mut buffer)?;
 
         &buffer
     };

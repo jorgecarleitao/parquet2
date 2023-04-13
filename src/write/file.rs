@@ -124,7 +124,7 @@ impl<W: Write> FileWriter<W> {
     /// Returns an error if data has been written to the file.
     fn start(&mut self) -> Result<()> {
         if self.offset == 0 {
-            self.offset = start_file(&mut self.writer)? as u64;
+            self.offset = start_file(&mut self.writer)?;
             self.state = State::Started;
             Ok(())
         } else {

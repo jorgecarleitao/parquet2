@@ -65,7 +65,7 @@ pub fn write_page<W: Write>(
     }?;
 
     let header_size = write_page_header(writer, &header)?;
-    let mut bytes_written = header_size as u64;
+    let mut bytes_written = header_size;
 
     bytes_written += match &compressed_page {
         CompressedPage::Data(compressed_page) => {

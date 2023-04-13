@@ -355,7 +355,7 @@ pub fn pyarrow_required(column: &str) -> Array {
         ),
         "bool" => Array::Boolean(bool_values.iter().map(|b| Some(*b)).collect()),
         "date" => Array::Int64(i64_values.iter().map(|i| Some(*i as i64)).collect()),
-        "uint32" => Array::Int32(i64_values.iter().map(|i| Some(*i as i32)).collect()),
+        "uint32" => Array::Int32(i64_values.iter().map(|i| Some(*i)).collect()),
         "fixed_binary" => Array::FixedLenBinary(
             binary_values
                 .iter()

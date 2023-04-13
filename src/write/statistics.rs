@@ -293,35 +293,32 @@ mod tests {
 
         Ok(())
     }
-    
+
     #[test]
     fn primitive() -> Result<()> {
-        let iter = vec![
-            PrimitiveStatistics {
-                null_count: Some(1),
-                distinct_count: None,
-                min_value: Some(10),
-                max_value: Some(50),
-            },
+        let iter = vec![PrimitiveStatistics {
+            null_count: Some(2),
+            distinct_count: None,
+            min_value: Some(30),
+            max_value: Some(70),
+            primitive_type: PrimitiveType::from_physical("bla".to_string(), PhysicalType::Int32),
+        }];
+        let a = reduce_primitive(iter.iter());
+
+        assert_eq!(
+            a,
             PrimitiveStatistics {
                 null_count: Some(2),
                 distinct_count: None,
                 min_value: Some(30),
                 max_value: Some(70),
-            },
-        ];
-        let a = reduce_primitive(iter.iter());
-        
-        assert_eq!(
-            a,
-            PrimitiveStatistics {
-                null_count: Some(3),
-                distinct_count: None,
-                min_value: Some(10),
-                max_value: Some(70),
+                primitive_type: PrimitiveType::from_physical(
+                    "bla".to_string(),
+                    PhysicalType::Int32,
+                ),
             },
         );
-        
+
         Ok(())
     }
 }
