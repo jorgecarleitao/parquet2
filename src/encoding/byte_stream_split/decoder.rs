@@ -8,6 +8,7 @@ use crate::types::NativeType;
 #[derive(Debug)]
 pub struct Decoder<'a, T: NativeType> {
     values: &'a [u8],
+    buffer: Vec<u8>,
     num_elements: usize,
     current: usize,
     element_size: usize,
@@ -24,6 +25,7 @@ impl<'a, T: NativeType> Decoder<'a, T> {
         let num_elements = values.len() / element_size;
         Ok(Self {
             values,
+            buffer: vec![0_u8; element_size],
             num_elements,
             current: 0,
             element_size,
@@ -41,13 +43,11 @@ impl<'a, T: NativeType> Iterator for Decoder<'a, T> {
             return None
         }
 
-        let mut buffer = vec![0_u8; self.element_size];
-
         for n in 0..self.element_size {
-            buffer[n] = self.values[(self.num_elements * n) + self.current]
+            self.buffer[n] = self.values[(self.num_elements * n) + self.current]
         }
 
-        let value = T::from_le_bytes(buffer.as_slice().try_into().unwrap());
+        let value = T::from_le_bytes(self.buffer.as_slice().try_into().unwrap());
 
         self.current += 1;
 
