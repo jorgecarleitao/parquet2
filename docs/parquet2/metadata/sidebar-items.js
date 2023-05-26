@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ColumnOrder","SortOrder"],"fn":["get_sort_order"],"struct":["ColumnChunkMetaData","ColumnDescriptor","Descriptor","FileMetaData","KeyValue","RowGroupMetaData","SchemaDescriptor","ThriftFileMetaData"]};

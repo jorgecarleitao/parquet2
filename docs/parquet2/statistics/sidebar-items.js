@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["deserialize_statistics","serialize_statistics"],"struct":["BinaryStatistics","BooleanStatistics","FixedLenStatistics","ParquetStatistics","PrimitiveStatistics"],"trait":["Statistics"]};

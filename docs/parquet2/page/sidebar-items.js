@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CompressedPage","DataPageHeader","Page","PageType"],"fn":["split_buffer","split_buffer_v1","split_buffer_v2"],"struct":["CompressedDataPage","CompressedDictPage","DataPage","DataPageHeaderV1","DataPageHeaderV2","DictPage","ParquetPageHeader"],"trait":["DataPageHeaderExt"]};
