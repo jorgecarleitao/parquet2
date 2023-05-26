@@ -35,6 +35,11 @@ fn stream_len(seek: &mut impl Seek) -> std::result::Result<u64, std::io::Error> 
 pub fn read_metadata<R: Read + Seek>(reader: &mut R) -> Result<FileMetaData> {
     // check file is large enough to hold footer
     let file_size = stream_len(reader)?;
+    read_metadata_with_size(reader, file_size)
+}
+
+/// Reads a [`FileMetaData`] from the reader, located at the end of the file, with known file size.
+pub fn read_metadata_with_size<R: Read + Seek>(reader: &mut R, file_size: u64) -> Result<FileMetaData> {
     if file_size < HEADER_SIZE + FOOTER_SIZE {
         return Err(Error::oos(
             "A parquet file must containt a header and footer with at least 12 bytes",
