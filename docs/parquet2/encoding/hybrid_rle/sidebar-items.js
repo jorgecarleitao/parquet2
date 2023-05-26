@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["HybridEncoded"],"fn":["bitpacked_encode","encode_bool","encode_u32"],"struct":["BitmapIter","Decoder","HybridRleDecoder"]};
