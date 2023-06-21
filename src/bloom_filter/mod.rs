@@ -5,7 +5,7 @@ mod split_block;
 
 pub use hash::{hash_byte, hash_native};
 pub use read::read;
-pub use split_block::{insert, is_in_set};
+pub use split_block::SbbfFilter;
 
 #[cfg(test)]
 mod tests {
@@ -13,12 +13,12 @@ mod tests {
 
     #[test]
     fn basics() {
-        let mut bitset = vec![0; 32];
+        let mut filter = SbbfFilter::new(16, 16);
 
         // insert
         for a in 0..10i64 {
             let hash = hash_native(a);
-            insert(&mut bitset, hash);
+            filter.insert_hash(hash);
         }
 
         // bloom filter produced by parquet-mr/spark for a column of i64 (0..=10)
@@ -38,13 +38,13 @@ mod tests {
             24, 130, 24, 8, 134, 8, 68, 6, 2, 101, 128, 10, 64, 2, 38, 78, 114, 1, 64, 38, 1, 192,
             194, 152, 64, 70, 0, 36, 56, 121, 64, 0,
         ];
-        assert_eq!(bitset, expected);
+        assert_eq!(filter.as_bytes(), expected);
 
         // check
         for a in 0..11i64 {
             let hash = hash_native(a);
 
-            let valid = is_in_set(&bitset, hash);
+            let valid = filter.contains_hash(hash);
 
             assert_eq!(a < 10, valid);
         }
@@ -52,13 +52,13 @@ mod tests {
 
     #[test]
     fn binary() {
-        let mut bitset = vec![0; 32];
+        let mut filter = SbbfFilter::new(16, 16);
 
         // insert
         for a in 0..10i64 {
             let value = format!("a{}", a);
             let hash = hash_byte(value);
-            insert(&mut bitset, hash);
+            filter.insert_hash(hash);
         }
 
         // bloom filter produced by parquet-mr/spark for a column of i64 f"a{i}" for i in 0..10
@@ -66,6 +66,6 @@ mod tests {
             200, 1, 80, 20, 64, 68, 8, 109, 6, 37, 4, 67, 144, 80, 96, 32, 8, 132, 43, 33, 0, 5,
             99, 65, 2, 0, 224, 44, 64, 78, 96, 4,
         ];
-        assert_eq!(bitset, expected);
+        assert_eq!(filter.as_bytes(), expected);
     }
 }
