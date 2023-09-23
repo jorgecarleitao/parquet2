@@ -57,7 +57,11 @@ pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn S
         PhysicalType::Int64 => {
             let stats = stats.iter().map(|x| x.as_any().downcast_ref().unwrap());
             Some(Arc::new(reduce_primitive::<i64, _>(stats)))
-        }
+        },
+        PhysicalType::Int96 => {
+            let stats = stats.iter().map(|x| x.as_any().downcast_ref().unwrap());
+            Some(Arc::new(reduce_primitive::<[u32; 3], _>(stats)))
+        },
         PhysicalType::Float => {
             let stats = stats.iter().map(|x| x.as_any().downcast_ref().unwrap());
             Some(Arc::new(reduce_primitive::<f32, _>(stats)))
@@ -74,7 +78,6 @@ pub fn reduce(stats: &[&Option<Arc<dyn Statistics>>]) -> Result<Option<Arc<dyn S
             let stats = stats.iter().map(|x| x.as_any().downcast_ref().unwrap());
             Some(Arc::new(reduce_fix_len_binary(stats)))
         }
-        _ => todo!(),
     })
 }
 
