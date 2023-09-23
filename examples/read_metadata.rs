@@ -1,40 +1,69 @@
 use parquet2::bloom_filter;
-use parquet2::error::Result;
+use parquet2::error::Error;
 
 // ANCHOR: deserialize
-use parquet2::encoding::Encoding;
-use parquet2::page::{split_buffer, DataPage, DictPage, Page};
+use parquet2::deserialize::{FullDecoder, NativeDecoder, NativeValuesDecoder};
+use parquet2::page::{DataPage, DictPage, Page};
 use parquet2::schema::types::PhysicalType;
+use parquet2::types::decode;
 
-fn deserialize(page: &DataPage, dict: Option<&DictPage>) -> Result<()> {
-    // split the data buffer in repetition levels, definition levels and values
-    let (_rep_levels, _def_levels, _values_buffer) = split_buffer(page)?;
+enum Dict {
+    I32(Vec<i32>),
+    _I64(Vec<i64>),
+}
 
-    // decode and deserialize.
-    match (
-        page.descriptor.primitive_type.physical_type,
-        page.encoding(),
-        dict,
-    ) {
-        (
-            PhysicalType::Int32,
-            Encoding::PlainDictionary | Encoding::RleDictionary,
-            Some(_dict_page),
-        ) => {
-            // plain encoded page with a dictionary
-            // _dict_page can be downcasted based on the descriptor's physical type
-            todo!()
-        }
-        (PhysicalType::Int32, Encoding::Plain, None) => {
-            // plain encoded page
-            todo!()
-        }
+fn deserialize_dict_i32(page: &DictPage) -> Vec<i32> {
+    page.buffer
+        .chunks_exact(std::mem::size_of::<i32>())
+        .map(decode::<i32>)
+        .collect()
+}
+
+fn deserialize_dict(page: &DictPage, physical_type: PhysicalType) -> Result<Dict, Error> {
+    match physical_type {
+        PhysicalType::Int32 => Ok(Dict::I32(deserialize_dict_i32(page))),
         _ => todo!(),
+    }
+}
+
+/// Deserializes the [`DataPage`] and optional [`Dict`] into `Vec<Option<i32>>` by handling
+/// single
+fn deserialize(page: &DataPage, dict: Option<&Dict>) -> Result<Vec<Option<i32>>, Error> {
+    match page.descriptor.primitive_type.physical_type {
+        PhysicalType::Int32 => {
+            let dict = dict.map(|dict| {
+                if let Dict::I32(dict) = dict {
+                    dict
+                } else {
+                    unreachable!()
+                }
+            });
+            let values = NativeValuesDecoder::<i32, Vec<i32>>::try_new(page, dict)?;
+            let decoder = FullDecoder::try_new(page, values)?;
+            let decoder = NativeDecoder::try_new(page, decoder)?;
+            // decoder is an enum comprising the different cases:
+            match decoder {
+                NativeDecoder::Full(values) => match values {
+                    FullDecoder::Optional(_, _) => todo!("optional pages"),
+                    FullDecoder::Required(values) => match values {
+                        NativeValuesDecoder::Plain(values) => Ok(values.map(Some).collect()),
+                        NativeValuesDecoder::Dictionary(dict) => dict
+                            .indexes
+                            .map(|x| x.map(|x| Some(dict.dict[x as usize])))
+                            .collect(),
+                    },
+                    FullDecoder::Levels(_, _, _) => todo!("nested pages"),
+                },
+                NativeDecoder::Filtered(_) => todo!("Filtered page"),
+            }
+        }
+        PhysicalType::Int64 => todo!("int64"),
+        _ => todo!("Other physical types"),
     }
 }
 // ANCHOR_END: deserialize
 
-fn main() -> Result<()> {
+fn main() -> Result<(), Error> {
     // ANCHOR: metadata
     use std::env;
     let args: Vec<String> = env::args().collect();
@@ -119,6 +148,11 @@ fn main() -> Result<()> {
     // ANCHOR: pages
     use parquet2::read::get_page_iterator;
     let pages = get_page_iterator(column_metadata, &mut reader, None, vec![], 1024 * 1024)?;
+    let type_ = column_metadata
+        .descriptor()
+        .descriptor
+        .primitive_type
+        .physical_type;
     // ANCHOR_END: pages
 
     // ANCHOR: decompress
@@ -131,10 +165,7 @@ fn main() -> Result<()> {
         match page {
             Page::Dict(page) => {
                 // the first page may be a dictionary page, which needs to be deserialized
-                // depending on your target in-memory format, you may want to deserialize
-                // the values differently...
-                // let page = deserialize_dict(&page)?;
-                dict = Some(page);
+                dict = Some(deserialize_dict(&page, type_)?);
             }
             Page::Data(page) => {
                 let _array = deserialize(&page, dict.as_ref())?;

@@ -1,35 +1,7 @@
 use parquet2::error::{Error, Result};
 use parquet2::types::{decode, NativeType};
 
-#[derive(Debug)]
-pub struct PrimitivePageDict<T: NativeType> {
-    values: Vec<T>,
-}
-
-impl<T: NativeType> PrimitivePageDict<T> {
-    pub fn new(values: Vec<T>) -> Self {
-        Self { values }
-    }
-
-    pub fn values(&self) -> &[T] {
-        &self.values
-    }
-
-    #[inline]
-    pub fn value(&self, index: usize) -> Result<&T> {
-        self.values.get(index).ok_or_else(|| {
-            Error::OutOfSpec(
-                "The data page has an index larger than the dictionary page values".to_string(),
-            )
-        })
-    }
-}
-
-pub fn read<T: NativeType>(
-    buf: &[u8],
-    num_values: usize,
-    _is_sorted: bool,
-) -> Result<PrimitivePageDict<T>> {
+pub fn read<T: NativeType>(buf: &[u8], num_values: usize, _is_sorted: bool) -> Result<Vec<T>> {
     let size_of = std::mem::size_of::<T>();
 
     let typed_size = num_values.wrapping_mul(size_of);
@@ -43,5 +15,5 @@ pub fn read<T: NativeType>(
 
     let values = values.chunks_exact(size_of).map(decode::<T>).collect();
 
-    Ok(PrimitivePageDict::new(values))
+    Ok(values)
 }

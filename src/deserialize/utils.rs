@@ -8,7 +8,10 @@ use crate::{
     read::levels::get_bit_width,
 };
 
-use super::hybrid_rle::{HybridDecoderBitmapIter, HybridRleIter};
+use super::{
+    hybrid_rle::{HybridDecoderBitmapIter, HybridRleIter},
+    FilteredHybridEncoded, FilteredHybridRleDecoderIter, HybridEncoded,
+};
 
 pub(super) fn dict_indices_decoder(page: &DataPage) -> Result<hybrid_rle::HybridRleDecoder, Error> {
     let (_, _, indices_buffer) = split_buffer(page)?;
@@ -144,6 +147,191 @@ impl<T, I: Iterator<Item = T>> Iterator for SliceFilteredIter<I> {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         (self.total_length, Some(self.total_length))
+    }
+}
+
+pub fn get_selected_rows(page: &DataPage) -> VecDeque<Interval> {
+    page.selected_rows()
+        .unwrap_or(&[Interval::new(0, page.num_values())])
+        .iter()
+        .copied()
+        .collect()
+}
+
+#[derive(Debug, Clone)]
+pub struct OptionalPageValidity<'a> {
+    pub(super) iter: HybridDecoderBitmapIter<'a>,
+    current: Option<(HybridEncoded<'a>, usize)>,
+}
+
+impl<'a> OptionalPageValidity<'a> {
+    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
+        let (_, validity, _) = split_buffer(page)?;
+
+        let iter = hybrid_rle::Decoder::new(validity, 1);
+        let iter = HybridDecoderBitmapIter::new(iter, page.num_values());
+        Ok(Self {
+            iter,
+            current: None,
+        })
+    }
+
+    /// Number of items remaining
+    pub fn len(&self) -> usize {
+        self.iter.len()
+            + self
+                .current
+                .as_ref()
+                .map(|(run, offset)| run.len() - offset)
+                .unwrap_or_default()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn next_limited(&mut self, limit: usize) -> Option<FilteredHybridEncoded<'a>> {
+        let (run, offset) = if let Some((run, offset)) = self.current {
+            (run, offset)
+        } else {
+            // a new run
+            let run = self.iter.next()?.unwrap(); // no run -> None
+            self.current = Some((run, 0));
+            return self.next_limited(limit);
+        };
+
+        match run {
+            HybridEncoded::Bitmap(values, length) => {
+                let run_length = length - offset;
+
+                let length = limit.min(run_length);
+
+                if length == run_length {
+                    self.current = None;
+                } else {
+                    self.current = Some((run, offset + length));
+                }
+
+                Some(FilteredHybridEncoded::Bitmap {
+                    values,
+                    offset,
+                    length,
+                })
+            }
+            HybridEncoded::Repeated(is_set, run_length) => {
+                let run_length = run_length - offset;
+
+                let length = limit.min(run_length);
+
+                if length == run_length {
+                    self.current = None;
+                } else {
+                    self.current = Some((run, offset + length));
+                }
+
+                Some(FilteredHybridEncoded::Repeated { is_set, length })
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct FilteredOptionalPageValidity<'a> {
+    pub iter: FilteredHybridRleDecoderIter<'a>,
+    pub current: Option<(FilteredHybridEncoded<'a>, usize)>,
+}
+
+impl<'a> FilteredOptionalPageValidity<'a> {
+    pub fn new(iter: FilteredHybridRleDecoderIter<'a>) -> Self {
+        Self {
+            iter,
+            current: None,
+        }
+    }
+
+    pub fn try_new(page: &'a DataPage) -> Result<Self, Error> {
+        let (_, validity, _) = split_buffer(page)?;
+
+        let iter = hybrid_rle::Decoder::new(validity, 1);
+        let iter = HybridDecoderBitmapIter::new(iter, page.num_values());
+        let selected_rows = get_selected_rows(page);
+        let iter = FilteredHybridRleDecoderIter::new(iter, selected_rows);
+
+        Ok(Self {
+            iter,
+            current: None,
+        })
+    }
+
+    /// Returns the number of items (not runs)
+    pub fn len(&self) -> usize {
+        self.iter.len()
+    }
+
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn next_limited(
+        &mut self,
+        limit: usize,
+    ) -> Option<Result<FilteredHybridEncoded<'a>, Error>> {
+        let (run, own_offset) = if let Some((run, offset)) = self.current {
+            (run, offset)
+        } else {
+            // a new run
+            let run = self.iter.next()?; // no run -> None
+            match run {
+                Ok(run) => {
+                    self.current = Some((run, 0));
+                    return self.next_limited(limit);
+                }
+                Err(e) => return Some(Err(e)),
+            }
+        };
+
+        match run {
+            FilteredHybridEncoded::Bitmap {
+                values,
+                offset,
+                length,
+            } => {
+                let run_length = length - own_offset;
+
+                let length = limit.min(run_length);
+
+                if length == run_length {
+                    self.current = None;
+                } else {
+                    self.current = Some((run, own_offset + length));
+                }
+
+                Some(Ok(FilteredHybridEncoded::Bitmap {
+                    values,
+                    offset,
+                    length,
+                }))
+            }
+            FilteredHybridEncoded::Repeated { is_set, length } => {
+                let run_length = length - own_offset;
+
+                let length = limit.min(run_length);
+
+                if length == run_length {
+                    self.current = None;
+                } else {
+                    self.current = Some((run, own_offset + length));
+                }
+
+                Some(Ok(FilteredHybridEncoded::Repeated { is_set, length }))
+            }
+            FilteredHybridEncoded::Skipped(set) => {
+                self.current = None;
+                Some(Ok(FilteredHybridEncoded::Skipped(set)))
+            }
+        }
     }
 }
 

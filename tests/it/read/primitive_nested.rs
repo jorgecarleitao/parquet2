@@ -1,6 +1,6 @@
 use std::convert::TryInto;
 
-use super::{dictionary::PrimitivePageDict, Array};
+use super::Array;
 
 use parquet2::{
     encoding::{bitpacked, hybrid_rle::HybridRleDecoder, uleb128, Encoding},
@@ -146,7 +146,7 @@ fn read_array<T: NativeType>(
 
 pub fn page_to_array<T: NativeType>(
     page: &DataPage,
-    dict: Option<&PrimitivePageDict<T>>,
+    dict: Option<&Vec<T>>,
 ) -> Result<Array, Error> {
     let (rep_levels, def_levels, values) = split_buffer(page)?;
 
@@ -174,12 +174,10 @@ fn read_dict_array<T: NativeType>(
     def_levels: &[u8],
     values: &[u8],
     length: u32,
-    dict: &PrimitivePageDict<i64>,
+    dict: &[i64],
     rep_level_encoding: (&Encoding, i16),
     def_level_encoding: (&Encoding, i16),
 ) -> Result<Array, Error> {
-    let dict_values = dict.values();
-
     let bit_width = values[0];
     let values = &values[1..];
 
@@ -188,7 +186,7 @@ fn read_dict_array<T: NativeType>(
 
     let indices = bitpacked::Decoder::<u32>::try_new(values, bit_width as usize, length as usize)?;
 
-    let values = indices.map(|id| dict_values[id as usize]);
+    let values = indices.map(|id| dict[id as usize]);
 
     read_array_impl::<T, _>(
         rep_levels,
@@ -202,7 +200,7 @@ fn read_dict_array<T: NativeType>(
 
 pub fn page_dict_to_array<T: NativeType>(
     page: &DataPage,
-    dict: Option<&PrimitivePageDict<i64>>,
+    dict: Option<&Vec<i64>>,
 ) -> Result<Array, Error> {
     assert_eq!(page.descriptor.max_rep_level, 1);
 
