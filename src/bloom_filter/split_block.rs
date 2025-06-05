@@ -73,10 +73,9 @@ pub fn insert(bitset: &mut [u8], hash: u64) {
     let slice = &bitset[block_index * 32..(block_index + 1) * 32];
     let mut block_mask = load_block(slice);
 
-    for i in 0..8 {
-        block_mask[i] |= mask[i];
-
-        let mut_slice = &mut bitset[block_index * 32..(block_index + 1) * 32];
-        unload_block(block_mask, mut_slice)
-    }
+    // elide the index check.
+    block_mask.iter_mut().zip(mask.iter()).for_each(|(a, b)| *a |= *b);
+    
+    let mut_slice = &mut bitset[block_index * 32..(block_index + 1) * 32];
+    unload_block(block_mask, mut_slice)
 }

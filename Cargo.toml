@@ -51,10 +51,3 @@ gzip_zlib_ng = ["flate2/zlib-ng"]
 bloom_filter = ["xxhash-rust"]
 serde_types = ["serde"]
 
-[[bench]]
-name = "decode_bitpacking"
-harness = false
-
-[[bench]]
-name = "decode_rle"
-harness = false
